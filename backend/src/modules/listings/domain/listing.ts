@@ -36,4 +36,8 @@ export interface Listing {
 export interface ListingFilters {
   status?: ListingStatus;
   q?: string;
+  minLatitude?: number;
+  maxLatitude?: number;
+  minLongitude?: number;
+  maxLongitude?: number;
 }

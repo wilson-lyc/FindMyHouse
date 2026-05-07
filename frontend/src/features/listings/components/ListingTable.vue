@@ -12,15 +12,23 @@ defineProps<{
 const emit = defineEmits<{
   edit: [listing: Listing];
   delete: [listing: Listing];
+  select: [listing: Listing];
 }>();
 </script>
 
 <template>
-  <el-table v-loading="loading" :data="listings" class="listings-table" empty-text="还没有房源，先新增一套看看">
+  <el-table
+    v-loading="loading"
+    :data="listings"
+    class="listings-table"
+    empty-text="还没有房源，先新增一套看看"
+    @row-click="emit('select', $event)"
+  >
     <el-table-column prop="title" label="房源" min-width="220">
       <template #default="{ row }">
         <div class="listing-title">{{ row.title }}</div>
         <div class="muted">{{ row.address }}</div>
+        <div v-if="row.latitude && row.longitude" class="muted">{{ row.longitude.toFixed(6) }}, {{ row.latitude.toFixed(6) }}</div>
       </template>
     </el-table-column>
     <el-table-column label="月租" width="130">

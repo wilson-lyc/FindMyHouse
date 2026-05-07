@@ -3,6 +3,8 @@ import Fastify from 'fastify';
 import { registerErrorHandler } from './error-handler.js';
 import { registerHealthRoutes } from '../routes/health.routes.js';
 import { registerListingRoutes } from '../modules/listings/listing.routes.js';
+import { registerLocationRoutes } from '../modules/locations/location.routes.js';
+import { registerMapRoutes } from '../modules/maps/map.routes.js';
 
 export async function createApp() {
   const app = Fastify({
@@ -17,6 +19,8 @@ export async function createApp() {
 
   await registerHealthRoutes(app);
   await registerListingRoutes(app);
+  await registerLocationRoutes(app);
+  await registerMapRoutes(app);
 
   return app;
 }

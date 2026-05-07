@@ -38,4 +38,8 @@ export type ListingForm = Omit<Listing, 'id' | 'createdAt' | 'updatedAt'>;
 export interface ListingFilters {
   q: string;
   status: ListingStatus | '';
+  minLatitude?: number;
+  maxLatitude?: number;
+  minLongitude?: number;
+  maxLongitude?: number;
 }

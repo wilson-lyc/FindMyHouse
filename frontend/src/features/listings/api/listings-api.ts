@@ -5,6 +5,10 @@ export async function fetchListings(filters: ListingFilters) {
   const params = new URLSearchParams();
   if (filters.q) params.set('q', filters.q);
   if (filters.status) params.set('status', filters.status);
+  if (filters.minLatitude !== undefined) params.set('minLatitude', String(filters.minLatitude));
+  if (filters.maxLatitude !== undefined) params.set('maxLatitude', String(filters.maxLatitude));
+  if (filters.minLongitude !== undefined) params.set('minLongitude', String(filters.minLongitude));
+  if (filters.maxLongitude !== undefined) params.set('maxLongitude', String(filters.maxLongitude));
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return getData<Listing[]>(`/api/listings${suffix}`);

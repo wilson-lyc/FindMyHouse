@@ -37,7 +37,11 @@ export const updateListingSchema = createListingSchema.partial();
 
 export const listListingsQuerySchema = z.object({
   status: z.enum(listingStatuses).optional(),
-  q: z.string().trim().optional()
+  q: z.string().trim().optional(),
+  minLatitude: z.coerce.number().finite().optional(),
+  maxLatitude: z.coerce.number().finite().optional(),
+  minLongitude: z.coerce.number().finite().optional(),
+  maxLongitude: z.coerce.number().finite().optional()
 });
 
 export const idParamsSchema = z.object({

@@ -9,7 +9,7 @@ export class ListingRepository {
 
   list(filters: ListingFilters = {}): Listing[] {
     const where: string[] = [];
-    const params: Record<string, string> = {};
+    const params: Record<string, number | string> = {};
 
     if (filters.status) {
       where.push('status = @status');
@@ -19,6 +19,18 @@ export class ListingRepository {
     if (filters.q) {
       where.push('(title LIKE @q OR address LIKE @q OR notes LIKE @q)');
       params.q = `%${filters.q}%`;
+    }
+
+    if (filters.minLatitude !== undefined && filters.maxLatitude !== undefined) {
+      where.push('latitude BETWEEN @minLatitude AND @maxLatitude');
+      params.minLatitude = filters.minLatitude;
+      params.maxLatitude = filters.maxLatitude;
+    }
+
+    if (filters.minLongitude !== undefined && filters.maxLongitude !== undefined) {
+      where.push('longitude BETWEEN @minLongitude AND @maxLongitude');
+      params.minLongitude = filters.minLongitude;
+      params.maxLongitude = filters.maxLongitude;
     }
 
     const sql = `

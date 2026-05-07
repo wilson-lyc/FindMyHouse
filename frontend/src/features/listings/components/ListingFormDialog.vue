@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
+import { ElMessage } from 'element-plus';
+import { Aim } from '@element-plus/icons-vue';
+import { geocodeAddress } from '../../maps/api/maps-api';
 import { listingStatuses, type Listing, type ListingForm } from '../model/listing';
 import { statusLabels } from '../model/listing-status';
 import { createEmptyListingForm, listingToForm } from '../lib/listing-form';
@@ -17,6 +20,7 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<FormInstance>();
+const geocoding = ref(false);
 const form = reactive<ListingForm>(createEmptyListingForm());
 
 const rules: FormRules<ListingForm> = {
@@ -34,6 +38,26 @@ watch(
   },
   { immediate: true }
 );
+
+async function geocode() {
+  if (!form.address.trim()) {
+    ElMessage.warning('请先输入地址');
+    return;
+  }
+
+  geocoding.value = true;
+  try {
+    const result = await geocodeAddress(form.address);
+    form.address = result.formattedAddress || form.address;
+    form.latitude = result.latitude;
+    form.longitude = result.longitude;
+    ElMessage.success('已定位到高德坐标');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '定位失败');
+  } finally {
+    geocoding.value = false;
+  }
+}
 
 async function submitForm() {
   const valid = await formRef.value?.validate().catch(() => false);
@@ -60,7 +84,16 @@ async function submitForm() {
           </el-select>
         </el-form-item>
         <el-form-item label="地址" prop="address" class="span-2">
-          <el-input v-model="form.address" placeholder="输入房源地址" />
+          <div class="address-row">
+            <el-input v-model="form.address" placeholder="输入房源地址" />
+            <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="坐标" class="span-2">
+          <div class="coordinate-row">
+            <el-input-number v-model="form.longitude" :precision="6" controls-position="right" placeholder="经度" />
+            <el-input-number v-model="form.latitude" :precision="6" controls-position="right" placeholder="纬度" />
+          </div>
         </el-form-item>
         <el-form-item label="月租" prop="rentPrice">
           <el-input-number v-model="form.rentPrice" :min="0" :step="500" controls-position="right" />
