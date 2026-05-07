@@ -22,13 +22,23 @@ export interface AMapMap {
   add(marker: AMapMarker | AMapMarker[]): void;
   clearMap(): void;
   getBounds(): AMapBounds;
+  setCenter(position: [number, number]): void;
   setFitView(): void;
-  on(eventName: string, handler: () => void): void;
+  on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
   destroy(): void;
 }
 
 export interface AMapMarker {
   on(eventName: string, handler: () => void): void;
+}
+
+export interface AMapMouseEvent {
+  lnglat?: {
+    lng?: number;
+    lat?: number;
+    getLng?: () => number;
+    getLat?: () => number;
+  };
 }
 
 export interface AMapInfoWindow {

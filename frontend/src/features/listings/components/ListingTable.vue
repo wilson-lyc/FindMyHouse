@@ -27,8 +27,7 @@ const emit = defineEmits<{
     <el-table-column prop="title" label="房源" min-width="220">
       <template #default="{ row }">
         <div class="listing-title">{{ row.title }}</div>
-        <div class="muted">{{ row.address }}</div>
-        <div v-if="row.latitude && row.longitude" class="muted">{{ row.longitude.toFixed(6) }}, {{ row.latitude.toFixed(6) }}</div>
+        <div class="muted listing-address">{{ row.address }}</div>
       </template>
     </el-table-column>
     <el-table-column label="月租" width="130">
