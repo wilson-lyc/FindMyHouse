@@ -199,6 +199,13 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.map-house-ai-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .map-house-filter-row .el-input {
   grid-column: 1 / -1;
 }
@@ -235,6 +242,62 @@ body {
   min-height: 120px;
   overflow: auto;
   padding-right: 2px;
+}
+
+.house-ai-plan {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #cbdce6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.house-ai-plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #1f3445;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.house-ai-plan p {
+  margin: 0;
+  color: #526879;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.house-ai-plan ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #324858;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.house-ai-plan dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.house-ai-plan dt {
+  color: #7c8a95;
+  font-weight: 600;
+}
+
+.house-ai-plan dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #2f4658;
 }
 
 .house-card {

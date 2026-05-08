@@ -65,8 +65,31 @@ export interface HouseFilters {
   q: string;
   status: HouseStatus | '';
   sourceChannel: HouseSourceChannel | '';
+  keywords?: string[];
+  minRentPrice?: number;
+  maxRentPrice?: number;
+  minBedroomCount?: number;
+  maxBedroomCount?: number;
+  minLivingRoomCount?: number;
+  maxLivingRoomCount?: number;
+  minBathroomCount?: number;
+  maxBathroomCount?: number;
   minLatitude?: number;
   maxLatitude?: number;
   minLongitude?: number;
   maxLongitude?: number;
+  limit?: number;
+}
+
+export type HouseAgentSearchFilters = Partial<Omit<HouseFilters, 'status' | 'sourceChannel'>> & {
+  status?: HouseStatus;
+  sourceChannel?: HouseSourceChannel;
+};
+
+export interface HouseAgentSearchResult {
+  query: string;
+  filters: HouseAgentSearchFilters;
+  explanation?: string;
+  steps: string[];
+  houses: House[];
 }

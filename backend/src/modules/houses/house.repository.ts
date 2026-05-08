@@ -26,6 +26,52 @@ export class HouseRepository {
       params.q = `%${filters.q}%`;
     }
 
+    filters.keywords?.forEach((keyword, index) => {
+      const paramName = `keyword${index}`;
+      where.push(`(name LIKE @${paramName} OR address LIKE @${paramName} OR contact_notes LIKE @${paramName})`);
+      params[paramName] = `%${keyword}%`;
+    });
+
+    if (filters.minRentPrice !== undefined) {
+      where.push('rent_price >= @minRentPrice');
+      params.minRentPrice = filters.minRentPrice;
+    }
+
+    if (filters.maxRentPrice !== undefined) {
+      where.push('rent_price <= @maxRentPrice');
+      params.maxRentPrice = filters.maxRentPrice;
+    }
+
+    if (filters.minBedroomCount !== undefined) {
+      where.push('bedroom_count >= @minBedroomCount');
+      params.minBedroomCount = filters.minBedroomCount;
+    }
+
+    if (filters.maxBedroomCount !== undefined) {
+      where.push('bedroom_count <= @maxBedroomCount');
+      params.maxBedroomCount = filters.maxBedroomCount;
+    }
+
+    if (filters.minLivingRoomCount !== undefined) {
+      where.push('living_room_count >= @minLivingRoomCount');
+      params.minLivingRoomCount = filters.minLivingRoomCount;
+    }
+
+    if (filters.maxLivingRoomCount !== undefined) {
+      where.push('living_room_count <= @maxLivingRoomCount');
+      params.maxLivingRoomCount = filters.maxLivingRoomCount;
+    }
+
+    if (filters.minBathroomCount !== undefined) {
+      where.push('bathroom_count >= @minBathroomCount');
+      params.minBathroomCount = filters.minBathroomCount;
+    }
+
+    if (filters.maxBathroomCount !== undefined) {
+      where.push('bathroom_count <= @maxBathroomCount');
+      params.maxBathroomCount = filters.maxBathroomCount;
+    }
+
     if (filters.minLatitude !== undefined && filters.maxLatitude !== undefined) {
       where.push('latitude BETWEEN @minLatitude AND @maxLatitude');
       params.minLatitude = filters.minLatitude;
@@ -42,7 +88,12 @@ export class HouseRepository {
       SELECT * FROM houses
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY updated_at DESC
+      ${filters.limit ? 'LIMIT @limit' : ''}
     `;
+
+    if (filters.limit) {
+      params.limit = filters.limit;
+    }
 
     return this.database.prepare(sql).all(params).map((row) => toHouse(row as HouseRow));
   }

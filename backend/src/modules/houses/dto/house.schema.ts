@@ -47,10 +47,19 @@ export const listHousesQuerySchema = z.object({
   status: z.enum(houseStatuses).optional(),
   sourceChannel: z.enum(houseSourceChannels).optional(),
   q: z.string().trim().optional(),
+  minRentPrice: z.coerce.number().int().nonnegative().optional(),
+  maxRentPrice: z.coerce.number().int().nonnegative().optional(),
+  minBedroomCount: z.coerce.number().int().nonnegative().optional(),
+  maxBedroomCount: z.coerce.number().int().nonnegative().optional(),
+  minLivingRoomCount: z.coerce.number().int().nonnegative().optional(),
+  maxLivingRoomCount: z.coerce.number().int().nonnegative().optional(),
+  minBathroomCount: z.coerce.number().int().nonnegative().optional(),
+  maxBathroomCount: z.coerce.number().int().nonnegative().optional(),
   minLatitude: z.coerce.number().finite().optional(),
   maxLatitude: z.coerce.number().finite().optional(),
   minLongitude: z.coerce.number().finite().optional(),
-  maxLongitude: z.coerce.number().finite().optional()
+  maxLongitude: z.coerce.number().finite().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
 });
 
 export const idParamsSchema = z.object({

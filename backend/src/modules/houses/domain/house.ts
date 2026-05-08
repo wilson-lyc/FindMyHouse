@@ -44,8 +44,18 @@ export interface HouseFilters {
   status?: HouseStatus;
   sourceChannel?: HouseSourceChannel;
   q?: string;
+  keywords?: string[];
+  minRentPrice?: number;
+  maxRentPrice?: number;
+  minBedroomCount?: number;
+  maxBedroomCount?: number;
+  minLivingRoomCount?: number;
+  maxLivingRoomCount?: number;
+  minBathroomCount?: number;
+  maxBathroomCount?: number;
   minLatitude?: number;
   maxLatitude?: number;
   minLongitude?: number;
   maxLongitude?: number;
+  limit?: number;
 }

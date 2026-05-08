@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { House as HouseIcon, Location as LocationIcon, Plus, Search } from '@element-plus/icons-vue';
+import { Cpu, House as HouseIcon, Location as LocationIcon, Plus, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../../components/house/HouseFormDialog.vue';
 import HouseListCard from '../../components/house/HouseListCard.vue';
@@ -18,9 +18,12 @@ import type { MapBoundsFilter } from '../../model/map/geocode';
 const {
   houses,
   loading,
+  aiSearching,
+  aiSearchPlan,
   saving,
   filters,
   loadHouses,
+  aiSearchHouses,
   saveHouse,
   removeHouse
 } = useHouses();
@@ -36,6 +39,7 @@ const selectedHouseFocusKey = ref(0);
 const activePanel = ref<'houses' | 'locations'>('houses');
 const onlyViewportHouses = ref(false);
 const currentMapBounds = ref<MapBoundsFilter | null>(null);
+const aiSearchQuery = ref('');
 const leftPanelWidth = ref(420);
 const minLeftPanelWidth = 360;
 const maxLeftPanelWidth = 760;
@@ -98,6 +102,16 @@ async function applyHouseSearch() {
   }
 
   await loadHouses();
+}
+
+async function applyAiHouseSearch() {
+  const query = aiSearchQuery.value.trim();
+  if (!query) {
+    ElMessage.warning('请输入 AI 搜索词');
+    return;
+  }
+
+  await aiSearchHouses(query);
 }
 
 async function toggleViewportHouses() {
@@ -180,6 +194,16 @@ onMounted(async () => {
                 <el-button type="primary" :icon="Plus" @click="openCreateDialog">添加房源</el-button>
                 <el-checkbox v-model="onlyViewportHouses" @change="toggleViewportHouses">仅视野</el-checkbox>
               </div>
+              <div class="map-house-ai-row">
+                <el-input
+                  v-model="aiSearchQuery"
+                  :prefix-icon="Cpu"
+                  clearable
+                  placeholder="AI 搜索：如 5000 内一室，靠近地铁"
+                  @keyup.enter="applyAiHouseSearch"
+                />
+                <el-button type="primary" :loading="aiSearching" @click="applyAiHouseSearch">AI 搜索</el-button>
+              </div>
               <div class="map-house-control-row map-house-filter-row">
                 <el-select v-model="filters.status" clearable placeholder="状态" @change="applyHouseSearch">
                   <el-option
@@ -207,6 +231,41 @@ onMounted(async () => {
                 />
               </div>
             </div>
+
+            <section v-if="aiSearchPlan" class="house-ai-plan" aria-label="AI 搜索过程">
+              <div class="house-ai-plan-header">
+                <span>AI 搜索过程</span>
+                <el-tag size="small">{{ aiSearchPlan.houses.length }} 套</el-tag>
+              </div>
+              <p v-if="aiSearchPlan.explanation">{{ aiSearchPlan.explanation }}</p>
+              <ol v-if="aiSearchPlan.steps.length">
+                <li v-for="step in aiSearchPlan.steps" :key="step">{{ step }}</li>
+              </ol>
+              <dl>
+                <template v-if="aiSearchPlan.filters.keywords?.length">
+                  <dt>关键词</dt>
+                  <dd>{{ aiSearchPlan.filters.keywords.join('、') }}</dd>
+                </template>
+                <template v-if="aiSearchPlan.filters.minRentPrice !== undefined || aiSearchPlan.filters.maxRentPrice !== undefined">
+                  <dt>租金</dt>
+                  <dd>
+                    {{ aiSearchPlan.filters.minRentPrice ?? '不限' }} -
+                    {{ aiSearchPlan.filters.maxRentPrice ?? '不限' }}
+                  </dd>
+                </template>
+                <template v-if="aiSearchPlan.filters.minBedroomCount !== undefined || aiSearchPlan.filters.maxBedroomCount !== undefined">
+                  <dt>卧室</dt>
+                  <dd>
+                    {{ aiSearchPlan.filters.minBedroomCount ?? '不限' }} -
+                    {{ aiSearchPlan.filters.maxBedroomCount ?? '不限' }}
+                  </dd>
+                </template>
+                <template v-if="aiSearchPlan.filters.q">
+                  <dt>全文</dt>
+                  <dd>{{ aiSearchPlan.filters.q }}</dd>
+                </template>
+              </dl>
+            </section>
 
             <div v-loading="loading" class="house-card-list map-data-list">
               <el-empty v-if="!loading && !houses.length" description="暂无房源数据" />
