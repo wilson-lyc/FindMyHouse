@@ -55,5 +55,9 @@ export const idParamsSchema = z.object({
   id: z.string().uuid()
 });
 
+export const toggleFavoriteSchema = z.object({
+  isFavorited: z.boolean()
+});
+
 export type CreateListingInput = z.infer<typeof createListingSchema>;
 export type UpdateListingInput = z.infer<typeof updateListingSchema>;

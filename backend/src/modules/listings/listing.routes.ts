@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import { createListingSchema, idParamsSchema, listListingsQuerySchema, updateListingSchema } from './dto/listing.schema.js';
+import { createListingSchema, idParamsSchema, listListingsQuerySchema, toggleFavoriteSchema, updateListingSchema } from './dto/listing.schema.js';
 import { ListingRepository } from './listing.repository.js';
 import { ListingService } from './listing.service.js';
 
@@ -50,5 +50,17 @@ export async function registerListingRoutes(app: FastifyInstance) {
     }
 
     return reply.code(204).send();
+  });
+
+  app.post('/api/listings/:id/favorite', async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const { isFavorited } = toggleFavoriteSchema.parse(request.body);
+    const listing = listingService.toggleFavorite(id, isFavorited);
+
+    if (!listing) {
+      return reply.code(404).send({ error: 'Listing not found' });
+    }
+
+    return { data: listing };
   });
 }

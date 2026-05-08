@@ -46,6 +46,7 @@ export interface Listing {
   orientation?: string;
   availableDate?: string;
   status: ListingStatus;
+  isFavorited?: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;

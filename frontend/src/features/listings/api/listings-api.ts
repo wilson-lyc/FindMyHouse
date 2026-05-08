@@ -25,3 +25,7 @@ export function updateListing(id: string, payload: ListingForm) {
 export function deleteListing(id: string) {
   return deleteData(`/api/listings/${id}`);
 }
+
+export function toggleFavoriteListing(id: string, isFavorited: boolean) {
+  return postData<Listing, { isFavorited: boolean }>(`/api/listings/${id}/favorite`, { isFavorited });
+}

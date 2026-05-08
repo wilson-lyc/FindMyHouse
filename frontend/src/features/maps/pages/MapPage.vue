@@ -2,17 +2,18 @@
 import { computed, onMounted, ref } from 'vue';
 import { House, Location as LocationIcon, Plus, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { formatCurrency } from '../../../shared/utils/format';
 import LocationFormDialog from '../../locations/components/LocationFormDialog.vue';
 import LocationPanel from '../../locations/components/LocationPanel.vue';
 import { useLocations } from '../../locations/composables/useLocations';
 import type { Location, LocationForm } from '../../locations/model/location';
 import ListingFormDialog from '../../listings/components/ListingFormDialog.vue';
 import { useListings } from '../../listings/composables/useListings';
+import { toggleFavoriteListing } from '../../listings/api/listings-api';
 import { normalizeListingForm } from '../../listings/lib/listing-form';
 import { listingStatuses, type Listing, type ListingForm } from '../../listings/model/listing';
 import { statusLabels, statusType } from '../../listings/model/listing-status';
 import AmapListingMap from '../components/AmapListingMap.vue';
+import HouseListCard from '../components/HouseListCard.vue';
 import type { MapBoundsFilter } from '../model/geocode';
 
 const {
@@ -34,7 +35,7 @@ const editingLocation = ref<Location | null>(null);
 const selectedListing = ref<Listing | null>(null);
 const selectedListingFocusKey = ref(0);
 const activePanel = ref<'listings' | 'locations'>('listings');
-const onlyViewportListings = ref(true);
+const onlyViewportListings = ref(false);
 const currentMapBounds = ref<MapBoundsFilter | null>(null);
 const leftPanelWidth = ref(420);
 const minLeftPanelWidth = 360;
@@ -111,6 +112,16 @@ function selectListing(listing: Listing) {
 
 function showPanel(panel: string) {
   activePanel.value = panel === 'locations' ? 'locations' : 'listings';
+}
+
+async function toggleFavorite(listingId: string) {
+  try {
+    const listing = listings.value.find((l) => l.id === listingId);
+    await toggleFavoriteListing(listingId, !listing?.isFavorited);
+    await loadListings();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '操作失败');
+  }
 }
 
 function notifyMapResize() {
@@ -203,24 +214,17 @@ onMounted(async () => {
             <div v-loading="loading" class="listing-card-list map-data-list">
               <el-empty v-if="!loading && !listings.length" description="暂无房源数据" />
               <template v-else>
-                <el-card
+                <HouseListCard
                   v-for="listing in listings"
                   :key="listing.id"
-                  class="listing-card"
-                  :class="{ active: selectedListing?.id === listing.id }"
-                  shadow="never"
-                  @click="selectListing(listing)"
-                >
-                  <div class="listing-card-header">
-                    <strong>{{ listing.title }}</strong>
-                    <el-tag :type="statusType(listing.status)" size="small">{{ statusLabels[listing.status] }}</el-tag>
-                  </div>
-                  <small>{{ listing.address }}</small>
-                  <div class="listing-card-footer">
-                    <b>{{ formatCurrency(listing.rentPrice) }}</b>
-                    <el-button size="small" @click.stop="openEditDialog(listing)">详情</el-button>
-                  </div>
-                </el-card>
+                  :listing="listing"
+                  :selected="selectedListing?.id === listing.id"
+                  :favorited="listing.isFavorited === true"
+                  @select="selectListing"
+                  @edit="openEditDialog"
+                  @delete="confirmDeleteListing"
+                  @toggle-favorite="toggleFavorite"
+                />
               </template>
             </div>
           </div>

@@ -25,6 +25,7 @@ export function migrate() {
       floor TEXT,
       orientation TEXT,
       available_date TEXT,
+      is_favorited INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'new',
       notes TEXT,
       created_at TEXT NOT NULL,
@@ -66,7 +67,8 @@ function ensureListingColumns() {
     ['electricity_fee_per_kwh', 'REAL'],
     ['internet_fee', 'INTEGER'],
     ['shared_fee', 'INTEGER'],
-    ['other_fee', 'INTEGER']
+    ['other_fee', 'INTEGER'],
+    ['is_favorited', 'INTEGER NOT NULL DEFAULT 0']
   ] as const;
 
   for (const [name, type] of columns) {

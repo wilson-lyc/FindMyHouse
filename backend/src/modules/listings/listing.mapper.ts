@@ -25,6 +25,7 @@ export interface ListingRow {
   orientation: string | null;
   available_date: string | null;
   status: ListingStatus;
+  is_favorited: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -55,6 +56,7 @@ export function toListing(row: ListingRow): Listing {
     orientation: row.orientation ?? undefined,
     availableDate: row.available_date ?? undefined,
     status: row.status,
+    isFavorited: row.is_favorited === 1,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at

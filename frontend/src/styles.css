@@ -495,7 +495,6 @@ h1 {
   padding: 0;
 }
 
-.listing-card:hover,
 .listing-card.active {
   border-color: #407899;
   box-shadow: 0 8px 22px rgb(31 49 63 / 10%);
@@ -527,11 +526,41 @@ h1 {
   font-size: 16px;
 }
 
-.listing-card-footer {
+.listing-card-fees {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.fee-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.fee-label {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.fee-value {
+  color: #303133;
+  font-weight: 500;
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #ebeef5;
 }
 
 .map-detail-panel {

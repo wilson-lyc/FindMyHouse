@@ -58,12 +58,12 @@ export class ListingRepository {
             id, title, source, source_url, address, latitude, longitude,
             rent_price, payment_periods, deposit_amount, agency_fee, property_fee, water_fee_per_ton,
             electricity_fee_per_kwh, internet_fee, shared_fee, other_fee, area_sqm,
-            layout, floor, orientation, available_date, status, notes, created_at, updated_at
+            layout, floor, orientation, available_date, is_favorited, status, notes, created_at, updated_at
           ) VALUES (
             @id, @title, @source, @source_url, @address, @latitude, @longitude,
             @rent_price, @payment_periods, @deposit_amount, @agency_fee, @property_fee, @water_fee_per_ton,
             @electricity_fee_per_kwh, @internet_fee, @shared_fee, @other_fee, @area_sqm,
-            @layout, @floor, @orientation, @available_date, @status, @notes, @created_at, @updated_at
+            @layout, @floor, @orientation, @available_date, 0, @status, @notes, @created_at, @updated_at
           )
         `
       )
@@ -114,6 +114,7 @@ export class ListingRepository {
             floor = @floor,
             orientation = @orientation,
             available_date = @available_date,
+            is_favorited = @is_favorited,
             status = @status,
             notes = @notes,
             updated_at = @updated_at
@@ -123,6 +124,7 @@ export class ListingRepository {
       .run({
         id,
         ...toListingRowParams(next),
+        is_favorited: next.isFavorited ? 1 : 0,
         updated_at: next.updatedAt
       });
 
@@ -132,5 +134,16 @@ export class ListingRepository {
   delete(id: string): boolean {
     const result = this.database.prepare('DELETE FROM listings WHERE id = ?').run(id);
     return result.changes > 0;
+  }
+
+  toggleFavorite(id: string, isFavorited: boolean): Listing | undefined {
+    const existing = this.findById(id);
+    if (!existing) return undefined;
+
+    this.database
+      .prepare('UPDATE listings SET is_favorited = ?, updated_at = ? WHERE id = ?')
+      .run(isFavorited ? 1 : 0, new Date().toISOString(), id);
+
+    return this.findById(id);
   }
 }
