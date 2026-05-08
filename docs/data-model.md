@@ -30,22 +30,23 @@ erDiagram
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | id | text | 主键，UUID |
-| title | text | 房源标题 |
-| source | text | 来源平台 |
-| source_url | text | 原始链接 |
+| name | text | 房源名称 |
+| status | text | 房源状态 |
+| bedroom_count | integer | 房间数 |
+| living_room_count | integer | 客厅数 |
+| bathroom_count | integer | 卫生间数 |
+| source_channel | text | 房源渠道枚举 |
+| source_channel_name | text | 房源渠道补充说明 |
 | address | text | 地址 |
 | latitude | real | 纬度 |
 | longitude | real | 经度 |
 | rent_price | integer | 月租金 |
-| deposit_amount | integer | 押金 |
-| agency_fee | integer | 中介费 |
-| area_sqm | real | 面积 |
-| layout | text | 户型 |
-| floor | text | 楼层 |
-| orientation | text | 朝向 |
-| available_date | text | 可入住日期 |
-| status | text | 房源状态 |
-| notes | text | 用户备注 |
+| property_fee | integer | 物业费 |
+| water_fee_per_ton | real | 水费，每吨 |
+| electricity_fee_per_kwh | real | 电费，每度 |
+| other_fee | integer | 其他费用 |
+| phone | text | 联系电话 |
+| wechat | text | 微信 |
 | created_at | text | 创建时间 |
 | updated_at | text | 更新时间 |
 
@@ -158,14 +159,20 @@ erDiagram
 
 房源状态：
 
-- `new`
-- `shortlisted`
-- `contacted`
-- `scheduled`
-- `visited`
-- `rejected`
-- `applied`
+- `watching`：观望中
+- `interested`：有意向
+- `negotiating`：洽谈中
+- `abandoned`：已放弃
 - `signed`
+
+房源渠道：
+
+- `beike`：贝壳
+- `mini_program`：小程序
+- `anjuke`：安居客
+- `lianjia`：链家
+- `offline_agent`：线下中介
+- `other`：其他
 
 通勤方式：
 
@@ -183,4 +190,3 @@ erDiagram
 5. Agent 读取房源、地点、通勤、偏好和看房记录。
 6. Agent 输出结构化分析并保存快照。
 7. 推荐排序使用最新结构化数据和 Agent 输出。
-

@@ -24,8 +24,4 @@ export class HouseService {
   deleteHouse(id: string): boolean {
     return this.repository.delete(id);
   }
-
-  toggleFavorite(id: string, isFavorited: boolean): House | undefined {
-    return this.repository.toggleFavorite(id, isFavorited);
-  }
 }

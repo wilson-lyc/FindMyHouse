@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { Star, StarFilled } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
-import type { House } from '../../model/house/house';
+import { houseSourceChannelLabels, type House } from '../../model/house/house';
 
 defineProps<{
   house: House;
   selected: boolean;
-  favorited: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [house: House];
   edit: [house: House];
   delete: [house: House];
-  'toggle-favorite': [houseId: string];
 }>();
 
 function formatFeeLabel(value: number | undefined, suffix: string) {
@@ -36,9 +33,13 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
     @click="emit('select', house)"
   >
     <div class="house-card-header">
-      <strong>{{ house.title }}</strong>
+      <strong>{{ house.name }}</strong>
       <el-tag :type="statusType(house.status)" size="small">{{ statusLabels[house.status] }}</el-tag>
     </div>
+    <small>
+      {{ house.bedroomCount }}房{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫
+      <template v-if="house.sourceChannel"> · {{ houseSourceChannelLabels[house.sourceChannel] }}</template>
+    </small>
     <div class="house-card-fees">
       <div class="fee-row">
         <span class="fee-label">租金</span>
@@ -59,14 +60,6 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
     </div>
     <div class="house-card-actions">
       <el-button size="small" @click.stop="emit('edit', house)">查看详情</el-button>
-      <el-button
-        size="small"
-        :type="favorited ? 'warning' : 'default'"
-        :icon="favorited ? StarFilled : Star"
-        @click.stop="emit('toggle-favorite', house.id)"
-      >
-        {{ favorited ? '已收藏' : '收藏' }}
-      </el-button>
       <el-button size="small" type="danger" @click.stop="emit('delete', house)">删除</el-button>
     </div>
   </el-card>

@@ -16,8 +16,13 @@ export class HouseRepository {
       params.status = filters.status;
     }
 
+    if (filters.sourceChannel) {
+      where.push('source_channel = @sourceChannel');
+      params.sourceChannel = filters.sourceChannel;
+    }
+
     if (filters.q) {
-      where.push('(title LIKE @q OR address LIKE @q OR notes LIKE @q)');
+      where.push('(name LIKE @q OR address LIKE @q OR source_channel_name LIKE @q OR phone LIKE @q OR wechat LIKE @q)');
       params.q = `%${filters.q}%`;
     }
 
@@ -55,15 +60,13 @@ export class HouseRepository {
       .prepare(
         `
           INSERT INTO houses (
-            id, title, source, source_url, address, latitude, longitude,
-            rent_price, payment_periods, deposit_amount, agency_fee, property_fee, water_fee_per_ton,
-            electricity_fee_per_kwh, internet_fee, shared_fee, other_fee, area_sqm,
-            layout, floor, orientation, available_date, is_favorited, status, notes, created_at, updated_at
+            id, name, status, bedroom_count, living_room_count, bathroom_count, source_channel, source_channel_name,
+            address, latitude, longitude, rent_price, property_fee, water_fee_per_ton,
+            electricity_fee_per_kwh, other_fee, phone, wechat, created_at, updated_at
           ) VALUES (
-            @id, @title, @source, @source_url, @address, @latitude, @longitude,
-            @rent_price, @payment_periods, @deposit_amount, @agency_fee, @property_fee, @water_fee_per_ton,
-            @electricity_fee_per_kwh, @internet_fee, @shared_fee, @other_fee, @area_sqm,
-            @layout, @floor, @orientation, @available_date, 0, @status, @notes, @created_at, @updated_at
+            @id, @name, @status, @bedroom_count, @living_room_count, @bathroom_count, @source_channel, @source_channel_name,
+            @address, @latitude, @longitude, @rent_price, @property_fee, @water_fee_per_ton,
+            @electricity_fee_per_kwh, @other_fee, @phone, @wechat, @created_at, @updated_at
           )
         `
       )
@@ -93,30 +96,23 @@ export class HouseRepository {
       .prepare(
         `
           UPDATE houses SET
-            title = @title,
-            source = @source,
-            source_url = @source_url,
+            name = @name,
+            status = @status,
+            bedroom_count = @bedroom_count,
+            living_room_count = @living_room_count,
+            bathroom_count = @bathroom_count,
+            source_channel = @source_channel,
+            source_channel_name = @source_channel_name,
             address = @address,
             latitude = @latitude,
             longitude = @longitude,
             rent_price = @rent_price,
-            payment_periods = @payment_periods,
-            deposit_amount = @deposit_amount,
-            agency_fee = @agency_fee,
             property_fee = @property_fee,
             water_fee_per_ton = @water_fee_per_ton,
             electricity_fee_per_kwh = @electricity_fee_per_kwh,
-            internet_fee = @internet_fee,
-            shared_fee = @shared_fee,
             other_fee = @other_fee,
-            area_sqm = @area_sqm,
-            layout = @layout,
-            floor = @floor,
-            orientation = @orientation,
-            available_date = @available_date,
-            is_favorited = @is_favorited,
-            status = @status,
-            notes = @notes,
+            phone = @phone,
+            wechat = @wechat,
             updated_at = @updated_at
           WHERE id = @id
         `
@@ -124,7 +120,6 @@ export class HouseRepository {
       .run({
         id,
         ...toHouseRowParams(next),
-        is_favorited: next.isFavorited ? 1 : 0,
         updated_at: next.updatedAt
       });
 
@@ -134,16 +129,5 @@ export class HouseRepository {
   delete(id: string): boolean {
     const result = this.database.prepare('DELETE FROM houses WHERE id = ?').run(id);
     return result.changes > 0;
-  }
-
-  toggleFavorite(id: string, isFavorited: boolean): House | undefined {
-    const existing = this.findById(id);
-    if (!existing) return undefined;
-
-    this.database
-      .prepare('UPDATE houses SET is_favorited = ?, updated_at = ? WHERE id = ?')
-      .run(isFavorited ? 1 : 0, new Date().toISOString(), id);
-
-    return this.findById(id);
   }
 }

@@ -1,38 +1,38 @@
 import { db } from './connection.js';
 
+const houseColumns = [
+  ['id', 'TEXT PRIMARY KEY'],
+  ['name', 'TEXT NOT NULL'],
+  ['status', "TEXT NOT NULL DEFAULT 'watching'"],
+  ['bedroom_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['living_room_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['bathroom_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['source_channel', 'TEXT'],
+  ['source_channel_name', 'TEXT'],
+  ['address', 'TEXT NOT NULL'],
+  ['latitude', 'REAL'],
+  ['longitude', 'REAL'],
+  ['rent_price', 'INTEGER NOT NULL'],
+  ['property_fee', 'INTEGER'],
+  ['water_fee_per_ton', 'REAL'],
+  ['electricity_fee_per_kwh', 'REAL'],
+  ['other_fee', 'INTEGER'],
+  ['phone', 'TEXT'],
+  ['wechat', 'TEXT'],
+  ['created_at', 'TEXT NOT NULL'],
+  ['updated_at', 'TEXT NOT NULL']
+] as const;
+
 export function migrate() {
+  resetHousesTableIfNeeded();
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS houses (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      source TEXT,
-      source_url TEXT,
-      address TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL,
-      rent_price INTEGER NOT NULL,
-      payment_periods TEXT,
-      deposit_amount INTEGER,
-      agency_fee INTEGER,
-      property_fee INTEGER,
-      water_fee_per_ton REAL,
-      electricity_fee_per_kwh REAL,
-      internet_fee INTEGER,
-      shared_fee INTEGER,
-      other_fee INTEGER,
-      area_sqm REAL,
-      layout TEXT,
-      floor TEXT,
-      orientation TEXT,
-      available_date TEXT,
-      is_favorited INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'new',
-      notes TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      ${houseColumns.map(([name, type]) => `${name} ${type}`).join(',\n      ')}
     );
 
     CREATE INDEX IF NOT EXISTS idx_houses_status ON houses(status);
+    CREATE INDEX IF NOT EXISTS idx_houses_source_channel ON houses(source_channel);
     CREATE INDEX IF NOT EXISTS idx_houses_rent_price ON houses(rent_price);
     CREATE INDEX IF NOT EXISTS idx_houses_updated_at ON houses(updated_at);
 
@@ -51,29 +51,22 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_locations_category ON locations(category);
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
   `);
-
-  ensureHouseColumns();
 }
 
-function ensureHouseColumns() {
-  const existingColumns = new Set(
-    db.prepare('PRAGMA table_info(houses)').all().map((column) => (column as { name: string }).name)
-  );
+function resetHousesTableIfNeeded() {
+  const existing = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'houses'")
+    .get();
 
-  const columns = [
-    ['payment_periods', 'TEXT'],
-    ['property_fee', 'INTEGER'],
-    ['water_fee_per_ton', 'REAL'],
-    ['electricity_fee_per_kwh', 'REAL'],
-    ['internet_fee', 'INTEGER'],
-    ['shared_fee', 'INTEGER'],
-    ['other_fee', 'INTEGER'],
-    ['is_favorited', 'INTEGER NOT NULL DEFAULT 0']
-  ] as const;
+  if (!existing) return;
 
-  for (const [name, type] of columns) {
-    if (!existingColumns.has(name)) {
-      db.exec(`ALTER TABLE houses ADD COLUMN ${name} ${type}`);
-    }
+  const actualColumns = db.prepare('PRAGMA table_info(houses)').all().map((column) => (column as { name: string }).name);
+  const expectedColumns = houseColumns.map(([name]) => name);
+  const matchesExpectedShape =
+    actualColumns.length === expectedColumns.length &&
+    expectedColumns.every((name, index) => actualColumns[index] === name);
+
+  if (!matchesExpectedShape) {
+    db.exec('DROP TABLE houses');
   }
 }

@@ -9,7 +9,8 @@ export function useHouses() {
   const saving = ref(false);
   const filters = reactive<HouseFilters>({
     q: '',
-    status: ''
+    status: '',
+    sourceChannel: ''
   });
 
   async function loadHouses() {

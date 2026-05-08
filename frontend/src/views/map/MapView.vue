@@ -7,11 +7,10 @@ import HouseListCard from '../../components/house/HouseListCard.vue';
 import LocationFormDialog from '../../components/location/LocationFormDialog.vue';
 import LocationPanel from '../../components/location/LocationPanel.vue';
 import AmapHouseMap from '../../components/map/AmapHouseMap.vue';
-import { toggleFavoriteHouse } from '../../api/house/house-api';
 import { useHouses } from '../../composables/house/useHouses';
 import { useLocations } from '../../composables/location/useLocations';
 import { normalizeHouseForm } from '../../lib/house/house-form';
-import { houseStatuses, type House, type HouseForm } from '../../model/house/house';
+import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type House, type HouseForm } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location, LocationForm } from '../../model/location/location';
 import type { MapBoundsFilter } from '../../model/map/geocode';
@@ -66,7 +65,7 @@ async function submitHouse(form: HouseForm) {
 
 async function confirmDeleteHouse(house: House) {
   try {
-    await ElMessageBox.confirm(`确认删除「${house.title}」吗？`, '删除房源', {
+    await ElMessageBox.confirm(`确认删除「${house.name}」吗？`, '删除房源', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
@@ -112,16 +111,6 @@ function selectHouse(house: House) {
 
 function showPanel(panel: string) {
   activePanel.value = panel === 'locations' ? 'locations' : 'houses';
-}
-
-async function toggleFavorite(houseId: string) {
-  try {
-    const house = houses.value.find((l) => l.id === houseId);
-    await toggleFavoriteHouse(houseId, !house?.isFavorited);
-    await loadHouses();
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '操作失败');
-  }
 }
 
 function notifyMapResize() {
@@ -200,6 +189,14 @@ onMounted(async () => {
                     :value="status"
                   />
                 </el-select>
+                <el-select v-model="filters.sourceChannel" clearable placeholder="渠道" @change="applyHouseSearch">
+                  <el-option
+                    v-for="channel in houseSourceChannels"
+                    :key="channel"
+                    :label="houseSourceChannelLabels[channel]"
+                    :value="channel"
+                  />
+                </el-select>
                 <el-input
                   v-model="filters.q"
                   :prefix-icon="Search"
@@ -219,11 +216,9 @@ onMounted(async () => {
                   :key="house.id"
                   :house="house"
                   :selected="selectedHouse?.id === house.id"
-                  :favorited="house.isFavorited === true"
                   @select="selectHouse"
                   @edit="openEditDialog"
                   @delete="confirmDeleteHouse"
-                  @toggle-favorite="toggleFavorite"
                 />
               </template>
             </div>

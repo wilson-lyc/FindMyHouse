@@ -1,4 +1,4 @@
-export const locationCategories = ['work', 'school', 'transport', 'favorite', 'other'] as const;
+export const locationCategories = ['work', 'school', 'transport', 'common', 'other'] as const;
 
 export type LocationCategory = (typeof locationCategories)[number];
 

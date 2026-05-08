@@ -6,8 +6,8 @@ import { Aim } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
 import CoordinatePickerMap from '../map/CoordinatePickerMap.vue';
 import {
-  housePaymentPeriodLabels,
-  housePaymentPeriods,
+  houseSourceChannelLabels,
+  houseSourceChannels,
   houseStatuses,
   type House,
   type HouseForm
@@ -33,14 +33,12 @@ const form = reactive<HouseForm>(createEmptyHouseForm());
 const formSections = [
   { key: 'basic', label: '基础' },
   { key: 'location', label: '位置' },
-  { key: 'rent', label: '租金' },
   { key: 'fees', label: '费用' },
-  { key: 'condition', label: '条件' },
-  { key: 'notes', label: '备注' }
+  { key: 'contact', label: '联系' }
 ];
 
 const rules: FormRules<HouseForm> = {
-  title: [{ required: true, message: '请输入房源标题', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入房源名称', trigger: 'blur' }],
   address: [{ required: true, message: '请输入地址', trigger: 'blur' }],
   rentPrice: [{ required: true, type: 'number', min: 0, message: '请输入有效月租金', trigger: 'blur' }]
 };
@@ -119,13 +117,35 @@ async function submitForm() {
           <section id="house-form-basic" class="house-form-section">
             <h3>基础信息</h3>
             <div class="form-grid">
-              <el-form-item label="标题" prop="title">
-                <el-input v-model="form.title" placeholder="例如：科技园两房一厅" />
+              <el-form-item label="名称" prop="name">
+                <el-input v-model="form.name" placeholder="" />
               </el-form-item>
               <el-form-item label="状态" prop="status">
-                <el-select v-model="form.status">
+                <el-select v-model="form.status" placeholder="">
                   <el-option v-for="status in houseStatuses" :key="status" :label="statusLabels[status]" :value="status" />
                 </el-select>
+              </el-form-item>
+              <el-form-item label="房">
+                <el-input-number v-model="form.bedroomCount" :min="0" :step="1" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="厅">
+                <el-input-number v-model="form.livingRoomCount" :min="0" :step="1" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="卫">
+                <el-input-number v-model="form.bathroomCount" :min="0" :step="1" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="渠道">
+                <el-select v-model="form.sourceChannel" clearable placeholder="">
+                  <el-option
+                    v-for="channel in houseSourceChannels"
+                    :key="channel"
+                    :label="houseSourceChannelLabels[channel]"
+                    :value="channel"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="渠道备注" class="span-2">
+                <el-input v-model="form.sourceChannelName" placeholder="" />
               </el-form-item>
             </div>
           </section>
@@ -135,7 +155,7 @@ async function submitForm() {
             <div class="form-grid">
               <el-form-item label="地址" prop="address" class="span-2">
                 <div class="address-row">
-                  <el-input v-model="form.address" placeholder="输入房源地址" />
+                  <el-input v-model="form.address" placeholder="" />
                   <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
                 </div>
               </el-form-item>
@@ -153,34 +173,12 @@ async function submitForm() {
             </div>
           </section>
 
-          <section id="house-form-rent" class="house-form-section">
-            <h3>租金付款</h3>
+          <section id="house-form-fees" class="house-form-section">
+            <h3>费用</h3>
             <div class="form-grid">
-              <el-form-item label="月租" prop="rentPrice">
+              <el-form-item label="租金" prop="rentPrice">
                 <el-input-number v-model="form.rentPrice" :min="0" :step="500" controls-position="right" />
               </el-form-item>
-              <el-form-item label="支付周期">
-                <el-select v-model="form.paymentPeriods" multiple collapse-tags collapse-tags-tooltip placeholder="">
-                  <el-option
-                    v-for="period in housePaymentPeriods"
-                    :key="period"
-                    :label="housePaymentPeriodLabels[period]"
-                    :value="period"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="押金">
-                <el-input-number v-model="form.depositAmount" :min="0" :step="500" controls-position="right" />
-              </el-form-item>
-              <el-form-item label="中介费">
-                <el-input-number v-model="form.agencyFee" :min="0" :step="500" controls-position="right" />
-              </el-form-item>
-            </div>
-          </section>
-
-          <section id="house-form-fees" class="house-form-section">
-            <h3>额外费用</h3>
-            <div class="form-grid">
               <el-form-item label="物业费">
                 <el-input-number v-model="form.propertyFee" :min="0" :step="100" controls-position="right" />
               </el-form-item>
@@ -196,50 +194,20 @@ async function submitForm() {
                   controls-position="right"
                 />
               </el-form-item>
-              <el-form-item label="网费">
-                <el-input-number v-model="form.internetFee" :min="0" :step="50" controls-position="right" />
-              </el-form-item>
-              <el-form-item label="公摊费用">
-                <el-input-number v-model="form.sharedFee" :min="0" :step="50" controls-position="right" />
-              </el-form-item>
               <el-form-item label="其他费用">
                 <el-input-number v-model="form.otherFee" :min="0" :step="50" controls-position="right" />
               </el-form-item>
             </div>
           </section>
 
-          <section id="house-form-condition" class="house-form-section">
-            <h3>房屋条件</h3>
+          <section id="house-form-contact" class="house-form-section">
+            <h3>联系方式</h3>
             <div class="form-grid">
-              <el-form-item label="面积">
-                <el-input-number v-model="form.areaSqm" :min="0" :precision="1" controls-position="right" />
+              <el-form-item label="电话">
+                <el-input v-model="form.phone" placeholder="" />
               </el-form-item>
-              <el-form-item label="户型">
-                <el-input v-model="form.layout" placeholder="两房一厅" />
-              </el-form-item>
-              <el-form-item label="楼层">
-                <el-input v-model="form.floor" placeholder="8/18" />
-              </el-form-item>
-              <el-form-item label="朝向">
-                <el-input v-model="form.orientation" placeholder="南向" />
-              </el-form-item>
-              <el-form-item label="入住日期">
-                <el-date-picker v-model="form.availableDate" value-format="YYYY-MM-DD" type="date" placeholder="选择日期" />
-              </el-form-item>
-            </div>
-          </section>
-
-          <section id="house-form-notes" class="house-form-section">
-            <h3>来源备注</h3>
-            <div class="form-grid">
-              <el-form-item label="来源">
-                <el-input v-model="form.source" placeholder="平台或中介" />
-              </el-form-item>
-              <el-form-item label="链接">
-                <el-input v-model="form.sourceUrl" placeholder="原始房源链接" />
-              </el-form-item>
-              <el-form-item label="备注" class="span-2">
-                <el-input v-model="form.notes" type="textarea" :rows="4" placeholder="记录亮点、风险点或沟通信息" />
+              <el-form-item label="微信">
+                <el-input v-model="form.wechat" placeholder="" />
               </el-form-item>
             </div>
           </section>

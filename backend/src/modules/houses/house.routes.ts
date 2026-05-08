@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import { createHouseSchema, idParamsSchema, listHousesQuerySchema, toggleFavoriteSchema, updateHouseSchema } from './dto/house.schema.js';
+import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from './dto/house.schema.js';
 import { HouseRepository } from './house.repository.js';
 import { HouseService } from './house.service.js';
 
@@ -50,17 +50,5 @@ export async function registerHouseRoutes(app: FastifyInstance) {
     }
 
     return reply.code(204).send();
-  });
-
-  app.post('/api/houses/:id/favorite', async (request, reply) => {
-    const { id } = idParamsSchema.parse(request.params);
-    const { isFavorited } = toggleFavoriteSchema.parse(request.body);
-    const house = houseService.toggleFavorite(id, isFavorited);
-
-    if (!house) {
-      return reply.code(404).send({ error: 'House not found' });
-    }
-
-    return { data: house };
   });
 }

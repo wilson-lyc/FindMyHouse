@@ -5,6 +5,7 @@ export async function fetchHouses(filters: HouseFilters) {
   const params = new URLSearchParams();
   if (filters.q) params.set('q', filters.q);
   if (filters.status) params.set('status', filters.status);
+  if (filters.sourceChannel) params.set('sourceChannel', filters.sourceChannel);
   if (filters.minLatitude !== undefined) params.set('minLatitude', String(filters.minLatitude));
   if (filters.maxLatitude !== undefined) params.set('maxLatitude', String(filters.maxLatitude));
   if (filters.minLongitude !== undefined) params.set('minLongitude', String(filters.minLongitude));
@@ -24,8 +25,4 @@ export function updateHouse(id: string, payload: HouseForm) {
 
 export function deleteHouse(id: string) {
   return deleteData(`/api/houses/${id}`);
-}
-
-export function toggleFavoriteHouse(id: string, isFavorited: boolean) {
-  return postData<House, { isFavorited: boolean }>(`/api/houses/${id}/favorite`, { isFavorited });
 }

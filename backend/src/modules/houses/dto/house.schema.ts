@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { housePaymentPeriods, houseStatuses } from '../domain/house.js';
+import { houseSourceChannels, houseStatuses } from '../domain/house.js';
 
 const optionalText = z
   .string()
@@ -14,36 +14,37 @@ const optionalNumber = z
   .nullable()
   .transform((value) => value ?? undefined);
 
+const optionalSourceChannel = z
+  .union([z.enum(houseSourceChannels), z.literal('')])
+  .optional()
+  .nullable()
+  .transform((value) => value || undefined);
+
 export const createHouseSchema = z.object({
-  title: z.string().trim().min(1, 'title is required'),
-  source: optionalText,
-  sourceUrl: optionalText,
+  name: z.string().trim().min(1, 'name is required'),
+  status: z.enum(houseStatuses).default('watching'),
+  bedroomCount: z.number().int().nonnegative(),
+  livingRoomCount: z.number().int().nonnegative(),
+  bathroomCount: z.number().int().nonnegative(),
+  sourceChannel: optionalSourceChannel,
+  sourceChannelName: optionalText,
   address: z.string().trim().min(1, 'address is required'),
   latitude: optionalNumber,
   longitude: optionalNumber,
   rentPrice: z.number().int().nonnegative(),
-  paymentPeriods: z.array(z.enum(housePaymentPeriods)).optional(),
-  depositAmount: optionalNumber,
-  agencyFee: optionalNumber,
   propertyFee: optionalNumber,
   waterFeePerTon: optionalNumber,
   electricityFeePerKwh: optionalNumber,
-  internetFee: optionalNumber,
-  sharedFee: optionalNumber,
   otherFee: optionalNumber,
-  areaSqm: optionalNumber,
-  layout: optionalText,
-  floor: optionalText,
-  orientation: optionalText,
-  availableDate: optionalText,
-  status: z.enum(houseStatuses).default('new'),
-  notes: optionalText
+  phone: optionalText,
+  wechat: optionalText
 });
 
 export const updateHouseSchema = createHouseSchema.partial();
 
 export const listHousesQuerySchema = z.object({
   status: z.enum(houseStatuses).optional(),
+  sourceChannel: z.enum(houseSourceChannels).optional(),
   q: z.string().trim().optional(),
   minLatitude: z.coerce.number().finite().optional(),
   maxLatitude: z.coerce.number().finite().optional(),
@@ -53,10 +54,6 @@ export const listHousesQuerySchema = z.object({
 
 export const idParamsSchema = z.object({
   id: z.string().uuid()
-});
-
-export const toggleFavoriteSchema = z.object({
-  isFavorited: z.boolean()
 });
 
 export type CreateHouseInput = z.infer<typeof createHouseSchema>;

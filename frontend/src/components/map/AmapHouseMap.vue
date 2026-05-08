@@ -76,7 +76,7 @@ function createInfoWindow(content: string, position: [number, number]) {
 }
 
 function houseInfoContent(house: House) {
-  return `<div class="map-info"><strong>${house.title}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--primary el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
+  return `<div class="map-info"><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--primary el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
 }
 
 function bindHouseInfoAction(house: House) {
@@ -120,7 +120,7 @@ function renderMarkers() {
 
     const marker = new amap.value.Marker({
       position,
-      title: house.title,
+      title: house.name,
       label: {
         content: `<div class="map-marker-label house">¥${house.rentPrice}</div>`,
         direction: 'top'

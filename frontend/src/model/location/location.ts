@@ -1,4 +1,4 @@
-export const locationCategories = ['work', 'school', 'transport', 'favorite', 'other'] as const;
+export const locationCategories = ['work', 'school', 'transport', 'common', 'other'] as const;
 
 export type LocationCategory = (typeof locationCategories)[number];
 
@@ -6,7 +6,7 @@ export const locationCategoryLabels: Record<LocationCategory, string> = {
   work: '公司',
   school: '学校',
   transport: '交通',
-  favorite: '常用',
+  common: '常用',
   other: '其他'
 };
 

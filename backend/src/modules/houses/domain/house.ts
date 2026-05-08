@@ -1,52 +1,43 @@
 export const houseStatuses = [
-  'new',
-  'shortlisted',
-  'contacted',
-  'scheduled',
-  'visited',
-  'rejected',
-  'applied',
+  'watching',
+  'interested',
+  'negotiating',
+  'abandoned',
   'signed'
 ] as const;
 
 export type HouseStatus = (typeof houseStatuses)[number];
 
-export const housePaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
+export const houseSourceChannels = ['beike', 'mini_program', 'anjuke', 'lianjia', 'offline_agent', 'other'] as const;
 
-export type HousePaymentPeriod = (typeof housePaymentPeriods)[number];
+export type HouseSourceChannel = (typeof houseSourceChannels)[number];
 
 export interface House {
   id: string;
-  title: string;
-  source?: string;
-  sourceUrl?: string;
+  name: string;
+  status: HouseStatus;
+  bedroomCount: number;
+  livingRoomCount: number;
+  bathroomCount: number;
+  sourceChannel?: HouseSourceChannel;
+  sourceChannelName?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   rentPrice: number;
-  paymentPeriods?: HousePaymentPeriod[];
-  depositAmount?: number;
-  agencyFee?: number;
   propertyFee?: number;
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
-  internetFee?: number;
-  sharedFee?: number;
   otherFee?: number;
-  areaSqm?: number;
-  layout?: string;
-  floor?: string;
-  orientation?: string;
-  availableDate?: string;
-  status: HouseStatus;
-  isFavorited: boolean;
-  notes?: string;
+  phone?: string;
+  wechat?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface HouseFilters {
   status?: HouseStatus;
+  sourceChannel?: HouseSourceChannel;
   q?: string;
   minLatitude?: number;
   maxLatitude?: number;
