@@ -24,6 +24,8 @@ export interface AMapMap {
   getBounds(): AMapBounds;
   resize?(): void;
   setCenter(position: [number, number], immediately?: boolean, duration?: number): void;
+  setZoom?(zoom: number, immediately?: boolean, duration?: number): void;
+  setZoomAndCenter?(zoom: number, position: [number, number], immediately?: boolean, duration?: number): void;
   setFitView(): void;
   on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
   destroy(): void;

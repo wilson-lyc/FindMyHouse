@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { listingStatuses } from '../domain/listing.js';
+import { listingPaymentPeriods, listingStatuses } from '../domain/listing.js';
 
 const optionalText = z
   .string()
@@ -22,8 +22,15 @@ export const createListingSchema = z.object({
   latitude: optionalNumber,
   longitude: optionalNumber,
   rentPrice: z.number().int().nonnegative(),
+  paymentPeriods: z.array(z.enum(listingPaymentPeriods)).optional(),
   depositAmount: optionalNumber,
   agencyFee: optionalNumber,
+  propertyFee: optionalNumber,
+  waterFeePerTon: optionalNumber,
+  electricityFeePerKwh: optionalNumber,
+  internetFee: optionalNumber,
+  sharedFee: optionalNumber,
+  otherFee: optionalNumber,
   areaSqm: optionalNumber,
   layout: optionalText,
   floor: optionalText,

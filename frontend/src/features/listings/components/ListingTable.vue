@@ -14,6 +14,23 @@ const emit = defineEmits<{
   delete: [listing: Listing];
   select: [listing: Listing];
 }>();
+
+function formatFeeSummary(listing: Listing) {
+  const fees = [
+    ['物业', listing.propertyFee],
+    ['水', listing.waterFeePerTon === undefined ? undefined : `${listing.waterFeePerTon}/吨`],
+    ['电', listing.electricityFeePerKwh === undefined ? undefined : `${listing.electricityFeePerKwh}/度`],
+    ['网费', listing.internetFee],
+    ['公摊', listing.sharedFee],
+    ['其他', listing.otherFee]
+  ];
+
+  const visibleFees = fees
+    .filter(([, value]) => value !== undefined)
+    .map(([label, value]) => `${label} ${typeof value === 'number' ? formatCurrency(value) : value}`);
+
+  return visibleFees.length ? visibleFees.join(' / ') : '-';
+}
 </script>
 
 <template>
@@ -32,6 +49,9 @@ const emit = defineEmits<{
     </el-table-column>
     <el-table-column label="月租" width="130">
       <template #default="{ row }">{{ formatCurrency(row.rentPrice) }}</template>
+    </el-table-column>
+    <el-table-column label="费用" min-width="220">
+      <template #default="{ row }">{{ formatFeeSummary(row) }}</template>
     </el-table-column>
     <el-table-column label="面积" width="100">
       <template #default="{ row }">{{ row.areaSqm ? `${row.areaSqm} m²` : '-' }}</template>

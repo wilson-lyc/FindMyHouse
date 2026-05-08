@@ -11,6 +11,10 @@ export const listingStatuses = [
 
 export type ListingStatus = (typeof listingStatuses)[number];
 
+export const listingPaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
+
+export type ListingPaymentPeriod = (typeof listingPaymentPeriods)[number];
+
 export interface Listing {
   id: string;
   title: string;
@@ -20,8 +24,15 @@ export interface Listing {
   latitude?: number;
   longitude?: number;
   rentPrice: number;
+  paymentPeriods?: ListingPaymentPeriod[];
   depositAmount?: number;
   agencyFee?: number;
+  propertyFee?: number;
+  waterFeePerTon?: number;
+  electricityFeePerKwh?: number;
+  internetFee?: number;
+  sharedFee?: number;
+  otherFee?: number;
   areaSqm?: number;
   layout?: string;
   floor?: string;

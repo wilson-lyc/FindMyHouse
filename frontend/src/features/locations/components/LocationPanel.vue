@@ -17,29 +17,30 @@ const emit = defineEmits<{
 
 <template>
   <section class="location-panel">
-    <div class="panel-title-row">
-      <div>
-        <h2>关键地点</h2>
-        <p class="muted">公司、学校和常用地点会和房源一起显示在地图上。</p>
+    <div class="map-listing-controls">
+      <div class="map-listing-control-row map-listing-control-row--single">
+        <el-button type="primary" :icon="Plus" @click="emit('create')">添加地点</el-button>
       </div>
-      <el-button type="primary" :icon="Plus" @click="emit('create')">新增地点</el-button>
     </div>
 
-    <el-skeleton v-if="loading" :rows="4" animated />
-    <el-empty v-else-if="!locations.length" description="还没有关键地点" />
-    <div v-else class="location-list">
-      <article v-for="location in locations" :key="location.id" class="location-item">
-        <div>
-          <strong>{{ location.name }}</strong>
-          <span>{{ locationCategoryLabels[location.category] }}</span>
-        </div>
-        <p>{{ location.address }}</p>
-        <p v-if="location.latitude && location.longitude" class="muted">{{ location.longitude.toFixed(6) }}, {{ location.latitude.toFixed(6) }}</p>
-        <div class="location-actions">
-          <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
-          <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>
-        </div>
-      </article>
+    <div v-loading="loading" class="location-list map-data-list">
+      <el-empty v-if="!loading && !locations.length" description="暂无地点数据" />
+      <template v-else>
+        <article v-for="location in locations" :key="location.id" class="location-item">
+          <div class="location-item-header">
+            <strong>{{ location.name }}</strong>
+            <span>{{ locationCategoryLabels[location.category] }}</span>
+          </div>
+          <p>{{ location.address }}</p>
+          <p v-if="location.latitude && location.longitude" class="muted">
+            {{ location.longitude.toFixed(6) }}, {{ location.latitude.toFixed(6) }}
+          </p>
+          <div class="location-actions">
+            <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
+            <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>
+          </div>
+        </article>
+      </template>
     </div>
   </section>
 </template>

@@ -56,12 +56,14 @@ export class ListingRepository {
         `
           INSERT INTO listings (
             id, title, source, source_url, address, latitude, longitude,
-            rent_price, deposit_amount, agency_fee, area_sqm, layout, floor,
-            orientation, available_date, status, notes, created_at, updated_at
+            rent_price, payment_periods, deposit_amount, agency_fee, property_fee, water_fee_per_ton,
+            electricity_fee_per_kwh, internet_fee, shared_fee, other_fee, area_sqm,
+            layout, floor, orientation, available_date, status, notes, created_at, updated_at
           ) VALUES (
             @id, @title, @source, @source_url, @address, @latitude, @longitude,
-            @rent_price, @deposit_amount, @agency_fee, @area_sqm, @layout, @floor,
-            @orientation, @available_date, @status, @notes, @created_at, @updated_at
+            @rent_price, @payment_periods, @deposit_amount, @agency_fee, @property_fee, @water_fee_per_ton,
+            @electricity_fee_per_kwh, @internet_fee, @shared_fee, @other_fee, @area_sqm,
+            @layout, @floor, @orientation, @available_date, @status, @notes, @created_at, @updated_at
           )
         `
       )
@@ -98,8 +100,15 @@ export class ListingRepository {
             latitude = @latitude,
             longitude = @longitude,
             rent_price = @rent_price,
+            payment_periods = @payment_periods,
             deposit_amount = @deposit_amount,
             agency_fee = @agency_fee,
+            property_fee = @property_fee,
+            water_fee_per_ton = @water_fee_per_ton,
+            electricity_fee_per_kwh = @electricity_fee_per_kwh,
+            internet_fee = @internet_fee,
+            shared_fee = @shared_fee,
+            other_fee = @other_fee,
             area_sqm = @area_sqm,
             layout = @layout,
             floor = @floor,

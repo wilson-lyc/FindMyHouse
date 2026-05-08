@@ -14,6 +14,7 @@ const props = defineProps<{
   listings: Listing[];
   locations: KeyLocation[];
   selectedListingId?: string;
+  selectedListingFocusKey?: number;
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +30,7 @@ const loadError = ref('');
 let infoWindow: AMapInfoWindow | undefined;
 let boundsTimer: number | undefined;
 let resizeObserver: ResizeObserver | undefined;
+const listingFocusZoom = 16;
 
 function listingPosition(listing: Listing): [number, number] | undefined {
   if (listing.longitude === undefined || listing.latitude === undefined) {
@@ -91,6 +93,19 @@ function bindListingInfoAction(listing: Listing) {
 function openListingInfoWindow(listing: Listing, position: [number, number]) {
   createInfoWindow(listingInfoContent(listing), position);
   bindListingInfoAction(listing);
+}
+
+function focusListing(listing: Listing, position: [number, number]) {
+  if (!map.value) return;
+
+  if (map.value.setZoomAndCenter) {
+    map.value.setZoomAndCenter(listingFocusZoom, position);
+  } else {
+    map.value.setZoom?.(listingFocusZoom);
+    map.value.setCenter(position);
+  }
+
+  openListingInfoWindow(listing, position);
 }
 
 function renderMarkers() {
@@ -183,13 +198,12 @@ watch(
 );
 
 watch(
-  () => props.selectedListingId,
-  (id) => {
+  () => [props.selectedListingId, props.selectedListingFocusKey] as const,
+  ([id]) => {
     const listing = props.listings.find((item) => item.id === id);
     const position = listing ? listingPosition(listing) : undefined;
     if (!listing || !position) return;
-    map.value?.setCenter(position);
-    openListingInfoWindow(listing, position);
+    focusListing(listing, position);
   }
 );
 

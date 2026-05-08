@@ -11,8 +11,15 @@ export function migrate() {
       latitude REAL,
       longitude REAL,
       rent_price INTEGER NOT NULL,
+      payment_periods TEXT,
       deposit_amount INTEGER,
       agency_fee INTEGER,
+      property_fee INTEGER,
+      water_fee_per_ton REAL,
+      electricity_fee_per_kwh REAL,
+      internet_fee INTEGER,
+      shared_fee INTEGER,
+      other_fee INTEGER,
       area_sqm REAL,
       layout TEXT,
       floor TEXT,
@@ -43,4 +50,28 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_locations_category ON locations(category);
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
   `);
+
+  ensureListingColumns();
+}
+
+function ensureListingColumns() {
+  const existingColumns = new Set(
+    db.prepare('PRAGMA table_info(listings)').all().map((column) => (column as { name: string }).name)
+  );
+
+  const columns = [
+    ['payment_periods', 'TEXT'],
+    ['property_fee', 'INTEGER'],
+    ['water_fee_per_ton', 'REAL'],
+    ['electricity_fee_per_kwh', 'REAL'],
+    ['internet_fee', 'INTEGER'],
+    ['shared_fee', 'INTEGER'],
+    ['other_fee', 'INTEGER']
+  ] as const;
+
+  for (const [name, type] of columns) {
+    if (!existingColumns.has(name)) {
+      db.exec(`ALTER TABLE listings ADD COLUMN ${name} ${type}`);
+    }
+  }
 }

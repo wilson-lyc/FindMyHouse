@@ -11,6 +11,17 @@ export const listingStatuses = [
 
 export type ListingStatus = (typeof listingStatuses)[number];
 
+export const listingPaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
+
+export type ListingPaymentPeriod = (typeof listingPaymentPeriods)[number];
+
+export const listingPaymentPeriodLabels: Record<ListingPaymentPeriod, string> = {
+  monthly: '月付',
+  quarterly: '季付',
+  semiannually: '半年付',
+  annually: '年付'
+};
+
 export interface Listing {
   id: string;
   title: string;
@@ -20,8 +31,15 @@ export interface Listing {
   latitude?: number;
   longitude?: number;
   rentPrice: number;
+  paymentPeriods?: ListingPaymentPeriod[];
   depositAmount?: number;
   agencyFee?: number;
+  propertyFee?: number;
+  waterFeePerTon?: number;
+  electricityFeePerKwh?: number;
+  internetFee?: number;
+  sharedFee?: number;
+  otherFee?: number;
   areaSqm?: number;
   layout?: string;
   floor?: string;
@@ -33,7 +51,9 @@ export interface Listing {
   updatedAt: string;
 }
 
-export type ListingForm = Omit<Listing, 'id' | 'createdAt' | 'updatedAt'>;
+export type ListingForm = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'rentPrice'> & {
+  rentPrice?: number;
+};
 
 export interface ListingFilters {
   q: string;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { House, Location as LocationIcon, Plus, Search, Setting } from '@element-plus/icons-vue';
+import { House, Location as LocationIcon, Plus, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { formatCurrency } from '../../../shared/utils/format';
 import LocationFormDialog from '../../locations/components/LocationFormDialog.vue';
@@ -32,6 +32,7 @@ const editingListing = ref<Listing | null>(null);
 const locationDialogVisible = ref(false);
 const editingLocation = ref<Location | null>(null);
 const selectedListing = ref<Listing | null>(null);
+const selectedListingFocusKey = ref(0);
 const activePanel = ref<'listings' | 'locations'>('listings');
 const onlyViewportListings = ref(true);
 const currentMapBounds = ref<MapBoundsFilter | null>(null);
@@ -110,6 +111,7 @@ async function toggleViewportListings() {
 
 function selectListing(listing: Listing) {
   selectedListing.value = listing;
+  selectedListingFocusKey.value += 1;
 }
 
 function showPanel(panel: string) {
@@ -201,17 +203,6 @@ onBeforeUnmount(() => {
               <span>地点</span>
             </el-menu-item>
           </el-menu>
-          <div class="map-directory-bottom">
-            <el-button
-              class="map-directory-icon-button"
-              tag="a"
-              href="/admin/listings"
-              :icon="Setting"
-              text
-              aria-label="后台配置"
-              title="后台配置"
-            />
-          </div>
         </nav>
 
         <section class="map-data-content">
@@ -242,24 +233,27 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-loading="loading" class="listing-card-list map-data-list">
-              <el-card
-                v-for="listing in listings"
-                :key="listing.id"
-                class="listing-card"
-                :class="{ active: selectedListing?.id === listing.id }"
-                shadow="never"
-                @click="selectListing(listing)"
-              >
-                <div class="listing-card-header">
-                  <strong>{{ listing.title }}</strong>
-                  <el-tag :type="statusType(listing.status)" size="small">{{ statusLabels[listing.status] }}</el-tag>
-                </div>
-                <small>{{ listing.address }}</small>
-                <div class="listing-card-footer">
-                  <b>{{ formatCurrency(listing.rentPrice) }}</b>
-                  <el-button size="small" @click.stop="openEditDialog(listing)">详情</el-button>
-                </div>
-              </el-card>
+              <el-empty v-if="!loading && !listings.length" description="暂无房源数据" />
+              <template v-else>
+                <el-card
+                  v-for="listing in listings"
+                  :key="listing.id"
+                  class="listing-card"
+                  :class="{ active: selectedListing?.id === listing.id }"
+                  shadow="never"
+                  @click="selectListing(listing)"
+                >
+                  <div class="listing-card-header">
+                    <strong>{{ listing.title }}</strong>
+                    <el-tag :type="statusType(listing.status)" size="small">{{ statusLabels[listing.status] }}</el-tag>
+                  </div>
+                  <small>{{ listing.address }}</small>
+                  <div class="listing-card-footer">
+                    <b>{{ formatCurrency(listing.rentPrice) }}</b>
+                    <el-button size="small" @click.stop="openEditDialog(listing)">详情</el-button>
+                  </div>
+                </el-card>
+              </template>
             </div>
           </div>
           <LocationPanel
@@ -289,6 +283,7 @@ onBeforeUnmount(() => {
           :listings="mappedListings"
           :locations="locations"
           :selected-listing-id="selectedListing?.id"
+          :selected-listing-focus-key="selectedListingFocusKey"
           @bounds-change="applyMapBounds"
           @edit-listing="openEditDialog"
           @select-listing="selectListing"

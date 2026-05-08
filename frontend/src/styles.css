@@ -287,6 +287,12 @@ h1 {
   gap: 10px;
 }
 
+.map-data-content > .location-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
 .map-listing-controls {
   display: grid;
   gap: 8px;
@@ -301,6 +307,10 @@ h1 {
 
 .map-listing-control-row + .map-listing-control-row {
   grid-template-columns: minmax(110px, 0.55fr) minmax(140px, 1fr);
+}
+
+.map-listing-control-row--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .map-data-header {
@@ -686,6 +696,59 @@ h1 {
   column-gap: 18px;
 }
 
+.listing-form-nav {
+  position: sticky;
+  z-index: 1100;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #dce5eb;
+  background: #ffffff;
+  padding: 0 0 12px;
+}
+
+.listing-form-nav button {
+  height: 30px;
+  border: 1px solid #d4e1e8;
+  border-radius: 8px;
+  background: #f6fafc;
+  color: #486274;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 12px;
+}
+
+.listing-form-nav button:hover {
+  border-color: #407899;
+  background: #eaf4f8;
+  color: #214459;
+}
+
+.listing-form-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.listing-form-section {
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #fbfdfe;
+  padding: 16px 16px 2px;
+  scroll-margin-top: 54px;
+}
+
+.listing-form-section h3 {
+  margin: 0 0 14px;
+  color: #1f3445;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 .listing-form-dialog {
   display: flex;
   max-height: min(860px, calc(100vh - 48px));
@@ -769,14 +832,19 @@ h1 {
 }
 
 .coordinate-picker-map {
+  isolation: isolate;
   position: relative;
+  z-index: 0;
   min-height: 320px;
   overflow: hidden;
   border: 1px solid #dce5eb;
   border-radius: 8px;
+  background: #eef4f7;
 }
 
 .coordinate-amap-container {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 320px;
 }
@@ -902,16 +970,26 @@ h1 {
 
 .location-list {
   display: grid;
+  align-content: start;
   gap: 10px;
+  min-height: 100%;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .location-item {
   border: 1px solid #e2e9ee;
   border-radius: 8px;
+  background: #ffffff;
   padding: 12px;
 }
 
-.location-item div:first-child {
+.location-item:hover {
+  border-color: #407899;
+  box-shadow: 0 8px 22px rgb(31 49 63 / 10%);
+}
+
+.location-item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -961,6 +1039,10 @@ h1 {
 
   .listing-form-scrollbar {
     height: calc(100vh - 180px);
+  }
+
+  .listing-form-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .header-actions {
