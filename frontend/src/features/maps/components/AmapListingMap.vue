@@ -27,6 +27,7 @@ const amap = ref<AMapNamespace>();
 const loadError = ref('');
 let infoWindow: AMapInfoWindow | undefined;
 let boundsTimer: number | undefined;
+let resizeObserver: ResizeObserver | undefined;
 
 function listingPosition(listing: Listing): [number, number] | undefined {
   if (listing.longitude === undefined || listing.latitude === undefined) {
@@ -127,6 +128,10 @@ function renderMarkers() {
   }
 }
 
+function resizeMap() {
+  map.value?.resize?.();
+}
+
 onMounted(async () => {
   if (!mapContainer.value) return;
 
@@ -140,6 +145,8 @@ onMounted(async () => {
     });
     map.value.on('moveend', scheduleBoundsChange);
     map.value.on('zoomend', scheduleBoundsChange);
+    resizeObserver = new ResizeObserver(resizeMap);
+    resizeObserver.observe(mapContainer.value);
     renderMarkers();
     window.setTimeout(() => {
       map.value?.setFitView();
@@ -172,6 +179,7 @@ watch(
 
 onBeforeUnmount(() => {
   window.clearTimeout(boundsTimer);
+  resizeObserver?.disconnect();
   map.value?.destroy();
 });
 </script>

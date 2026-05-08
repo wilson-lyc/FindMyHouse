@@ -22,6 +22,7 @@ export interface AMapMap {
   add(marker: AMapMarker | AMapMarker[]): void;
   clearMap(): void;
   getBounds(): AMapBounds;
+  resize?(): void;
   setCenter(position: [number, number]): void;
   setFitView(): void;
   on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
