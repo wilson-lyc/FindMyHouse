@@ -255,7 +255,10 @@ onBeforeUnmount(() => {
                   <el-tag :type="statusType(listing.status)" size="small">{{ statusLabels[listing.status] }}</el-tag>
                 </div>
                 <small>{{ listing.address }}</small>
-                <b>{{ formatCurrency(listing.rentPrice) }}</b>
+                <div class="listing-card-footer">
+                  <b>{{ formatCurrency(listing.rentPrice) }}</b>
+                  <el-button size="small" @click.stop="openEditDialog(listing)">详情</el-button>
+                </div>
               </el-card>
             </div>
           </div>
@@ -287,6 +290,7 @@ onBeforeUnmount(() => {
           :locations="locations"
           :selected-listing-id="selectedListing?.id"
           @bounds-change="applyMapBounds"
+          @edit-listing="openEditDialog"
           @select-listing="selectListing"
         />
       </div>

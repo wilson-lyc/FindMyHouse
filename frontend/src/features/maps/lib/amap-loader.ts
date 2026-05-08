@@ -23,7 +23,7 @@ export interface AMapMap {
   clearMap(): void;
   getBounds(): AMapBounds;
   resize?(): void;
-  setCenter(position: [number, number]): void;
+  setCenter(position: [number, number], immediately?: boolean, duration?: number): void;
   setFitView(): void;
   on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
   destroy(): void;

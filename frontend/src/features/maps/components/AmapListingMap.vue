@@ -19,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   boundsChange: [bounds: MapBoundsFilter];
   selectListing: [listing: Listing];
+  editListing: [listing: Listing];
 }>();
 
 const mapContainer = ref<HTMLDivElement>();
@@ -72,6 +73,26 @@ function createInfoWindow(content: string, position: [number, number]) {
   infoWindow.open(map.value, position);
 }
 
+function listingInfoContent(listing: Listing) {
+  return `<div class="map-info"><strong>${listing.title}</strong><span>${listing.address}</span><span>${formatCurrency(listing.rentPrice)} · ${statusLabels[listing.status]}</span><div class="map-info-actions"><button class="el-button el-button--primary el-button--small map-info-detail-button" data-listing-id="${listing.id}" type="button"><span>详情</span></button></div></div>`;
+}
+
+function bindListingInfoAction(listing: Listing) {
+  window.setTimeout(() => {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.map-info-detail-button');
+    for (const button of buttons) {
+      if (button.dataset.listingId === listing.id) {
+        button.onclick = () => emit('editListing', listing);
+      }
+    }
+  }, 0);
+}
+
+function openListingInfoWindow(listing: Listing, position: [number, number]) {
+  createInfoWindow(listingInfoContent(listing), position);
+  bindListingInfoAction(listing);
+}
+
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
@@ -93,10 +114,7 @@ function renderMarkers() {
 
     marker.on('click', () => {
       emit('selectListing', listing);
-      createInfoWindow(
-        `<div class="map-info"><strong>${listing.title}</strong><span>${listing.address}</span><span>${formatCurrency(listing.rentPrice)} · ${statusLabels[listing.status]}</span></div>`,
-        position
-      );
+      openListingInfoWindow(listing, position);
     });
     markers.push(marker);
   }
@@ -170,10 +188,8 @@ watch(
     const listing = props.listings.find((item) => item.id === id);
     const position = listing ? listingPosition(listing) : undefined;
     if (!listing || !position) return;
-    createInfoWindow(
-      `<div class="map-info"><strong>${listing.title}</strong><span>${listing.address}</span><span>${formatCurrency(listing.rentPrice)} · ${statusLabels[listing.status]}</span></div>`,
-      position
-    );
+    map.value?.setCenter(position);
+    openListingInfoWindow(listing, position);
   }
 );
 

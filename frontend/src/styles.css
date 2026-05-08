@@ -551,6 +551,13 @@ h1 {
   font-size: 16px;
 }
 
+.listing-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .map-detail-panel {
   top: 86px;
   right: 14px;
@@ -863,6 +870,12 @@ h1 {
 
 .map-info span {
   color: #607282;
+}
+
+.map-info-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 .location-panel {

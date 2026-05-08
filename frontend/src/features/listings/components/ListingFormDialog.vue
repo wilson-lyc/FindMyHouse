@@ -75,7 +75,7 @@ async function submitForm() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="listing ? '编辑房源' : '新增房源'"
+    :title="listing ? '房源详情' : '新增房源'"
     width="760px"
     class="listing-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
