@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Location, Money, OfficeBuilding } from '@element-plus/icons-vue';
+import { Location } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../../shared/utils/format';
 import type { Location as KeyLocation } from '../../locations/model/location';
 import { locationCategoryLabels } from '../../locations/model/location';
@@ -192,9 +192,5 @@ onBeforeUnmount(() => {
       <span>{{ loadError }}</span>
     </div>
     <div ref="mapContainer" class="amap-container" />
-    <div class="map-stats">
-      <span><el-icon><Money /></el-icon>{{ listings.filter((item) => item.latitude && item.longitude).length }} 套房源</span>
-      <span><el-icon><OfficeBuilding /></el-icon>{{ locations.filter((item) => item.latitude && item.longitude).length }} 个地点</span>
-    </div>
   </section>
 </template>

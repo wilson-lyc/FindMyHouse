@@ -824,21 +824,29 @@ h1 {
 }
 
 .map-marker-label {
-  border-radius: 999px;
-  padding: 4px 8px;
-  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 160px;
+  overflow: hidden;
+  border: 1px solid rgb(23 32 42 / 12%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 94%);
+  padding: 4px 7px;
+  color: #17202a;
   font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 6px 14px rgb(31 49 63 / 18%);
+  font-weight: 600;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgb(31 49 63 / 10%);
 }
 
-.map-marker-label.listing {
-  background: #d94848;
-}
-
-.map-marker-label.location {
-  background: #286e5a;
+.amap-marker-label {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
 
 .map-info {
