@@ -180,8 +180,8 @@ onMounted(async () => {
                 <el-button type="primary" :icon="Plus" @click="openCreateDialog">添加房源</el-button>
                 <el-checkbox v-model="onlyViewportHouses" @change="toggleViewportHouses">仅视野</el-checkbox>
               </div>
-              <div class="map-house-control-row">
-                <el-select v-model="filters.status" clearable placeholder="筛选" @change="applyHouseSearch">
+              <div class="map-house-control-row map-house-filter-row">
+                <el-select v-model="filters.status" clearable placeholder="状态" @change="applyHouseSearch">
                   <el-option
                     v-for="status in houseStatuses"
                     :key="status"
@@ -215,7 +215,6 @@ onMounted(async () => {
                   v-for="house in houses"
                   :key="house.id"
                   :house="house"
-                  :selected="selectedHouse?.id === house.id"
                   @select="selectHouse"
                   @edit="openEditDialog"
                   @delete="confirmDeleteHouse"

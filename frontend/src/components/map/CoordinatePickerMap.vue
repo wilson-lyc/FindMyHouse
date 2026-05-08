@@ -8,6 +8,9 @@ const props = defineProps<{
   active?: boolean;
   longitude?: number;
   latitude?: number;
+  markerLabel?: string;
+  markerClass?: string;
+  markerTitle?: string;
 }>();
 
 const emit = defineEmits<{
@@ -47,12 +50,14 @@ function renderMarker() {
   if (props.longitude === undefined || props.latitude === undefined) return;
 
   const position: [number, number] = [props.longitude, props.latitude];
+  const markerLabel = props.markerLabel ?? '房源';
+  const markerClass = props.markerClass ?? 'house';
   map.value.add(
     new amap.value.Marker({
       position,
-      title: '房源坐标',
+      title: props.markerTitle ?? `${markerLabel}坐标`,
       label: {
-        content: '<div class="map-marker-label house">房源</div>',
+        content: `<div class="map-marker-label ${markerClass}">${markerLabel}</div>`,
         direction: 'top'
       }
     })

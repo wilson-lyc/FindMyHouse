@@ -12,6 +12,10 @@ export const houseSourceChannels = ['beike', 'mini_program', 'anjuke', 'lianjia'
 
 export type HouseSourceChannel = (typeof houseSourceChannels)[number];
 
+export const rentPaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
+
+export type RentPaymentPeriod = (typeof rentPaymentPeriods)[number];
+
 export interface House {
   id: string;
   name: string;
@@ -20,17 +24,18 @@ export interface House {
   livingRoomCount: number;
   bathroomCount: number;
   sourceChannel?: HouseSourceChannel;
-  sourceChannelName?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   rentPrice: number;
+  rentPaymentPeriods?: RentPaymentPeriod[];
   propertyFee?: number;
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
   otherFee?: number;
   phone?: string;
   wechat?: string;
+  contactNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

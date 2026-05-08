@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { Delete, Edit } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
 import { houseSourceChannelLabels, type House } from '../../model/house/house';
 
 defineProps<{
   house: House;
-  selected: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -28,7 +28,6 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
 <template>
   <el-card
     class="house-card"
-    :class="{ active: selected }"
     shadow="never"
     @click="emit('select', house)"
   >
@@ -59,8 +58,8 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
       </div>
     </div>
     <div class="house-card-actions">
-      <el-button size="small" @click.stop="emit('edit', house)">查看详情</el-button>
-      <el-button size="small" type="danger" @click.stop="emit('delete', house)">删除</el-button>
+      <el-button link type="primary" :icon="Edit" @click.stop="emit('edit', house)">详情</el-button>
+      <el-button link type="danger" :icon="Delete" @click.stop="emit('delete', house)">删除</el-button>
     </div>
   </el-card>
 </template>

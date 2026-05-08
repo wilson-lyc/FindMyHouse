@@ -9,6 +9,8 @@ import {
   houseSourceChannelLabels,
   houseSourceChannels,
   houseStatuses,
+  rentPaymentPeriodLabels,
+  rentPaymentPeriods,
   type House,
   type HouseForm
 } from '../../model/house/house';
@@ -31,10 +33,10 @@ const geocoding = ref(false);
 const form = reactive<HouseForm>(createEmptyHouseForm());
 
 const formSections = [
-  { key: 'basic', label: '基础' },
-  { key: 'location', label: '位置' },
-  { key: 'fees', label: '费用' },
-  { key: 'contact', label: '联系' }
+  { key: 'basic', label: '基础信息' },
+  { key: 'location', label: '地理位置' },
+  { key: 'fees', label: '租金费用' },
+  { key: 'contact', label: '联系方式' }
 ];
 
 const rules: FormRules<HouseForm> = {
@@ -65,7 +67,7 @@ async function geocode() {
     form.address = result.formattedAddress || form.address;
     form.latitude = result.latitude;
     form.longitude = result.longitude;
-    ElMessage.success('已定位到高德坐标');
+    ElMessage.success('已定位');
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '定位失败');
   } finally {
@@ -144,14 +146,11 @@ async function submitForm() {
                   />
                 </el-select>
               </el-form-item>
-              <el-form-item label="渠道备注" class="span-2">
-                <el-input v-model="form.sourceChannelName" placeholder="" />
-              </el-form-item>
             </div>
           </section>
 
           <section id="house-form-location" class="house-form-section">
-            <h3>位置定位</h3>
+            <h3>地理位置</h3>
             <div class="form-grid">
               <el-form-item label="地址" prop="address" class="span-2">
                 <div class="address-row">
@@ -159,7 +158,7 @@ async function submitForm() {
                   <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="地图定位" class="span-2">
+              <el-form-item label="定位" class="span-2">
                 <div class="coordinate-map-field">
                   <CoordinatePickerMap
                     v-if="modelValue"
@@ -174,10 +173,20 @@ async function submitForm() {
           </section>
 
           <section id="house-form-fees" class="house-form-section">
-            <h3>费用</h3>
+            <h3>租金费用</h3>
             <div class="form-grid">
               <el-form-item label="租金" prop="rentPrice">
                 <el-input-number v-model="form.rentPrice" :min="0" :step="500" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="交租周期">
+                <el-select v-model="form.rentPaymentPeriods" multiple collapse-tags collapse-tags-tooltip placeholder="">
+                  <el-option
+                    v-for="period in rentPaymentPeriods"
+                    :key="period"
+                    :label="rentPaymentPeriodLabels[period]"
+                    :value="period"
+                  />
+                </el-select>
               </el-form-item>
               <el-form-item label="物业费">
                 <el-input-number v-model="form.propertyFee" :min="0" :step="100" controls-position="right" />
@@ -208,6 +217,9 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="微信">
                 <el-input v-model="form.wechat" placeholder="" />
+              </el-form-item>
+              <el-form-item label="备注" class="span-2">
+                <el-input v-model="form.contactNotes" type="textarea" :rows="3" placeholder="" />
               </el-form-item>
             </div>
           </section>

@@ -21,6 +21,17 @@ export const houseSourceChannelLabels: Record<HouseSourceChannel, string> = {
   other: '其他'
 };
 
+export const rentPaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
+
+export type RentPaymentPeriod = (typeof rentPaymentPeriods)[number];
+
+export const rentPaymentPeriodLabels: Record<RentPaymentPeriod, string> = {
+  monthly: '月付',
+  quarterly: '季付',
+  semiannually: '半年付',
+  annually: '年付'
+};
+
 export interface House {
   id: string;
   name: string;
@@ -29,17 +40,18 @@ export interface House {
   livingRoomCount: number;
   bathroomCount: number;
   sourceChannel?: HouseSourceChannel;
-  sourceChannelName?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   rentPrice: number;
+  rentPaymentPeriods?: RentPaymentPeriod[];
   propertyFee?: number;
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
   otherFee?: number;
   phone?: string;
   wechat?: string;
+  contactNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

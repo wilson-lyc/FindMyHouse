@@ -195,6 +195,14 @@ body {
   grid-template-columns: minmax(110px, 0.55fr) minmax(140px, 1fr);
 }
 
+.map-house-control-row.map-house-filter-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.map-house-filter-row .el-input {
+  grid-column: 1 / -1;
+}
+
 .map-house-control-row--single {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -239,18 +247,12 @@ body {
   padding: 12px;
   color: inherit;
   text-align: left;
-  cursor: pointer;
 }
 
 .house-card .el-card__body {
   display: grid;
   gap: 8px;
   padding: 0;
-}
-
-.house-card.active {
-  border-color: #407899;
-  box-shadow: 0 8px 22px rgb(31 49 63 / 10%);
 }
 
 .house-card-header {
@@ -311,9 +313,19 @@ body {
 .house-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-top: 4px;
-  border-top: 1px solid #ebeef5;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 24px;
+  padding-top: 8px;
+  border-top: 1px solid #eef2f5;
+}
+
+.house-card-actions .el-button {
+  height: 22px;
+  margin-left: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .muted {
@@ -333,7 +345,7 @@ body {
   z-index: 1100;
   top: 0;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 14px;
   border-bottom: 1px solid #dce5eb;

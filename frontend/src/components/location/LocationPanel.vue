@@ -32,9 +32,6 @@ const emit = defineEmits<{
             <span>{{ locationCategoryLabels[location.category] }}</span>
           </div>
           <p>{{ location.address }}</p>
-          <p v-if="location.latitude && location.longitude" class="muted">
-            {{ location.longitude.toFixed(6) }}, {{ location.latitude.toFixed(6) }}
-          </p>
           <div class="location-actions">
             <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>

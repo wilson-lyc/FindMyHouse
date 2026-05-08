@@ -8,17 +8,18 @@ export function createEmptyHouseForm(): HouseForm {
     livingRoomCount: 1,
     bathroomCount: 1,
     sourceChannel: undefined,
-    sourceChannelName: '',
     address: '',
     latitude: undefined,
     longitude: undefined,
     rentPrice: undefined,
+    rentPaymentPeriods: [],
     propertyFee: undefined,
     waterFeePerTon: undefined,
     electricityFeePerKwh: undefined,
     otherFee: undefined,
     phone: '',
-    wechat: ''
+    wechat: '',
+    contactNotes: ''
   };
 }
 
@@ -30,17 +31,18 @@ export function houseToForm(house: House): HouseForm {
     livingRoomCount: house.livingRoomCount,
     bathroomCount: house.bathroomCount,
     sourceChannel: house.sourceChannel,
-    sourceChannelName: house.sourceChannelName ?? '',
     address: house.address,
     latitude: house.latitude,
     longitude: house.longitude,
     rentPrice: house.rentPrice,
+    rentPaymentPeriods: house.rentPaymentPeriods ?? [],
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
     otherFee: house.otherFee,
     phone: house.phone ?? '',
-    wechat: house.wechat ?? ''
+    wechat: house.wechat ?? '',
+    contactNotes: house.contactNotes ?? ''
   };
 }
 
@@ -49,11 +51,12 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     ...payload,
     name: payload.name.trim(),
     sourceChannel: payload.sourceChannel || null,
-    sourceChannelName: payload.sourceChannelName?.trim() ?? '',
     phone: payload.phone?.trim() ?? '',
     wechat: payload.wechat?.trim() ?? '',
+    contactNotes: payload.contactNotes?.trim() ?? '',
     latitude: payload.latitude ?? undefined,
     longitude: payload.longitude ?? undefined,
+    rentPaymentPeriods: payload.rentPaymentPeriods?.length ? payload.rentPaymentPeriods : undefined,
     propertyFee: payload.propertyFee ?? undefined,
     waterFeePerTon: payload.waterFeePerTon ?? undefined,
     electricityFeePerKwh: payload.electricityFeePerKwh ?? undefined,

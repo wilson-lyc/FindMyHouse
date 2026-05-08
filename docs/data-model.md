@@ -36,17 +36,18 @@ erDiagram
 | living_room_count | integer | 客厅数 |
 | bathroom_count | integer | 卫生间数 |
 | source_channel | text | 房源渠道枚举 |
-| source_channel_name | text | 房源渠道补充说明 |
 | address | text | 地址 |
 | latitude | real | 纬度 |
 | longitude | real | 经度 |
 | rent_price | integer | 月租金 |
+| rent_payment_periods | text | 交租周期 JSON |
 | property_fee | integer | 物业费 |
 | water_fee_per_ton | real | 水费，每吨 |
 | electricity_fee_per_kwh | real | 电费，每度 |
 | other_fee | integer | 其他费用 |
 | phone | text | 联系电话 |
 | wechat | text | 微信 |
+| contact_notes | text | 联系方式备注 |
 | created_at | text | 创建时间 |
 | updated_at | text | 更新时间 |
 

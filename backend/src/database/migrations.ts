@@ -8,24 +8,23 @@ const houseColumns = [
   ['living_room_count', 'INTEGER NOT NULL DEFAULT 0'],
   ['bathroom_count', 'INTEGER NOT NULL DEFAULT 0'],
   ['source_channel', 'TEXT'],
-  ['source_channel_name', 'TEXT'],
   ['address', 'TEXT NOT NULL'],
   ['latitude', 'REAL'],
   ['longitude', 'REAL'],
   ['rent_price', 'INTEGER NOT NULL'],
+  ['rent_payment_periods', 'TEXT'],
   ['property_fee', 'INTEGER'],
   ['water_fee_per_ton', 'REAL'],
   ['electricity_fee_per_kwh', 'REAL'],
   ['other_fee', 'INTEGER'],
   ['phone', 'TEXT'],
   ['wechat', 'TEXT'],
+  ['contact_notes', 'TEXT'],
   ['created_at', 'TEXT NOT NULL'],
   ['updated_at', 'TEXT NOT NULL']
 ] as const;
 
 export function migrate() {
-  resetHousesTableIfNeeded();
-
   db.exec(`
     CREATE TABLE IF NOT EXISTS houses (
       ${houseColumns.map(([name, type]) => `${name} ${type}`).join(',\n      ')}
@@ -51,22 +50,4 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_locations_category ON locations(category);
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
   `);
-}
-
-function resetHousesTableIfNeeded() {
-  const existing = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'houses'")
-    .get();
-
-  if (!existing) return;
-
-  const actualColumns = db.prepare('PRAGMA table_info(houses)').all().map((column) => (column as { name: string }).name);
-  const expectedColumns = houseColumns.map(([name]) => name);
-  const matchesExpectedShape =
-    actualColumns.length === expectedColumns.length &&
-    expectedColumns.every((name, index) => actualColumns[index] === name);
-
-  if (!matchesExpectedShape) {
-    db.exec('DROP TABLE houses');
-  }
 }

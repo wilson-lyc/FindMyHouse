@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { houseSourceChannels, houseStatuses } from '../domain/house.js';
+import { houseSourceChannels, houseStatuses, rentPaymentPeriods } from '../domain/house.js';
 
 const optionalText = z
   .string()
@@ -27,17 +27,18 @@ export const createHouseSchema = z.object({
   livingRoomCount: z.number().int().nonnegative(),
   bathroomCount: z.number().int().nonnegative(),
   sourceChannel: optionalSourceChannel,
-  sourceChannelName: optionalText,
   address: z.string().trim().min(1, 'address is required'),
   latitude: optionalNumber,
   longitude: optionalNumber,
   rentPrice: z.number().int().nonnegative(),
+  rentPaymentPeriods: z.array(z.enum(rentPaymentPeriods)).optional(),
   propertyFee: optionalNumber,
   waterFeePerTon: optionalNumber,
   electricityFeePerKwh: optionalNumber,
   otherFee: optionalNumber,
   phone: optionalText,
-  wechat: optionalText
+  wechat: optionalText,
+  contactNotes: optionalText
 });
 
 export const updateHouseSchema = createHouseSchema.partial();
