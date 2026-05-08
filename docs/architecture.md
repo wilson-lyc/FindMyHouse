@@ -34,7 +34,7 @@ flowchart LR
 推荐页面结构：
 
 - Dashboard：总览、最近房源、推荐摘要。
-- Listings：房源列表、筛选、排序、批量操作。
+- Houses：房源列表、筛选、排序、批量操作。
 - Map：地图模式，展示房源点位、工作地点、路线。
 - Compare：多房源对比表。
 - Agent：对话式分析、推荐解释、风险提示。
@@ -73,12 +73,12 @@ SQLite 适合 MVP 阶段，理由：
 
 MVP 推荐 REST API：
 
-- `GET /api/listings`
-- `POST /api/listings`
-- `GET /api/listings/:id`
-- `PATCH /api/listings/:id`
-- `DELETE /api/listings/:id`
-- `POST /api/listings/:id/geocode`
+- `GET /api/houses`
+- `POST /api/houses`
+- `GET /api/houses/:id`
+- `PATCH /api/houses/:id`
+- `DELETE /api/houses/:id`
+- `POST /api/houses/:id/geocode`
 - `POST /api/commutes/calculate`
 - `POST /api/agent/analyze`
 - `POST /api/agent/recommend`

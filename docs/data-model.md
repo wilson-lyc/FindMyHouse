@@ -23,7 +23,7 @@ erDiagram
 
 ## 表结构建议
 
-### listings
+### houses
 
 保存房源核心信息。
 
@@ -72,7 +72,7 @@ erDiagram
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | id | text | 主键，UUID |
-| listing_id | text | 房源 ID |
+| house_id | text | 房源 ID |
 | place_id | text | 地点 ID |
 | mode | text | walking、cycling、transit、driving |
 | distance_meters | integer | 距离 |
@@ -95,13 +95,13 @@ erDiagram
 | category | text | traffic、cost、comfort、risk、custom |
 | color | text | 展示颜色 |
 
-### listing_tags
+### house_tags
 
 保存房源与标签的多对多关系。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| listing_id | text | 房源 ID |
+| house_id | text | 房源 ID |
 | tag_id | text | 标签 ID |
 
 ### viewing_notes
@@ -111,7 +111,7 @@ erDiagram
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | id | text | 主键，UUID |
-| listing_id | text | 房源 ID |
+| house_id | text | 房源 ID |
 | visited_at | text | 看房时间 |
 | rating | integer | 主观评分 |
 | content | text | 记录内容 |
@@ -145,7 +145,7 @@ erDiagram
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | id | text | 主键，UUID |
-| listing_id | text | 可为空，针对单个房源时填写 |
+| house_id | text | 可为空，针对单个房源时填写 |
 | preference_id | text | 使用的偏好配置 |
 | analysis_type | text | summary、risk、recommendation、comparison |
 | input_snapshot_json | text | 输入数据快照 |

@@ -106,14 +106,14 @@ backend/src/
   config/              环境变量与运行配置
   database/            SQLite 连接和迁移初始化
   routes/              跨业务模块的基础路由
-  modules/listings/    房源模块，包含 domain、dto、mapper、repository、service、routes
+  modules/houses/    房源模块，包含 domain、dto、mapper、repository、service、routes
   modules/locations/   关键地点模块，包含 domain、dto、mapper、repository、service、routes
   modules/maps/        地图服务模块，封装高德地理编码能力
 
 frontend/src/
   app/                 前端应用入口组件
   shared/              跨功能复用的 API 基础设施和工具函数
-  features/listings/   房源业务功能，包含 api、components、composables、lib、model、pages
+  features/houses/   房源业务功能，包含 api、components、composables、lib、model、pages
   features/locations/  关键地点管理
   features/maps/       高德地图组件、SDK 加载和地理编码 API
 ```

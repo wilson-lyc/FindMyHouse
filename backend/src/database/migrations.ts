@@ -2,7 +2,7 @@ import { db } from './connection.js';
 
 export function migrate() {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS listings (
+    CREATE TABLE IF NOT EXISTS houses (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       source TEXT,
@@ -32,9 +32,9 @@ export function migrate() {
       updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
-    CREATE INDEX IF NOT EXISTS idx_listings_rent_price ON listings(rent_price);
-    CREATE INDEX IF NOT EXISTS idx_listings_updated_at ON listings(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_houses_status ON houses(status);
+    CREATE INDEX IF NOT EXISTS idx_houses_rent_price ON houses(rent_price);
+    CREATE INDEX IF NOT EXISTS idx_houses_updated_at ON houses(updated_at);
 
     CREATE TABLE IF NOT EXISTS locations (
       id TEXT PRIMARY KEY,
@@ -52,12 +52,12 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
   `);
 
-  ensureListingColumns();
+  ensureHouseColumns();
 }
 
-function ensureListingColumns() {
+function ensureHouseColumns() {
   const existingColumns = new Set(
-    db.prepare('PRAGMA table_info(listings)').all().map((column) => (column as { name: string }).name)
+    db.prepare('PRAGMA table_info(houses)').all().map((column) => (column as { name: string }).name)
   );
 
   const columns = [
@@ -73,7 +73,7 @@ function ensureListingColumns() {
 
   for (const [name, type] of columns) {
     if (!existingColumns.has(name)) {
-      db.exec(`ALTER TABLE listings ADD COLUMN ${name} ${type}`);
+      db.exec(`ALTER TABLE houses ADD COLUMN ${name} ${type}`);
     }
   }
 }

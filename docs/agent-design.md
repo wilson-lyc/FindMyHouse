@@ -50,12 +50,12 @@ flowchart TD
 
 Agent 可使用的内部工具：
 
-- `listListings(filters)`：查询房源列表。
-- `getListingDetail(listingId)`：获取单个房源详情。
-- `getCommuteResults(listingId)`：获取通勤结果。
+- `listHouses(filters)`：查询房源列表。
+- `getHouseDetail(houseId)`：获取单个房源详情。
+- `getCommuteResults(houseId)`：获取通勤结果。
 - `getUserPreference(preferenceId)`：读取用户偏好。
-- `getViewingNotes(listingId)`：读取看房记录。
-- `calculateRecommendationScore(listingId, preferenceId)`：计算基础推荐分。
+- `getViewingNotes(houseId)`：读取看房记录。
+- `calculateRecommendationScore(houseId, preferenceId)`：计算基础推荐分。
 - `saveAgentAnalysis(payload)`：保存分析结果。
 
 这些工具应返回结构化 JSON，减少 LLM 对自由文本的依赖。
@@ -113,10 +113,10 @@ Agent 负责解释：
 
 ```json
 {
-  "best_overall_listing_id": "listing-id",
+  "best_overall_house_id": "house-id",
   "ranking": [
     {
-      "listing_id": "listing-id",
+      "house_id": "house-id",
       "rank": 1,
       "reason": "通勤和预算最均衡"
     }
