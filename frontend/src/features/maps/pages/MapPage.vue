@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { House, Location as LocationIcon, Plus, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { formatCurrency } from '../../../shared/utils/format';
@@ -36,18 +36,13 @@ const selectedListingFocusKey = ref(0);
 const activePanel = ref<'listings' | 'locations'>('listings');
 const onlyViewportListings = ref(true);
 const currentMapBounds = ref<MapBoundsFilter | null>(null);
-const mapShell = ref<HTMLElement>();
 const leftPanelWidth = ref(420);
-const isResizing = ref(false);
 const minLeftPanelWidth = 360;
 const maxLeftPanelWidth = 760;
 
 const mappedListings = computed(() =>
   listings.value.filter((listing) => listing.latitude !== undefined && listing.longitude !== undefined)
 );
-const mapShellStyle = computed(() => ({
-  '--map-left-panel-width': `${leftPanelWidth.value}px`
-}));
 
 function openCreateDialog() {
   editingListing.value = null;
@@ -122,30 +117,6 @@ function notifyMapResize() {
   window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
 }
 
-function startPanelResize(event: PointerEvent) {
-  isResizing.value = true;
-  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-}
-
-function resizePanel(event: PointerEvent) {
-  if (!isResizing.value || !mapShell.value) return;
-
-  const shellRect = mapShell.value.getBoundingClientRect();
-  const shellMaxWidth = Math.max(minLeftPanelWidth, shellRect.width - 320);
-  const nextWidth = event.clientX - shellRect.left;
-
-  leftPanelWidth.value = Math.min(Math.min(maxLeftPanelWidth, shellMaxWidth), Math.max(minLeftPanelWidth, nextWidth));
-  notifyMapResize();
-}
-
-function stopPanelResize(event: PointerEvent) {
-  if (!isResizing.value) return;
-
-  isResizing.value = false;
-  (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
-  notifyMapResize();
-}
-
 function openCreateLocationDialog() {
   editingLocation.value = null;
   locationDialogVisible.value = true;
@@ -182,16 +153,13 @@ async function confirmDeleteLocation(location: Location) {
 onMounted(async () => {
   await Promise.all([loadListings(), loadLocations()]);
 });
-
-onBeforeUnmount(() => {
-  isResizing.value = false;
-});
 </script>
 
 <template>
-  <main class="map-page" :class="{ 'map-page--resizing': isResizing }">
-    <section ref="mapShell" class="map-split-shell" :style="mapShellStyle">
-      <aside class="map-data-panel">
+  <main class="map-page">
+    <el-splitter @resize-end="notifyMapResize">
+      <el-splitter-panel v-model:size="leftPanelWidth" :min="minLeftPanelWidth" :max="maxLeftPanelWidth">
+        <aside class="map-data-panel">
         <nav class="map-directory-rail" aria-label="地图数据目录">
           <el-menu class="map-directory-menu" :default-active="activePanel" @select="showPanel">
             <el-menu-item index="listings">
@@ -265,20 +233,10 @@ onBeforeUnmount(() => {
             @delete="confirmDeleteLocation"
           />
         </section>
-      </aside>
-
-      <div
-        class="map-resize-handle"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整地图和列表宽度"
-        @pointerdown="startPanelResize"
-        @pointermove="resizePanel"
-        @pointerup="stopPanelResize"
-        @pointercancel="stopPanelResize"
-      />
-
-      <div class="map-canvas-panel">
+        </aside>
+      </el-splitter-panel>
+      <el-splitter-panel>
+        <div class="map-canvas-panel">
         <AmapListingMap
           :listings="mappedListings"
           :locations="locations"
@@ -288,9 +246,9 @@ onBeforeUnmount(() => {
           @edit-listing="openEditDialog"
           @select-listing="selectListing"
         />
-      </div>
-    </section>
-
+        </div>
+      </el-splitter-panel>
+    </el-splitter>
     <ListingFormDialog v-model="dialogVisible" :listing="editingListing" :saving="saving" @submit="submitListing" />
     <LocationFormDialog
       v-model="locationDialogVisible"
