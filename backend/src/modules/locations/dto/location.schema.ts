@@ -20,6 +20,7 @@ export const createLocationSchema = z.object({
   address: z.string().trim().min(1, 'address is required'),
   latitude: optionalNumber,
   longitude: optionalNumber,
+  isFocus: z.boolean().default(false),
   notes: optionalText
 });
 

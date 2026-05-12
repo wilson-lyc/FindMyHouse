@@ -29,10 +29,12 @@ const emit = defineEmits<{
         <article v-for="location in locations" :key="location.id" class="location-item">
           <div class="location-item-header">
             <strong>{{ location.name }}</strong>
-            <span>{{ locationCategoryLabels[location.category] }}</span>
+            <div class="location-item-tags">
+              <el-tag v-if="location.isFocus" type="success" size="small">焦点</el-tag>
+              <el-tag size="small">{{ locationCategoryLabels[location.category] }}</el-tag>
+            </div>
           </div>
-          <p>{{ location.address }}</p>
-          <div class="location-actions">
+          <div class="house-card-actions">
             <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>
           </div>

@@ -7,6 +7,7 @@ export function createEmptyLocationForm(): LocationForm {
     address: '',
     latitude: undefined,
     longitude: undefined,
+    isFocus: false,
     notes: ''
   };
 }
@@ -18,6 +19,7 @@ export function locationToForm(location: Location): LocationForm {
     address: location.address,
     latitude: location.latitude,
     longitude: location.longitude,
+    isFocus: location.isFocus,
     notes: location.notes ?? ''
   };
 }
@@ -29,6 +31,7 @@ export function normalizeLocationForm(payload: LocationForm): LocationForm {
     address: payload.address.trim(),
     latitude: payload.latitude ?? undefined,
     longitude: payload.longitude ?? undefined,
+    isFocus: payload.isFocus,
     notes: payload.notes?.trim() || undefined
   };
 }

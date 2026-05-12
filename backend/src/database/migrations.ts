@@ -24,6 +24,15 @@ const houseColumns = [
   ['updated_at', 'TEXT NOT NULL']
 ] as const;
 
+function ensureColumn(table: string, name: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (columns.some((column) => column.name === name)) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+}
+
 export function migrate() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS houses (
@@ -42,6 +51,7 @@ export function migrate() {
       address TEXT NOT NULL,
       latitude REAL,
       longitude REAL,
+      is_focus INTEGER NOT NULL DEFAULT 0,
       notes TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -49,5 +59,8 @@ export function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_locations_category ON locations(category);
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_single_focus ON locations(is_focus) WHERE is_focus = 1;
   `);
+
+  ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');
 }

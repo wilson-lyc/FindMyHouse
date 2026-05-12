@@ -31,6 +31,8 @@ let infoWindow: AMapInfoWindow | undefined;
 let boundsTimer: number | undefined;
 let resizeObserver: ResizeObserver | undefined;
 const houseFocusZoom = 16;
+const locationFocusZoom = 14;
+let hasAppliedInitialFocus = false;
 
 function housePosition(house: House): [number, number] | undefined {
   if (house.longitude === undefined || house.latitude === undefined) {
@@ -108,6 +110,24 @@ function focusHouse(house: House, position: [number, number]) {
   openHouseInfoWindow(house, position);
 }
 
+function applyInitialFocusLocation() {
+  if (!map.value || hasAppliedInitialFocus) return false;
+
+  const focusLocation = props.locations.find((location) => location.isFocus);
+  const position = focusLocation ? locationPosition(focusLocation) : undefined;
+  if (!position) return false;
+
+  if (map.value.setZoomAndCenter) {
+    map.value.setZoomAndCenter(locationFocusZoom, position);
+  } else {
+    map.value.setZoom?.(locationFocusZoom);
+    map.value.setCenter(position);
+  }
+
+  hasAppliedInitialFocus = true;
+  return true;
+}
+
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
@@ -182,7 +202,9 @@ onMounted(async () => {
     resizeObserver.observe(mapContainer.value);
     renderMarkers();
     window.setTimeout(() => {
-      map.value?.setFitView();
+      if (!applyInitialFocusLocation()) {
+        map.value?.setFitView();
+      }
       emitBounds();
     }, 0);
   } catch (error) {
@@ -193,7 +215,12 @@ onMounted(async () => {
 
 watch(
   () => [props.houses, props.locations],
-  () => renderMarkers(),
+  () => {
+    renderMarkers();
+    if (applyInitialFocusLocation()) {
+      emitBounds();
+    }
+  },
   { deep: true }
 );
 

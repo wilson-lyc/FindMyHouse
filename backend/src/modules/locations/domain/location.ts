@@ -9,6 +9,7 @@ export interface Location {
   address: string;
   latitude?: number;
   longitude?: number;
+  isFocus: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;

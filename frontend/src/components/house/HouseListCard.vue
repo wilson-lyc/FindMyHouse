@@ -2,7 +2,7 @@
 import { Delete, Edit } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
-import { houseSourceChannelLabels, type House } from '../../model/house/house';
+import type { House } from '../../model/house/house';
 
 defineProps<{
   house: House;
@@ -37,7 +37,6 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
     </div>
     <small>
       {{ house.bedroomCount }}房{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫
-      <template v-if="house.sourceChannel"> · {{ houseSourceChannelLabels[house.sourceChannel] }}</template>
     </small>
     <div class="house-card-fees">
       <div class="fee-row">

@@ -618,10 +618,12 @@ body {
 }
 
 .location-item {
+  display: grid;
+  gap: 12px;
   border: 1px solid #e2e9ee;
   border-radius: 8px;
   background: #ffffff;
-  padding: 12px;
+  padding: 14px 12px 12px;
 }
 
 .location-item:hover {
@@ -636,27 +638,15 @@ body {
   gap: 8px;
 }
 
+.location-item-tags {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .location-item strong {
   font-size: 15px;
-}
-
-.location-item span {
-  color: #607282;
-  font-size: 12px;
-}
-
-.location-item p {
-  margin: 8px 0 0;
-  color: #324858;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.location-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 8px;
 }
 
 @media (max-width: 760px) {
