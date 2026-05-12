@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { House as HouseIcon, Location as LocationIcon, Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../../components/house/HouseFormDialog.vue';
@@ -9,11 +9,12 @@ import LocationPanel from '../../components/location/LocationPanel.vue';
 import AmapHouseMap from '../../components/map/AmapHouseMap.vue';
 import { useHouses } from '../../composables/house/useHouses';
 import { useLocations } from '../../composables/location/useLocations';
+import { getDrivingDistance, getDrivingRoute } from '../../api/map/map-api';
 import { normalizeHouseForm } from '../../lib/house/house-form';
 import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type House, type HouseForm } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location, LocationForm } from '../../model/location/location';
-import type { MapBoundsFilter } from '../../model/map/geocode';
+import type { DrivingDistanceResult, DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
 
 const {
   houses,
@@ -39,6 +40,16 @@ const currentMapBounds = ref<MapBoundsFilter | null>(null);
 const leftPanelWidth = ref(420);
 const minLeftPanelWidth = 360;
 const maxLeftPanelWidth = 760;
+const drivingDistances = ref<Map<string, DrivingDistanceResult>>(new Map());
+const loadingDistances = ref(false);
+const routeData = ref<DrivingRouteResult | null>(null);
+const loadingRoute = ref(false);
+
+const focusLocation = computed<Location | null>(() =>
+  locations.value.find(
+    (loc) => loc.isFocus && loc.latitude !== undefined && loc.longitude !== undefined
+  ) ?? null
+);
 
 const mappedHouses = computed(() =>
   houses.value.filter((house) => house.latitude !== undefined && house.longitude !== undefined)
@@ -108,6 +119,76 @@ function selectHouse(house: House) {
   selectedHouse.value = house;
   selectedHouseFocusKey.value += 1;
 }
+
+async function showRoute(house: House) {
+  const focus = focusLocation.value;
+  if (!focus || house.longitude === undefined || house.latitude === undefined) return;
+
+  const origin = `${house.longitude},${house.latitude}`;
+  const destination = `${focus.longitude},${focus.latitude}`;
+
+  loadingRoute.value = true;
+  try {
+    const result = await getDrivingRoute(origin, destination);
+    routeData.value = result ?? null;
+  } catch (error) {
+    ElMessage.error('获取路线失败');
+    console.error('Failed to get driving route:', error);
+  } finally {
+    loadingRoute.value = false;
+  }
+}
+
+async function loadDistances() {
+  const focus = focusLocation.value;
+  if (!focus) {
+    drivingDistances.value = new Map();
+    return;
+  }
+
+  const destination = `${focus.longitude},${focus.latitude}`;
+  const targets = houses.value.filter(
+    (h) => h.latitude !== undefined && h.longitude !== undefined
+  );
+
+  if (targets.length === 0) {
+    drivingDistances.value = new Map();
+    return;
+  }
+
+  loadingDistances.value = true;
+  const results = new Map<string, DrivingDistanceResult>();
+
+  try {
+    const promises = targets.map(async (house) => {
+      const origin = `${house.longitude},${house.latitude}`;
+      const result = await getDrivingDistance(origin, destination);
+      if (result) {
+        results.set(house.id, result);
+      }
+    });
+
+    await Promise.all(promises);
+  } catch (error) {
+    console.error('Failed to load driving distances:', error);
+  } finally {
+    drivingDistances.value = results;
+    loadingDistances.value = false;
+  }
+}
+
+watch(focusLocation, () => {
+  loadDistances();
+});
+
+watch(
+  () => houses.value.map((h) => `${h.id}:${h.latitude},${h.longitude}`).join('|'),
+  () => {
+    if (focusLocation.value) {
+      loadDistances();
+    }
+  }
+);
 
 function showPanel(panel: string) {
   activePanel.value = panel === 'locations' ? 'locations' : 'houses';
@@ -207,9 +288,12 @@ onMounted(async () => {
                   v-for="house in houses"
                   :key="house.id"
                   :house="house"
+                  :driving-distance="drivingDistances.get(house.id)"
+                  :focus-location-name="focusLocation?.name"
                   @select="selectHouse"
                   @edit="openEditDialog"
                   @delete="confirmDeleteHouse"
+                  @route="showRoute"
                 />
               </template>
             </div>
@@ -232,9 +316,11 @@ onMounted(async () => {
           :locations="locations"
           :selected-house-id="selectedHouse?.id"
           :selected-house-focus-key="selectedHouseFocusKey"
+          :route-data="routeData"
           @bounds-change="applyMapBounds"
           @edit-house="openEditDialog"
           @select-house="selectHouse"
+          @clear-route="routeData = null"
         />
         </div>
       </el-splitter-panel>

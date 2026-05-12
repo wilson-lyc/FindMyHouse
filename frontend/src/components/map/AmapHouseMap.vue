@@ -1,26 +1,28 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Location } from '@element-plus/icons-vue';
+import { Close, Location } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
-import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapNamespace } from '../../lib/map/amap-loader';
+import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
-import type { MapBoundsFilter } from '../../model/map/geocode';
+import type { DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
 
 const props = defineProps<{
   houses: House[];
   locations: KeyLocation[];
   selectedHouseId?: string;
   selectedHouseFocusKey?: number;
+  routeData?: DrivingRouteResult | null;
 }>();
 
 const emit = defineEmits<{
   boundsChange: [bounds: MapBoundsFilter];
   selectHouse: [house: House];
   editHouse: [house: House];
+  clearRoute: [];
 }>();
 
 const mapContainer = ref<HTMLDivElement>();
@@ -30,6 +32,8 @@ const loadError = ref('');
 let infoWindow: AMapInfoWindow | undefined;
 let boundsTimer: number | undefined;
 let resizeObserver: ResizeObserver | undefined;
+let routePolyline: AMapPolyline | undefined;
+let routeInfoWindow: AMapInfoWindow | undefined;
 const houseFocusZoom = 16;
 const locationFocusZoom = 14;
 let hasAppliedInitialFocus = false;
@@ -179,6 +183,71 @@ function renderMarkers() {
   if (markers.length) {
     map.value.add(markers);
   }
+
+  renderRoutePolyline();
+}
+
+function formatDistanceShort(meters: number): string {
+  if (meters >= 1000) {
+    return (meters / 1000).toFixed(1) + 'km';
+  }
+  return Math.round(meters) + 'm';
+}
+
+function formatDurationShort(seconds: number): string {
+  if (seconds >= 60) {
+    const minutes = Math.round(seconds / 60);
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return hours + 'h' + (mins > 0 ? mins + 'min' : '');
+    }
+    return minutes + 'min';
+  }
+  return Math.round(seconds) + 's';
+}
+
+function renderRoutePolyline() {
+  if (!map.value || !amap.value || !props.routeData) return;
+
+  const path = props.routeData.polyline;
+  if (!path || path.length < 2) return;
+
+  clearRoutePolyline();
+
+  routePolyline = new amap.value.Polyline({
+    path,
+    strokeColor: '#2b7de1',
+    strokeWeight: 5,
+    strokeOpacity: 0.8,
+    lineJoin: 'round',
+    lineCap: 'round'
+  });
+
+  routePolyline.setMap(map.value);
+
+  map.value?.setFitView([routePolyline]);
+
+  const midIndex = Math.floor(path.length / 2);
+  const midPoint = path[midIndex];
+
+  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(props.routeData.distance)} · ${formatDurationShort(props.routeData.duration)}</div>`;
+  routeInfoWindow = new amap.value.InfoWindow({
+    content: routeInfoContent,
+    offset: new amap.value.Pixel(0, 0)
+  });
+  routeInfoWindow.open(map.value, midPoint);
+}
+
+function clearRoutePolyline() {
+  if (routePolyline) {
+    routePolyline.setMap(null);
+    routePolyline = undefined;
+  }
+  if (routeInfoWindow) {
+    routeInfoWindow.close();
+    routeInfoWindow = undefined;
+  }
 }
 
 function resizeMap() {
@@ -234,6 +303,15 @@ watch(
   }
 );
 
+watch(
+  () => props.routeData,
+  () => {
+    if (!map.value || !amap.value) return;
+    clearRoutePolyline();
+    renderRoutePolyline();
+  }
+);
+
 onBeforeUnmount(() => {
   window.clearTimeout(boundsTimer);
   resizeObserver?.disconnect();
@@ -249,5 +327,13 @@ onBeforeUnmount(() => {
       <span>{{ loadError }}</span>
     </div>
     <div ref="mapContainer" class="amap-container" />
+    <button
+      v-if="props.routeData"
+      class="map-clear-route-btn"
+      title="关闭路线"
+      @click.stop="emit('clearRoute')"
+    >
+      <el-icon><Close /></el-icon>
+    </button>
   </section>
 </template>

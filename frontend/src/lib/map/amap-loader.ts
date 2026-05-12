@@ -19,16 +19,22 @@ export interface AMapBounds {
 }
 
 export interface AMapMap {
-  add(marker: AMapMarker | AMapMarker[]): void;
+  add(marker: AMapMarker | AMapMarker[] | AMapPolyline): void;
+  remove(marker: AMapMarker | AMapPolyline): void;
   clearMap(): void;
   getBounds(): AMapBounds;
   resize?(): void;
   setCenter(position: [number, number], immediately?: boolean, duration?: number): void;
   setZoom?(zoom: number, immediately?: boolean, duration?: number): void;
   setZoomAndCenter?(zoom: number, position: [number, number], immediately?: boolean, duration?: number): void;
-  setFitView(): void;
+  setFitView(overlays?: unknown[]): void;
   on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
   destroy(): void;
+}
+
+export interface AMapLngLat {
+  lng: number;
+  lat: number;
 }
 
 export interface AMapMarker {
@@ -46,12 +52,23 @@ export interface AMapMouseEvent {
 
 export interface AMapInfoWindow {
   open(map: AMapMap, position: [number, number]): void;
+  close(): void;
+}
+
+export interface AMapPixel {
+  offset: [number, number];
+}
+
+export interface AMapPolyline {
+  setMap(map: AMapMap | null): void;
 }
 
 export interface AMapNamespace {
   Map: new (container: string | HTMLDivElement, options: Record<string, unknown>) => AMapMap;
   Marker: new (options: Record<string, unknown>) => AMapMarker;
   InfoWindow: new (options: Record<string, unknown>) => AMapInfoWindow;
+  Polyline: new (options: Record<string, unknown>) => AMapPolyline;
+  Pixel: new (x: number, y: number) => AMapPixel;
 }
 
 let loadingPromise: Promise<AMapNamespace> | undefined;

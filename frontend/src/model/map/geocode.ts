@@ -8,6 +8,21 @@ export interface GeocodeResult {
   district?: string;
 }
 
+export interface DrivingDistanceResult {
+  origin: string;
+  destination: string;
+  distance: number;
+  duration: number;
+}
+
+export interface DrivingRouteResult {
+  origin: string;
+  destination: string;
+  distance: number;
+  duration: number;
+  polyline: Array<[number, number]>;
+}
+
 export interface MapBoundsFilter {
   minLatitude: number;
   maxLatitude: number;

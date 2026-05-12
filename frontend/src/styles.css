@@ -277,6 +277,10 @@ body {
   font-size: 16px;
 }
 
+.house-card-driving {
+  color: #607282;
+}
+
 .house-card-fees {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -328,6 +332,55 @@ body {
   color: #6c7a86;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.amap-container .map-route-label {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #1d1d1f;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 0.5px solid rgba(0, 0, 0, 0.04);
+}
+
+.amap-info-window {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.amap-info-contentContainer {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.amap-info-content {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.amap-info-close {
+  display: none !important;
+}
+
+.amap-info-sharp {
+  display: none !important;
 }
 
 .form-grid {
@@ -459,6 +512,32 @@ body {
   position: relative;
   min-height: 420px;
   overflow: hidden;
+}
+
+.map-clear-route-btn {
+  position: absolute;
+  z-index: 1000;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #dce5eb;
+  background: rgba(255, 255, 255, 0.95);
+  color: #606266;
+  cursor: pointer;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s;
+}
+
+.map-clear-route-btn:hover {
+  background: #ffffff;
+  color: #303133;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 }
 
 .amap-container {
