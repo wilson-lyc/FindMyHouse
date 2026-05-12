@@ -9,7 +9,6 @@ export function useLocations() {
   const loading = ref(false);
   const saving = ref(false);
   const filters = reactive<LocationFilters>({
-    q: '',
     category: ''
   });
 

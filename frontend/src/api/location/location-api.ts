@@ -3,7 +3,6 @@ import type { Location, LocationFilters, LocationForm } from '../../model/locati
 
 export async function fetchLocations(filters: LocationFilters) {
   const params = new URLSearchParams();
-  if (filters.q) params.set('q', filters.q);
   if (filters.category) params.set('category', filters.category);
 
   const suffix = params.toString() ? `?${params.toString()}` : '';

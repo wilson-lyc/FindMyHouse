@@ -46,7 +46,6 @@ export const updateHouseSchema = createHouseSchema.partial();
 export const listHousesQuerySchema = z.object({
   status: z.enum(houseStatuses).optional(),
   sourceChannel: z.enum(houseSourceChannels).optional(),
-  q: z.string().trim().optional(),
   minRentPrice: z.coerce.number().int().nonnegative().optional(),
   maxRentPrice: z.coerce.number().int().nonnegative().optional(),
   minBedroomCount: z.coerce.number().int().nonnegative().optional(),

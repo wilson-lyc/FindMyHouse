@@ -21,17 +21,6 @@ export class HouseRepository {
       params.sourceChannel = filters.sourceChannel;
     }
 
-    if (filters.q) {
-      where.push('(name LIKE @q OR address LIKE @q OR phone LIKE @q OR wechat LIKE @q OR contact_notes LIKE @q)');
-      params.q = `%${filters.q}%`;
-    }
-
-    filters.keywords?.forEach((keyword, index) => {
-      const paramName = `keyword${index}`;
-      where.push(`(name LIKE @${paramName} OR address LIKE @${paramName} OR contact_notes LIKE @${paramName})`);
-      params[paramName] = `%${keyword}%`;
-    });
-
     if (filters.minRentPrice !== undefined) {
       where.push('rent_price >= @minRentPrice');
       params.minRentPrice = filters.minRentPrice;

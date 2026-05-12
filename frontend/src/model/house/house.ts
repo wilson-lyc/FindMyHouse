@@ -62,10 +62,8 @@ export type HouseForm = Omit<House, 'id' | 'createdAt' | 'updatedAt' | 'rentPric
 };
 
 export interface HouseFilters {
-  q: string;
   status: HouseStatus | '';
   sourceChannel: HouseSourceChannel | '';
-  keywords?: string[];
   minRentPrice?: number;
   maxRentPrice?: number;
   minBedroomCount?: number;
@@ -79,17 +77,4 @@ export interface HouseFilters {
   minLongitude?: number;
   maxLongitude?: number;
   limit?: number;
-}
-
-export type HouseAgentSearchFilters = Partial<Omit<HouseFilters, 'status' | 'sourceChannel'>> & {
-  status?: HouseStatus;
-  sourceChannel?: HouseSourceChannel;
-};
-
-export interface HouseAgentSearchResult {
-  query: string;
-  filters: HouseAgentSearchFilters;
-  explanation?: string;
-  steps: string[];
-  houses: House[];
 }

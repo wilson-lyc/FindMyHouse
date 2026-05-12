@@ -25,6 +25,5 @@ export interface Location {
 export type LocationForm = Omit<Location, 'id' | 'createdAt' | 'updatedAt'>;
 
 export interface LocationFilters {
-  q: string;
   category: LocationCategory | '';
 }

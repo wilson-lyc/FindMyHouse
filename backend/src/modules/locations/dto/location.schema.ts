@@ -26,7 +26,6 @@ export const createLocationSchema = z.object({
 export const updateLocationSchema = createLocationSchema.partial();
 
 export const listLocationsQuerySchema = z.object({
-  q: z.string().trim().optional(),
   category: z.enum(locationCategories).optional()
 });
 

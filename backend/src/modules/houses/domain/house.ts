@@ -43,8 +43,6 @@ export interface House {
 export interface HouseFilters {
   status?: HouseStatus;
   sourceChannel?: HouseSourceChannel;
-  q?: string;
-  keywords?: string[];
   minRentPrice?: number;
   maxRentPrice?: number;
   minBedroomCount?: number;

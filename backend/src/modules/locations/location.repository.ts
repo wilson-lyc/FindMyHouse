@@ -16,11 +16,6 @@ export class LocationRepository {
       params.category = filters.category;
     }
 
-    if (filters.q) {
-      where.push('(name LIKE @q OR address LIKE @q OR notes LIKE @q)');
-      params.q = `%${filters.q}%`;
-    }
-
     const sql = `
       SELECT * FROM locations
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
