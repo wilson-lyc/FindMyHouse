@@ -1,116 +1,70 @@
 # FindMyHouse
 
-FindMyHouse 是一个面向租房决策的个人房源整理与智能分析工具。它帮助用户把不同渠道的房源信息结构化，在地图、通勤、预算、生活便利性和 Agent 分析的辅助下完成筛选、对比和最终决策。
+看房多了，记性不够用。这个工具帮你把各个渠道收集的房源汇总起来，在地图上直观地比较位置、通勤和花费，租房决策更踏实。
 
-## 当前阶段
+## 它能帮你做什么
 
-当前正在推进 Roadmap 阶段 2：双模式地图工作台。
+### 把所有房源收在一个地方
 
-已完成的基础内容：
+不管是在贝壳、链家看到的，还是中介发来的，都可以记进来。每个房源可以记录：
 
-- Git 仓库已初始化。
-- 当前开发分支为 `dev`。
-- 项目文档目录已建立。
-- 总体设计、系统架构、功能模块、数据模型、Agent 方案和 Roadmap 已形成初版。
-- 阶段 0 验收清单已补充，便于进入工程初始化阶段前检查。
-- Vue 3 + TypeScript + Vite 前端已初始化。
-- Node.js + TypeScript + Fastify 后端已初始化。
-- SQLite 持久化已接入，当前使用 `better-sqlite3`。
-- 房源 CRUD API 已实现。
-- 前端房源列表、筛选、创建、编辑和删除已实现。
-- 关键地点 CRUD API 已实现。
-- 已接入高德地理编码接口和前端高德 JS SDK 加载。
-- 前端已支持关键地点管理、地图点位展示、房源点位点击摘要和地图视野筛选。
-- 阶段 2 的界面方向已调整为双模式地图工作台：列表模式保留高密度管理效率，大屏地图模式强化空间关系判断。
-- 大屏地图模式已具备房源列表、筛选、地点、详情和分析统计浮动面板。
-- 房源详情/编辑弹窗已按基础、位置、租金费用、联系方式分区，并提供顶部等分跳转导航。
-- 房源详情/编辑弹窗内嵌高德地图点选坐标，地图容器已做层级隔离，避免第三方地图控件覆盖自有 UI。
+- 名称、户型、来源渠道
+- 月租金、物业费、水电费等全部费用
+- 联系方式
+- 当前状态：观望中 / 有意向 / 洽谈中 / 已放弃 / 已签约
 
-## 文档入口
+### 在地图上直观查看
 
-- [文档索引](./docs/README.md)
-- [项目总体设计](./docs/project-overview.md)
-- [系统架构设计](./docs/architecture.md)
-- [功能模块规划](./docs/feature-modules.md)
-- [数据模型设计](./docs/data-model.md)
-- [Agent 设计方案](./docs/agent-design.md)
-- [项目 Roadmap](./docs/roadmap.md)
+所有房源和你的关键地点（公司、学校、常去的地方）都标在地图上。一眼就能看出房子的位置关系，不用再反复切地图查位置。
 
-## 推荐技术栈
+### 一键算通勤
 
-- 前端：Vue 3、TypeScript、Vite、Pinia、Vue Router
-- 后端：Node.js、TypeScript、Fastify
-- 数据库：SQLite，迁移工具优先考虑 Prisma Migrate 或 Drizzle Kit
-- 地图：由后端封装 Mapbox、Google Maps、Amap 或 Leaflet 相关服务能力
+设一个焦点地点（比如公司），所有房源到公司的驾车距离和时间自动算好，通勤效率一目了然。还能在地图上画出驾车路线，看清楚走哪条路、大概多久。
 
-## MVP 边界
+### 按需筛选
 
-MVP 优先完成：
+- 按状态筛选：只看有意向的，或者只看还在观望的
+- 按渠道筛选：只看贝壳上的，或者只看中介推荐的
+- 仅看当前视野范围内的房源：地图缩放到某个区域，只看那里的房子
 
-1. 房源 CRUD 与基础数据持久化。
-2. 关键地点管理。
-3. 地图点位展示。
-4. 通勤计算与缓存。
-5. 基础筛选、排序、标签和对比。
+### 记录完整的费用信息
 
-暂不纳入 MVP 首批工程目标：
+租房不只是月租金。物业费、水费、电费都记下来，算账的时候心里有数，避免入住后发现额外开销。
 
-- 自动网页解析。
-- 浏览器剪藏插件。
-- OCR。
-- 多人协作。
-- Agent/AI 搜索与推荐能力。
-- 移动 App。
+### 管理关键地点
 
-## 后续工程初始化建议
+把公司、学校、地铁站、常去的地方都存好，还可以设一个默认的焦点地点。地图打开自动定位到这个位置，所有通勤计算都以它为准。
 
-本地开发：
+## 快速开始
+
+### 环境要求
+
+需要电脑上已安装 Node.js（版本 20 以上）和 npm（版本 10 以上）。
+
+### 安装步骤
 
 ```bash
+# 下载依赖
 npm install
+
+# 配置地图密钥
 cp .env.example .env
+```
+
+打开 `.env` 文件，填入你的高德地图 Key（需要去[高德开放平台](https://lbs.amap.com/)申请）：
+
+```ini
+AMAP_WEB_SERVICE_KEY=你的Web服务Key
+VITE_AMAP_JS_KEY=你的JS API Key
+VITE_AMAP_SECURITY_JS_CODE=安全密钥（可选）
+```
+
+### 启动
+
+```bash
 npm run dev
 ```
 
-高德地图相关变量放在本地 `.env` 中：
+启动后浏览器打开 http://localhost:5173 即可使用。
 
-```bash
-AMAP_WEB_SERVICE_KEY=your-amap-web-service-key
-VITE_AMAP_JS_KEY=your-amap-js-api-key
-VITE_AMAP_SECURITY_JS_CODE=
-```
 
-`.env` 已被 `.gitignore` 排除，不应提交真实 Key。
-
-默认端口：
-
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:3001`
-
-常用命令：
-
-```bash
-npm run typecheck
-npm run build
-npm run start
-```
-
-## 工程结构
-
-```text
-backend/src/
-  app/                 Fastify 应用组装和全局错误处理
-  config/              环境变量与运行配置
-  database/            SQLite 连接和迁移初始化
-  routes/              跨业务模块的基础路由
-  modules/houses/    房源模块，包含 domain、dto、mapper、repository、service、routes
-  modules/locations/   关键地点模块，包含 domain、dto、mapper、repository、service、routes
-  modules/maps/        地图服务模块，封装高德地理编码能力
-
-frontend/src/
-  app/                 前端应用入口组件
-  shared/              跨功能复用的 API 基础设施和工具函数
-  features/houses/   房源业务功能，包含 api、components、composables、lib、model、pages
-  features/locations/  关键地点管理
-  features/maps/       高德地图组件、SDK 加载和地理编码 API
-```
