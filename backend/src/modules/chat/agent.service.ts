@@ -1,10 +1,12 @@
-import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+import { AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import { Annotation, END, messagesStateReducer, START, StateGraph } from '@langchain/langgraph';
+import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt';
 import { getLlm } from '../langchain/llm.js';
 import { db } from '../../database/connection.js';
 import { HouseRepository } from '../houses/house.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
 import type { House } from '../houses/domain/house.js';
+import { createAgentTools, type ToolResult } from './agent.tools.js';
 
 const houseRepository = new HouseRepository(db);
 const locationRepository = new LocationRepository(db);
@@ -19,88 +21,33 @@ interface ChatMessage {
   content: string;
 }
 
-interface AgentToolCall {
-  tool: 'search_houses' | 'get_focus_location' | string;
-  params?: Record<string, unknown>;
-}
+const systemPrompt = `你是一个专业的找房助手，帮助用户搜索、管理和维护房源信息。
 
-interface ToolResult {
-  kind: 'houses' | 'focus_location' | 'empty' | 'unknown_tool';
-  content: string;
-  houses: House[];
-  reply?: string;
-}
+你可以使用工具查询、新增、更新和删除房源，也可以获取焦点地点。请优先依赖工具返回的数据，不要编造房源、ID、价格、地址或联系人信息。
 
-const systemPrompt = `你是一个专业的找房助手，帮助用户搜索和筛选房源。
-
-你可以根据用户的自然语言描述，调用工具来搜索房源。在回答之前，先判断是否需要搜索房源。
-
-工具列表：
-1. search_houses: 根据条件搜索房源
-   参数说明：
-   - minRentPrice (可选): 最低租金（元/月）
-   - maxRentPrice (可选): 最高租金（元/月）
-   - minBedroomCount (可选): 最少卧室数
-   - maxBedroomCount (可选): 最多卧室数
-   - minLivingRoomCount (可选): 最少客厅数
-   - maxLivingRoomCount (可选): 最多客厅数
-   - minBathroomCount (可选): 最少卫生间数
-   - maxBathroomCount (可选): 最多卫生间数
-   - status (可选): 房源状态，可选值：watching(看房中), interested(感兴趣), negotiating(谈价中), abandoned(已放弃), signed(已签约)
-   - sourceChannel (可选): 来源渠道，可选值：beike, mini_program, anjuke, lianjia, offline_agent, other
-   - limit (可选): 返回数量限制，默认20
-
-2. get_focus_location: 获取焦点地点信息
-
-在回答时，请遵循以下格式：
-- 如果需要搜索房源，先输出 ===TOOL_CALL=== 标记，然后在新行输出一个JSON对象，表示要调用的工具
-- 然后输出你的回答
-
-JSON格式示例：
-{"tool": "search_houses", "params": {"maxRentPrice": 5000, "minBedroomCount": 2}}
-{"tool": "get_focus_location", "params": {}}
-
-注意：一次只能调用一个工具。如果用户的问题不涉及房源搜索，直接回答即可。
+工具使用原则：
+- 用户想找房、筛选、列出、比较、查看详情、更新或删除房源时，使用相应工具。
+- 新增房源时，如果名称、地址、租金、卧室数、客厅数、卫生间数等必填信息缺失，先追问，不要编造。
+- 更新或删除房源时，如果没有明确房源 ID，先搜索候选房源或请用户确认。
+- 删除不可逆，只有用户明确要求删除且能定位到房源 ID 时才删除。
+- 如果一个问题需要多步完成，可以连续使用工具，直到有足够信息回答。
 
 回答要求：
-- 用中文回复
-- 总结找到的房源信息，包括名称、租金、户型、地址等
-- 给出有用的建议和对比分析
-- 回答要简洁清晰`;
-
-const systemPromptWithResults = (results: string) => `你是一个专业的找房助手，帮助用户搜索和筛选房源。
-
-以下是用户请求的房源搜索结果，基于这些结果给出回答：
-${results}
-
-回答要求：
-- 用中文回复
-- 总结找到的房源信息，包括名称、租金、户型、地址等
-- 给出有用的建议和对比分析
-- 回答要简洁清晰`;
+- 用中文回复。
+- 简洁清晰地总结房源名称、租金、户型、地址、状态和关键备注。
+- 对搜索结果给出有用的建议和对比分析。
+- 当工具执行新增、更新、删除后，明确说明执行结果。`;
 
 const AgentState = Annotation.Root({
-  messages: Annotation<ChatMessage[]>({
+  messages: Annotation<BaseMessage[]>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  houses: Annotation<House[]>({
     reducer: (_left, right) => right,
     default: () => [],
   }),
-  draftReply: Annotation<string>({
-    reducer: (_left, right) => right,
-    default: () => '',
-  }),
-  finalReply: Annotation<string>({
-    reducer: (_left, right) => right,
-    default: () => '',
-  }),
-  toolCall: Annotation<AgentToolCall | null>({
-    reducer: (_left, right) => right,
-    default: () => null,
-  }),
-  toolResult: Annotation<ToolResult | null>({
-    reducer: (_left, right) => right,
-    default: () => null,
-  }),
-  houses: Annotation<House[]>({
+  toolResults: Annotation<ToolResult[]>({
     reducer: (_left, right) => right,
     default: () => [],
   }),
@@ -108,225 +55,88 @@ const AgentState = Annotation.Root({
 
 type AgentStateType = typeof AgentState.State;
 
-function toLangChainMessages(messages: ChatMessage[]) {
-  const lastUserMessage = messages[messages.length - 1]?.content ?? '';
-
-  return [
-    ...messages.slice(0, -1).map((msg) =>
-      msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-    ),
-    new HumanMessage(lastUserMessage),
-  ];
+function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
+  return messages.map((message) =>
+    message.role === 'user' ? new HumanMessage(message.content) : new AIMessage(message.content)
+  );
 }
 
 function responseContentToString(content: unknown): string {
   return typeof content === 'string' ? content : JSON.stringify(content);
 }
 
-function extractJsonAfterToolMarker(content: string): { jsonText: string; fullMatch: string } | null {
-  const markerMatch = content.match(/===TOOL_CALL===\s*\n\s*/);
+function getLastAiMessage(messages: BaseMessage[]): AIMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
 
-  if (!markerMatch || markerMatch.index === undefined) {
-    return null;
-  }
-
-  const jsonStart = markerMatch.index + markerMatch[0].length;
-  if (content[jsonStart] !== '{') {
-    return null;
-  }
-
-  let depth = 0;
-  let inString = false;
-  let escaping = false;
-
-  for (let i = jsonStart; i < content.length; i += 1) {
-    const char = content[i];
-
-    if (escaping) {
-      escaping = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      escaping = true;
-      continue;
-    }
-
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) {
-      continue;
-    }
-
-    if (char === '{') {
-      depth += 1;
-    }
-
-    if (char === '}') {
-      depth -= 1;
-    }
-
-    if (depth === 0) {
-      const jsonText = content.slice(jsonStart, i + 1);
-      const trailingWhitespace = content.slice(i + 1).match(/^\s*\n?/)?.[0] ?? '';
-      return {
-        jsonText,
-        fullMatch: content.slice(markerMatch.index, i + 1 + trailingWhitespace.length),
-      };
+    if (message instanceof AIMessage) {
+      return message;
     }
   }
 
-  return null;
+  return undefined;
 }
 
-function parseToolCall(content: string): { toolCall: AgentToolCall | null; replyWithoutToolCall: string } {
-  const extracted = extractJsonAfterToolMarker(content);
-
-  if (!extracted) {
-    return { toolCall: null, replyWithoutToolCall: content };
+function parseToolResult(message: BaseMessage): ToolResult | null {
+  if (!(message instanceof ToolMessage)) {
+    return null;
   }
-
-  const replyWithoutToolCall = content.replace(extracted.fullMatch, '').trim();
 
   try {
-    return {
-      toolCall: JSON.parse(extracted.jsonText) as AgentToolCall,
-      replyWithoutToolCall,
-    };
+    return JSON.parse(responseContentToString(message.content)) as ToolResult;
   } catch {
-    return {
-      toolCall: null,
-      replyWithoutToolCall: replyWithoutToolCall || content,
-    };
+    return null;
   }
 }
 
-function toolParamsAsSearchFilters(params: Record<string, unknown> = {}) {
-  const limit = typeof params.limit === 'number' ? params.limit : 20;
-  return { ...params, limit };
+function getTrailingToolResults(messages: BaseMessage[]): ToolResult[] {
+  const results: ToolResult[] = [];
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (!(message instanceof ToolMessage)) {
+      break;
+    }
+
+    const parsed = parseToolResult(message);
+
+    if (parsed) {
+      results.unshift(parsed);
+    }
+  }
+
+  return results;
 }
 
-function formatHouseSummary(houses: House[]): string {
-  return houses
-    .map(
-      (h) =>
-        `- ${h.name} | 租金: ${h.rentPrice}元/月 | ${h.bedroomCount}室${h.livingRoomCount}厅${h.bathroomCount}卫 | ${h.address} | 状态: ${h.status}`
-    )
-    .join('\n');
-}
+function collectToolResults(state: AgentStateType) {
+  const toolResults = getTrailingToolResults(state.messages);
 
-function routeAfterPlanning(state: AgentStateType) {
-  return state.toolCall ? 'run_tool' : END;
-}
-
-function routeAfterTool(state: AgentStateType) {
-  return state.toolResult?.kind === 'houses' && state.houses.length > 0 ? 'summarize_results' : END;
+  return {
+    toolResults,
+    houses: toolResults.flatMap((result) => result.houses),
+  };
 }
 
 function createAgentGraph() {
+  const tools = createAgentTools({ houseRepository, locationRepository });
+  const toolNode = new ToolNode(tools);
+
   return new StateGraph(AgentState)
-    .addNode('plan', async (state) => {
-      const llm = getLlm();
-      const response = await llm.invoke([
-        new SystemMessage(systemPrompt),
-        ...toLangChainMessages(state.messages),
-      ]);
-      const content = responseContentToString(response.content);
-      const { toolCall, replyWithoutToolCall } = parseToolCall(content);
+    .addNode('agent', async (state) => {
+      const llm = getLlm().bindTools(tools);
+      const response = await llm.invoke([new SystemMessage(systemPrompt), ...state.messages]);
 
       return {
-        draftReply: replyWithoutToolCall,
-        finalReply: toolCall ? '' : content,
-        toolCall,
-        houses: [],
+        messages: response,
       };
     })
-    .addNode('run_tool', async (state) => {
-      const toolCall = state.toolCall;
-
-      if (!toolCall) {
-        return {
-          finalReply: state.draftReply,
-          houses: [],
-        };
-      }
-
-      if (toolCall.tool === 'search_houses') {
-        const houses = houseRepository.list(toolParamsAsSearchFilters(toolCall.params) as never);
-
-        if (houses.length === 0) {
-          const reply = state.draftReply || '没有找到匹配的房源，建议您调整搜索条件。';
-          return {
-            finalReply: reply,
-            houses: [],
-            toolResult: {
-              kind: 'empty',
-              content: reply,
-              houses: [],
-              reply,
-            } satisfies ToolResult,
-          };
-        }
-
-        return {
-          houses,
-          toolResult: {
-            kind: 'houses',
-            content: formatHouseSummary(houses),
-            houses,
-          } satisfies ToolResult,
-        };
-      }
-
-      if (toolCall.tool === 'get_focus_location') {
-        const locations = locationRepository.list();
-        const focusLocation = locations.find((l) => l.isFocus);
-        const reply = focusLocation
-          ? state.draftReply || `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`
-          : state.draftReply || '当前没有设置焦点地点。';
-
-        return {
-          finalReply: reply,
-          houses: [],
-          toolResult: {
-            kind: 'focus_location',
-            content: reply,
-            houses: [],
-            reply,
-          } satisfies ToolResult,
-        };
-      }
-
-      return {
-        finalReply: state.draftReply,
-        houses: state.houses,
-        toolResult: {
-          kind: 'unknown_tool',
-          content: state.draftReply,
-          houses: state.houses,
-          reply: state.draftReply,
-        } satisfies ToolResult,
-      };
-    })
-    .addNode('summarize_results', async (state) => {
-      const llm = getLlm();
-      const response = await llm.invoke([
-        new SystemMessage(systemPromptWithResults(state.toolResult?.content ?? '')),
-        ...toLangChainMessages(state.messages),
-        new AIMessage(state.draftReply || `为你找到了${state.houses.length}套房源。`),
-      ]);
-
-      return {
-        finalReply: responseContentToString(response.content),
-      };
-    })
-    .addEdge(START, 'plan')
-    .addConditionalEdges('plan', routeAfterPlanning)
-    .addConditionalEdges('run_tool', routeAfterTool)
-    .addEdge('summarize_results', END)
+    .addNode('tools', toolNode)
+    .addNode('collect_tool_results', collectToolResults)
+    .addEdge(START, 'agent')
+    .addConditionalEdges('agent', toolsCondition, ['tools', END])
+    .addEdge('tools', 'collect_tool_results')
+    .addEdge('collect_tool_results', 'agent')
     .compile();
 }
 
@@ -334,9 +144,14 @@ export class AgentService {
   private readonly graph = createAgentGraph();
 
   async chat(messages: ChatMessage[]): Promise<AgentResult> {
-    const result = await this.graph.invoke({ messages });
+    const result = await this.graph.invoke(
+      { messages: toLangChainMessages(messages), houses: [], toolResults: [] },
+      { recursionLimit: 12 }
+    );
+    const lastAiMessage = getLastAiMessage(result.messages);
+
     return {
-      reply: result.finalReply || result.draftReply,
+      reply: lastAiMessage ? responseContentToString(lastAiMessage.content) : '我暂时无法生成回复，请稍后再试。',
       houses: result.houses,
     };
   }
