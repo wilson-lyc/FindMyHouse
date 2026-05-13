@@ -1,4 +1,5 @@
 import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { getLlm } from '../langchain/llm.js';
 import { db } from '../../database/connection.js';
 import { HouseRepository } from '../houses/house.repository.js';
@@ -11,6 +12,23 @@ const locationRepository = new LocationRepository(db);
 export interface AgentResult {
   reply: string;
   houses: House[];
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface AgentToolCall {
+  tool: 'search_houses' | 'get_focus_location' | string;
+  params?: Record<string, unknown>;
+}
+
+interface ToolResult {
+  kind: 'houses' | 'focus_location' | 'empty' | 'unknown_tool';
+  content: string;
+  houses: House[];
+  reply?: string;
 }
 
 const systemPrompt = `你是一个专业的找房助手，帮助用户搜索和筛选房源。
@@ -61,106 +79,265 @@ ${results}
 - 给出有用的建议和对比分析
 - 回答要简洁清晰`;
 
-export class AgentService {
-  private foundHouses: House[] = [];
+const AgentState = Annotation.Root({
+  messages: Annotation<ChatMessage[]>({
+    reducer: (_left, right) => right,
+    default: () => [],
+  }),
+  draftReply: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => '',
+  }),
+  finalReply: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => '',
+  }),
+  toolCall: Annotation<AgentToolCall | null>({
+    reducer: (_left, right) => right,
+    default: () => null,
+  }),
+  toolResult: Annotation<ToolResult | null>({
+    reducer: (_left, right) => right,
+    default: () => null,
+  }),
+  houses: Annotation<House[]>({
+    reducer: (_left, right) => right,
+    default: () => [],
+  }),
+});
 
-  async chat(messages: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<AgentResult> {
-    this.foundHouses = [];
+type AgentStateType = typeof AgentState.State;
 
-    const llm = getLlm();
-    const lastUserMessage = messages[messages.length - 1].content;
+function toLangChainMessages(messages: ChatMessage[]) {
+  const lastUserMessage = messages[messages.length - 1]?.content ?? '';
 
-    const langchainMessages = [
-      new SystemMessage(systemPrompt),
-      ...messages.slice(0, -1).map((msg) =>
-        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-      ),
-      new HumanMessage(lastUserMessage),
-    ];
+  return [
+    ...messages.slice(0, -1).map((msg) =>
+      msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
+    ),
+    new HumanMessage(lastUserMessage),
+  ];
+}
 
-    const response = await llm.invoke(langchainMessages);
+function responseContentToString(content: unknown): string {
+  return typeof content === 'string' ? content : JSON.stringify(content);
+}
 
-    const content = typeof response.content === 'string' ? response.content : '';
+function extractJsonAfterToolMarker(content: string): { jsonText: string; fullMatch: string } | null {
+  const markerMatch = content.match(/===TOOL_CALL===\s*\n\s*/);
 
-    const toolCallMatch = content.match(/===TOOL_CALL===\s*\n\s*(\{[\s\S]*?\})\s*\n?/);
-    if (toolCallMatch) {
-      try {
-        const toolCall = JSON.parse(toolCallMatch[1]);
-        const replyWithoutToolCall = content
-          .replace(/===TOOL_CALL===\s*\n\s*\{[\s\S]*?\}\s*\n?/, '')
-          .trim();
+  if (!markerMatch || markerMatch.index === undefined) {
+    return null;
+  }
 
-        if (toolCall.tool === 'search_houses') {
-          const params = toolCall.params || {};
-          const limit = typeof params.limit === 'number' ? params.limit : 20;
-          const houses = houseRepository.list({ ...params, limit } as never);
+  const jsonStart = markerMatch.index + markerMatch[0].length;
+  if (content[jsonStart] !== '{') {
+    return null;
+  }
 
-          if (houses.length === 0) {
-            this.foundHouses = [];
-            return {
-              reply: replyWithoutToolCall || '没有找到匹配的房源，建议您调整搜索条件。',
-              houses: [],
-            };
-          }
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
 
-          this.foundHouses = houses;
-          const houseSummary = houses
-            .map(
-              (h) =>
-                `- ${h.name} | 租金: ${h.rentPrice}元/月 | ${h.bedroomCount}室${h.livingRoomCount}厅${h.bathroomCount}卫 | ${h.address} | 状态: ${h.status}`
-            )
-            .join('\n');
+  for (let i = jsonStart; i < content.length; i += 1) {
+    const char = content[i];
 
-          const finalResponse = await llm.invoke([
-            new SystemMessage(systemPromptWithResults(houseSummary)),
-            ...messages.slice(0, -1).map((msg) =>
-              msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-            ),
-            new HumanMessage(lastUserMessage),
-            new AIMessage(replyWithoutToolCall || `为你找到了${houses.length}套房源。`),
-          ]);
-
-          return {
-            reply: typeof finalResponse.content === 'string' ? finalResponse.content : JSON.stringify(finalResponse.content),
-            houses,
-          };
-        }
-
-        if (toolCall.tool === 'get_focus_location') {
-          const locations = locationRepository.list();
-          const focusLocation = locations.find((l) => l.isFocus);
-          if (!focusLocation) {
-            return {
-              reply: replyWithoutToolCall || '当前没有设置焦点地点。',
-              houses: [],
-            };
-          }
-          return {
-            reply:
-              replyWithoutToolCall ||
-              `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`,
-            houses: [],
-          };
-        }
-
-        return {
-          reply: replyWithoutToolCall || content,
-          houses: this.foundHouses,
-        };
-      } catch {
-        const cleanContent = content
-          .replace(/===TOOL_CALL===\s*\n\s*\{[\s\S]*?\}\s*\n?/, '')
-          .trim();
-        return {
-          reply: cleanContent || content,
-          houses: this.foundHouses,
-        };
-      }
+    if (escaping) {
+      escaping = false;
+      continue;
     }
 
+    if (char === '\\') {
+      escaping = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') {
+      depth += 1;
+    }
+
+    if (char === '}') {
+      depth -= 1;
+    }
+
+    if (depth === 0) {
+      const jsonText = content.slice(jsonStart, i + 1);
+      const trailingWhitespace = content.slice(i + 1).match(/^\s*\n?/)?.[0] ?? '';
+      return {
+        jsonText,
+        fullMatch: content.slice(markerMatch.index, i + 1 + trailingWhitespace.length),
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseToolCall(content: string): { toolCall: AgentToolCall | null; replyWithoutToolCall: string } {
+  const extracted = extractJsonAfterToolMarker(content);
+
+  if (!extracted) {
+    return { toolCall: null, replyWithoutToolCall: content };
+  }
+
+  const replyWithoutToolCall = content.replace(extracted.fullMatch, '').trim();
+
+  try {
     return {
-      reply: content,
-      houses: this.foundHouses,
+      toolCall: JSON.parse(extracted.jsonText) as AgentToolCall,
+      replyWithoutToolCall,
+    };
+  } catch {
+    return {
+      toolCall: null,
+      replyWithoutToolCall: replyWithoutToolCall || content,
+    };
+  }
+}
+
+function toolParamsAsSearchFilters(params: Record<string, unknown> = {}) {
+  const limit = typeof params.limit === 'number' ? params.limit : 20;
+  return { ...params, limit };
+}
+
+function formatHouseSummary(houses: House[]): string {
+  return houses
+    .map(
+      (h) =>
+        `- ${h.name} | 租金: ${h.rentPrice}元/月 | ${h.bedroomCount}室${h.livingRoomCount}厅${h.bathroomCount}卫 | ${h.address} | 状态: ${h.status}`
+    )
+    .join('\n');
+}
+
+function routeAfterPlanning(state: AgentStateType) {
+  return state.toolCall ? 'run_tool' : END;
+}
+
+function routeAfterTool(state: AgentStateType) {
+  return state.toolResult?.kind === 'houses' && state.houses.length > 0 ? 'summarize_results' : END;
+}
+
+function createAgentGraph() {
+  return new StateGraph(AgentState)
+    .addNode('plan', async (state) => {
+      const llm = getLlm();
+      const response = await llm.invoke([
+        new SystemMessage(systemPrompt),
+        ...toLangChainMessages(state.messages),
+      ]);
+      const content = responseContentToString(response.content);
+      const { toolCall, replyWithoutToolCall } = parseToolCall(content);
+
+      return {
+        draftReply: replyWithoutToolCall,
+        finalReply: toolCall ? '' : content,
+        toolCall,
+        houses: [],
+      };
+    })
+    .addNode('run_tool', async (state) => {
+      const toolCall = state.toolCall;
+
+      if (!toolCall) {
+        return {
+          finalReply: state.draftReply,
+          houses: [],
+        };
+      }
+
+      if (toolCall.tool === 'search_houses') {
+        const houses = houseRepository.list(toolParamsAsSearchFilters(toolCall.params) as never);
+
+        if (houses.length === 0) {
+          const reply = state.draftReply || '没有找到匹配的房源，建议您调整搜索条件。';
+          return {
+            finalReply: reply,
+            houses: [],
+            toolResult: {
+              kind: 'empty',
+              content: reply,
+              houses: [],
+              reply,
+            } satisfies ToolResult,
+          };
+        }
+
+        return {
+          houses,
+          toolResult: {
+            kind: 'houses',
+            content: formatHouseSummary(houses),
+            houses,
+          } satisfies ToolResult,
+        };
+      }
+
+      if (toolCall.tool === 'get_focus_location') {
+        const locations = locationRepository.list();
+        const focusLocation = locations.find((l) => l.isFocus);
+        const reply = focusLocation
+          ? state.draftReply || `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`
+          : state.draftReply || '当前没有设置焦点地点。';
+
+        return {
+          finalReply: reply,
+          houses: [],
+          toolResult: {
+            kind: 'focus_location',
+            content: reply,
+            houses: [],
+            reply,
+          } satisfies ToolResult,
+        };
+      }
+
+      return {
+        finalReply: state.draftReply,
+        houses: state.houses,
+        toolResult: {
+          kind: 'unknown_tool',
+          content: state.draftReply,
+          houses: state.houses,
+          reply: state.draftReply,
+        } satisfies ToolResult,
+      };
+    })
+    .addNode('summarize_results', async (state) => {
+      const llm = getLlm();
+      const response = await llm.invoke([
+        new SystemMessage(systemPromptWithResults(state.toolResult?.content ?? '')),
+        ...toLangChainMessages(state.messages),
+        new AIMessage(state.draftReply || `为你找到了${state.houses.length}套房源。`),
+      ]);
+
+      return {
+        finalReply: responseContentToString(response.content),
+      };
+    })
+    .addEdge(START, 'plan')
+    .addConditionalEdges('plan', routeAfterPlanning)
+    .addConditionalEdges('run_tool', routeAfterTool)
+    .addEdge('summarize_results', END)
+    .compile();
+}
+
+export class AgentService {
+  private readonly graph = createAgentGraph();
+
+  async chat(messages: ChatMessage[]): Promise<AgentResult> {
+    const result = await this.graph.invoke({ messages });
+    return {
+      reply: result.finalReply || result.draftReply,
+      houses: result.houses,
     };
   }
 }

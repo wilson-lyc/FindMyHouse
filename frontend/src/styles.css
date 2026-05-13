@@ -151,13 +151,13 @@ body {
   min-height: 0;
   overflow: auto;
   background: #f7f9fb;
-  padding: 12px;
+  padding: 0;
 }
 
 .map-data-content > .location-panel {
   min-height: 100%;
   border: 0;
-  padding: 0;
+  padding: 12px;
   background: transparent;
 }
 
@@ -171,6 +171,7 @@ body {
   min-height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
+  padding: 12px;
 }
 
 .map-data-content > .location-panel {
