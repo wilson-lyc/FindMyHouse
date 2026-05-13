@@ -7,9 +7,10 @@ import HouseListCard from '../../components/house/HouseListCard.vue';
 import LocationFormDialog from '../../components/location/LocationFormDialog.vue';
 import LocationPanel from '../../components/location/LocationPanel.vue';
 import ChatPanel from '../../components/chat/ChatPanel.vue';
-import AmapHouseMap from '../../components/map/AmapHouseMap.vue';
+import MapPanel from '../../components/map/MapPanel.vue';
 import { useHouses } from '../../composables/house/useHouses';
 import { useLocations } from '../../composables/location/useLocations';
+import { useMapStore } from '../../stores/mapStore';
 import { getDrivingRoute } from '../../api/map/map-api';
 import { normalizeHouseForm } from '../../lib/house/house-form';
 import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type House, type HouseForm } from '../../model/house/house';
@@ -28,6 +29,8 @@ const {
 } = useHouses();
 const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation } =
   useLocations();
+
+const mapStore = useMapStore();
 
 const dialogVisible = ref(false);
 const editingHouse = ref<House | null>(null);
@@ -125,6 +128,7 @@ async function toggleViewportHouses() {
 function selectHouse(house: House) {
   selectedHouse.value = house;
   selectedHouseFocusKey.value += 1;
+  mapStore.selectHouse(house.id);
 }
 
 function showRoute(house: House) {
@@ -135,11 +139,13 @@ function showRoute(house: House) {
   }
 
   routeData.value = route;
+  mapStore.setRouteData(route);
   activeRouteHouseId.value = house.id;
 }
 
 function clearRoute() {
   routeData.value = null;
+  mapStore.setRouteData(null);
   activeRouteHouseId.value = null;
 }
 
@@ -178,6 +184,7 @@ async function loadRoutes() {
     drivingRoutes.value = results;
     if (activeRouteHouseId.value) {
       routeData.value = results.get(activeRouteHouseId.value) ?? null;
+      mapStore.setRouteData(routeData.value);
       if (!routeData.value) {
         activeRouteHouseId.value = null;
       }
@@ -199,6 +206,22 @@ watch(
   }
 );
 
+watch(
+  mappedHouses,
+  (val) => {
+    mapStore.setHouses(val);
+  },
+  { deep: true }
+);
+
+watch(
+  locations,
+  (val) => {
+    mapStore.setLocations(val);
+  },
+  { deep: true }
+);
+
 function showPanel(panel: string) {
   if (panel === 'locations') {
     activePanel.value = 'locations';
@@ -210,11 +233,15 @@ function showPanel(panel: string) {
 }
 
 function onChatHousesFound(houses: House[]) {
-  highlightedHouseIds.value = houses.map((h) => h.id);
+  const ids = houses.map((h) => h.id);
+  highlightedHouseIds.value = ids;
+  mapStore.setHighlightedHouseIds(ids);
 }
 
 function onChatSelectHouse(house: House) {
-  highlightedHouseIds.value = [house.id];
+  const ids = [house.id];
+  highlightedHouseIds.value = ids;
+  mapStore.setHighlightedHouseIds(ids);
   selectHouse(house);
   activePanel.value = 'chat';
 }
@@ -346,13 +373,7 @@ onMounted(async () => {
       </el-splitter-panel>
       <el-splitter-panel>
         <div class="map-canvas-panel">
-        <AmapHouseMap
-          :houses="mappedHouses"
-          :locations="locations"
-          :selected-house-id="selectedHouse?.id"
-          :selected-house-focus-key="selectedHouseFocusKey"
-          :route-data="routeData"
-          :highlighted-house-ids="highlightedHouseIds"
+        <MapPanel
           @bounds-change="applyMapBounds"
           @edit-house="openEditDialog"
           @select-house="selectHouse"

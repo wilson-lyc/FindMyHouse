@@ -1,23 +1,16 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { Close, Location } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
+import { useMapStore } from '../../stores/mapStore';
 import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
-import type { DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
-
-const props = defineProps<{
-  houses: House[];
-  locations: KeyLocation[];
-  selectedHouseId?: string;
-  selectedHouseFocusKey?: number;
-  routeData?: DrivingRouteResult | null;
-  highlightedHouseIds?: string[];
-}>();
+import type { MapBoundsFilter } from '../../model/map/geocode';
 
 const emit = defineEmits<{
   boundsChange: [bounds: MapBoundsFilter];
@@ -25,6 +18,9 @@ const emit = defineEmits<{
   editHouse: [house: House];
   clearRoute: [];
 }>();
+
+const mapStore = useMapStore();
+const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds } = storeToRefs(mapStore);
 
 const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
@@ -120,7 +116,7 @@ function focusHouse(house: House, position: [number, number]) {
 function applyInitialFocusLocation() {
   if (!map.value || hasAppliedInitialFocus) return false;
 
-  const focusLocation = props.locations.find((location) => location.isFocus);
+  const focusLocation = locations.value.find((location) => location.isFocus);
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
   if (!position) return false;
 
@@ -141,9 +137,9 @@ function renderMarkers() {
   map.value.clearMap();
   const markers = [];
 
-  const highlightedIds = new Set(props.highlightedHouseIds ?? []);
+  const highlightedIds = new Set(highlightedHouseIds.value ?? []);
 
-  for (const house of props.houses) {
+  for (const house of houses.value) {
     const position = housePosition(house);
     if (!position) continue;
 
@@ -166,7 +162,7 @@ function renderMarkers() {
     markers.push(marker);
   }
 
-  for (const location of props.locations) {
+  for (const location of locations.value) {
     const position = locationPosition(location);
     if (!position) continue;
 
@@ -216,9 +212,9 @@ function formatDurationShort(seconds: number): string {
 }
 
 function renderRoutePolyline() {
-  if (!map.value || !amap.value || !props.routeData) return;
+  if (!map.value || !amap.value || !routeData.value) return;
 
-  const path = props.routeData.polyline;
+  const path = routeData.value.polyline;
   if (!path || path.length < 2) return;
 
   clearRoutePolyline();
@@ -239,7 +235,7 @@ function renderRoutePolyline() {
   const midIndex = Math.floor(path.length / 2);
   const midPoint = path[midIndex];
 
-  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(props.routeData.distance)} · ${formatDurationShort(props.routeData.duration)}</div>`;
+  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
   routeInfoWindow = new amap.value.InfoWindow({
     content: routeInfoContent,
     offset: new amap.value.Pixel(0, 0)
@@ -292,7 +288,7 @@ onMounted(async () => {
 });
 
 watch(
-  () => [props.houses, props.locations],
+  [houses, locations],
   () => {
     renderMarkers();
     if (applyInitialFocusLocation()) {
@@ -303,9 +299,9 @@ watch(
 );
 
 watch(
-  () => [props.selectedHouseId, props.selectedHouseFocusKey] as const,
+  [selectedHouseId, selectedHouseFocusKey],
   ([id]) => {
-    const house = props.houses.find((item) => item.id === id);
+    const house = houses.value.find((item) => item.id === id);
     const position = house ? housePosition(house) : undefined;
     if (!house || !position) return;
     focusHouse(house, position);
@@ -313,7 +309,7 @@ watch(
 );
 
 watch(
-  () => props.routeData,
+  routeData,
   () => {
     if (!map.value || !amap.value) return;
     clearRoutePolyline();
@@ -337,7 +333,7 @@ onBeforeUnmount(() => {
     </div>
     <div ref="mapContainer" class="amap-container" />
     <button
-      v-if="props.routeData"
+      v-if="routeData"
       class="map-clear-route-btn"
       title="关闭路线"
       @click.stop="emit('clearRoute')"
