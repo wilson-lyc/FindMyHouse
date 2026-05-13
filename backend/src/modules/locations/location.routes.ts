@@ -45,6 +45,17 @@ export async function registerLocationRoutes(app: FastifyInstance) {
     return { data: location };
   });
 
+  app.patch('/api/locations/:id/focus', async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const location = locationService.setFocusLocation(id);
+
+    if (!location) {
+      return reply.code(404).send({ error: 'Location not found' });
+    }
+
+    return { data: location };
+  });
+
   app.delete('/api/locations/:id', async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
     const deleted = locationService.deleteLocation(id);

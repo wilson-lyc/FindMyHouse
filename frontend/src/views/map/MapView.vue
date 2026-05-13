@@ -27,7 +27,7 @@ const {
   saveHouse,
   removeHouse
 } = useHouses();
-const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation } =
+const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation, setLocationFocus } =
   useLocations();
 
 const mapStore = useMapStore();
@@ -362,6 +362,7 @@ onMounted(async () => {
             @create="openCreateLocationDialog"
             @edit="openEditLocationDialog"
             @delete="confirmDeleteLocation"
+            @set-focus="setLocationFocus"
           />
           <ChatPanel
             v-else-if="activePanel === 'chat'"

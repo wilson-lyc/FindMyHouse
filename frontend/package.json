@@ -16,7 +16,8 @@
     "pinia": "^3.0.4",
     "vite": "^7.2.7",
     "vue": "^3.5.25",
-    "vue-element-plus-x": "^2.0.2"
+    "vue-element-plus-x": "^2.0.2",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",

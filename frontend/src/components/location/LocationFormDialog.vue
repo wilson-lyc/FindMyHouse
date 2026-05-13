@@ -85,9 +85,6 @@ async function submitForm() {
             <el-option v-for="category in locationCategories" :key="category" :label="locationCategoryLabels[category]" :value="category" />
           </el-select>
         </el-form-item>
-        <el-form-item label="焦点">
-          <el-switch v-model="form.isFocus" active-text="设为地图默认点" />
-        </el-form-item>
         <el-form-item label="地址" prop="address">
           <div class="address-row">
             <el-input v-model="form.address" placeholder="输入关键地点地址" />

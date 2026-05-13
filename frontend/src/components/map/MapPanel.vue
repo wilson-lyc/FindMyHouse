@@ -22,53 +22,22 @@ const emit = defineEmits<{
 const mapStore = useMapStore();
 const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds } = storeToRefs(mapStore);
 
+// ==================== 地图实例 ====================
+
 const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
-let infoWindow: AMapInfoWindow | undefined;
-let boundsTimer: number | undefined;
-let resizeObserver: ResizeObserver | undefined;
-let routePolyline: AMapPolyline | undefined;
-let routeInfoWindow: AMapInfoWindow | undefined;
+
 const houseFocusZoom = 16;
 const locationFocusZoom = 14;
+
 let hasAppliedInitialFocus = false;
+let resizeObserver: ResizeObserver | undefined;
 
-function housePosition(house: House): [number, number] | undefined {
-  if (house.longitude === undefined || house.latitude === undefined) {
-    return undefined;
-  }
+// ==================== 信息窗口 ====================
 
-  return [house.longitude, house.latitude];
-}
-
-function locationPosition(location: KeyLocation): [number, number] | undefined {
-  if (location.longitude === undefined || location.latitude === undefined) {
-    return undefined;
-  }
-
-  return [location.longitude, location.latitude];
-}
-
-function emitBounds() {
-  if (!map.value) return;
-  const bounds = map.value.getBounds();
-  const southWest = bounds.getSouthWest();
-  const northEast = bounds.getNorthEast();
-
-  emit('boundsChange', {
-    minLatitude: southWest.lat,
-    maxLatitude: northEast.lat,
-    minLongitude: southWest.lng,
-    maxLongitude: northEast.lng
-  });
-}
-
-function scheduleBoundsChange() {
-  window.clearTimeout(boundsTimer);
-  boundsTimer = window.setTimeout(emitBounds, 300);
-}
+let infoWindow: AMapInfoWindow | undefined;
 
 function createInfoWindow(content: string, position: [number, number]) {
   if (!amap.value || !map.value) return;
@@ -100,6 +69,48 @@ function openHouseInfoWindow(house: House, position: [number, number]) {
   bindHouseInfoAction(house);
 }
 
+// ==================== 视野与边界 ====================
+
+let boundsTimer: number | undefined;
+
+function emitBounds() {
+  if (!map.value) return;
+  const bounds = map.value.getBounds();
+  const southWest = bounds.getSouthWest();
+  const northEast = bounds.getNorthEast();
+
+  emit('boundsChange', {
+    minLatitude: southWest.lat,
+    maxLatitude: northEast.lat,
+    minLongitude: southWest.lng,
+    maxLongitude: northEast.lng
+  });
+}
+
+function scheduleBoundsChange() {
+  window.clearTimeout(boundsTimer);
+  boundsTimer = window.setTimeout(emitBounds, 300);
+}
+
+// ==================== 示例大头针 ====================
+
+function housePosition(house: House): [number, number] | undefined {
+  if (house.longitude === undefined || house.latitude === undefined) {
+    return undefined;
+  }
+
+  return [house.longitude, house.latitude];
+}
+
+function locationPosition(location: KeyLocation): [number, number] | undefined {
+  if (location.longitude === undefined || location.latitude === undefined) {
+    return undefined;
+  }
+
+  return [location.longitude, location.latitude];
+}
+
+/** 聚焦到指定房源，放大地图并弹出信息窗口 */
 function focusHouse(house: House, position: [number, number]) {
   if (!map.value) return;
 
@@ -113,6 +124,7 @@ function focusHouse(house: House, position: [number, number]) {
   openHouseInfoWindow(house, position);
 }
 
+/** 首次加载时跳转到焦点地点 */
 function applyInitialFocusLocation() {
   if (!map.value || hasAppliedInitialFocus) return false;
 
@@ -131,6 +143,7 @@ function applyInitialFocusLocation() {
   return true;
 }
 
+/** 渲染所有房源和地点的大头针 */
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
@@ -191,6 +204,11 @@ function renderMarkers() {
   renderRoutePolyline();
 }
 
+// ==================== 路线 ====================
+
+let routePolyline: AMapPolyline | undefined;
+let routeInfoWindow: AMapInfoWindow | undefined;
+
 function formatDistanceShort(meters: number): string {
   if (meters >= 1000) {
     return (meters / 1000).toFixed(1) + 'km';
@@ -211,6 +229,19 @@ function formatDurationShort(seconds: number): string {
   return Math.round(seconds) + 's';
 }
 
+/** 清除路线折线和信息窗口 */
+function clearRoutePolyline() {
+  if (routePolyline) {
+    routePolyline.setMap(null);
+    routePolyline = undefined;
+  }
+  if (routeInfoWindow) {
+    routeInfoWindow.close();
+    routeInfoWindow = undefined;
+  }
+}
+
+/** 绘制路线折线并显示距离时长标签 */
 function renderRoutePolyline() {
   if (!map.value || !amap.value || !routeData.value) return;
 
@@ -243,16 +274,7 @@ function renderRoutePolyline() {
   routeInfoWindow.open(map.value, midPoint);
 }
 
-function clearRoutePolyline() {
-  if (routePolyline) {
-    routePolyline.setMap(null);
-    routePolyline = undefined;
-  }
-  if (routeInfoWindow) {
-    routeInfoWindow.close();
-    routeInfoWindow = undefined;
-  }
-}
+// ==================== 地图生命周期 ====================
 
 function resizeMap() {
   map.value?.resize?.();
@@ -287,6 +309,14 @@ onMounted(async () => {
   }
 });
 
+onBeforeUnmount(() => {
+  window.clearTimeout(boundsTimer);
+  resizeObserver?.disconnect();
+  map.value?.destroy();
+});
+
+// ==================== 响应式监听 ====================
+
 watch(
   [houses, locations],
   () => {
@@ -316,12 +346,6 @@ watch(
     renderRoutePolyline();
   }
 );
-
-onBeforeUnmount(() => {
-  window.clearTimeout(boundsTimer);
-  resizeObserver?.disconnect();
-  map.value?.destroy();
-});
 </script>
 
 <template>
