@@ -151,13 +151,13 @@ body {
   min-height: 0;
   overflow: auto;
   background: #f7f9fb;
-  padding: 12px;
+  padding: 0;
 }
 
 .map-data-content > .location-panel {
   min-height: 100%;
   border: 0;
-  padding: 0;
+  padding: 12px;
   background: transparent;
 }
 
@@ -171,6 +171,7 @@ body {
   min-height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
+  padding: 12px;
 }
 
 .map-data-content > .location-panel {
@@ -634,6 +635,14 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   box-shadow: 0 4px 12px rgb(31 49 63 / 10%);
+}
+
+.map-marker-label.house.highlighted {
+  background: var(--el-color-warning-light-3, #fdf6ec);
+  border-color: var(--el-color-warning, #e6a23c);
+  color: var(--el-color-warning-dark-2, #b88230);
+  box-shadow: 0 4px 16px rgb(230 162 60 / 40%);
+  transform: scale(1.1);
 }
 
 .amap-marker-label {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { House as HouseIcon, Location as LocationIcon, Plus } from '@element-plus/icons-vue';
+import { House as HouseIcon, Location as LocationIcon, ChatDotSquare, Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../../components/house/HouseFormDialog.vue';
 import HouseListCard from '../../components/house/HouseListCard.vue';
 import LocationFormDialog from '../../components/location/LocationFormDialog.vue';
 import LocationPanel from '../../components/location/LocationPanel.vue';
+import ChatPanel from '../../components/chat/ChatPanel.vue';
 import AmapHouseMap from '../../components/map/AmapHouseMap.vue';
 import { useHouses } from '../../composables/house/useHouses';
 import { useLocations } from '../../composables/location/useLocations';
@@ -34,7 +35,7 @@ const locationDialogVisible = ref(false);
 const editingLocation = ref<Location | null>(null);
 const selectedHouse = ref<House | null>(null);
 const selectedHouseFocusKey = ref(0);
-const activePanel = ref<'houses' | 'locations'>('houses');
+const activePanel = ref<'houses' | 'locations' | 'chat'>('houses');
 const onlyViewportHouses = ref(false);
 const currentMapBounds = ref<MapBoundsFilter | null>(null);
 const leftPanelWidth = ref(420);
@@ -44,6 +45,7 @@ const drivingDistances = ref<Map<string, DrivingDistanceResult>>(new Map());
 const loadingDistances = ref(false);
 const routeData = ref<DrivingRouteResult | null>(null);
 const loadingRoute = ref(false);
+const highlightedHouseIds = ref<string[]>([]);
 
 const focusLocation = computed<Location | null>(() =>
   locations.value.find(
@@ -191,7 +193,23 @@ watch(
 );
 
 function showPanel(panel: string) {
-  activePanel.value = panel === 'locations' ? 'locations' : 'houses';
+  if (panel === 'locations') {
+    activePanel.value = 'locations';
+  } else if (panel === 'chat') {
+    activePanel.value = 'chat';
+  } else {
+    activePanel.value = 'houses';
+  }
+}
+
+function onChatHousesFound(houses: House[]) {
+  highlightedHouseIds.value = houses.map((h) => h.id);
+}
+
+function onChatSelectHouse(house: House) {
+  highlightedHouseIds.value = [house.id];
+  selectHouse(house);
+  activePanel.value = 'chat';
 }
 
 function notifyMapResize() {
@@ -251,6 +269,10 @@ onMounted(async () => {
               <el-icon><LocationIcon /></el-icon>
               <span>地点</span>
             </el-menu-item>
+            <el-menu-item index="chat">
+              <el-icon><ChatDotSquare /></el-icon>
+              <span>对话</span>
+            </el-menu-item>
           </el-menu>
         </nav>
 
@@ -299,12 +321,17 @@ onMounted(async () => {
             </div>
           </div>
           <LocationPanel
-            v-else
+            v-else-if="activePanel === 'locations'"
             :locations="locations"
             :loading="locationsLoading"
             @create="openCreateLocationDialog"
             @edit="openEditLocationDialog"
             @delete="confirmDeleteLocation"
+          />
+          <ChatPanel
+            v-else-if="activePanel === 'chat'"
+            @houses-found="onChatHousesFound"
+            @select-house="onChatSelectHouse"
           />
         </section>
         </aside>
@@ -317,6 +344,7 @@ onMounted(async () => {
           :selected-house-id="selectedHouse?.id"
           :selected-house-focus-key="selectedHouseFocusKey"
           :route-data="routeData"
+          :highlighted-house-ids="highlightedHouseIds"
           @bounds-change="applyMapBounds"
           @edit-house="openEditDialog"
           @select-house="selectHouse"
