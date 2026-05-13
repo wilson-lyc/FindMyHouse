@@ -85,7 +85,15 @@ function formatDuration(seconds: number): string {
       </div>
     </div>
     <div class="house-card-actions">
-      <el-button v-if="drivingDistance" link type="primary" :icon="Van" @click.stop="emit('route', house)">路线</el-button>
+      <el-button
+        v-if="focusLocationName && house.latitude !== undefined && house.longitude !== undefined"
+        link
+        type="primary"
+        :icon="Van"
+        @click.stop="emit('route', house)"
+      >
+        路线
+      </el-button>
       <el-button link type="primary" :icon="Edit" @click.stop="emit('edit', house)">详情</el-button>
       <el-button link type="danger" :icon="Delete" @click.stop="emit('delete', house)">删除</el-button>
     </div>

@@ -4,6 +4,7 @@ import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, typ
 import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from '../houses/dto/house.schema.js';
 import type { HouseRepository } from '../houses/house.repository.js';
 import type { LocationRepository } from '../locations/location.repository.js';
+import type { AmapService } from '../maps/amap.service.js';
 
 export const agentToolNames = [
   'search_houses',
@@ -31,6 +32,7 @@ export interface ToolResult {
 interface AgentToolContext {
   houseRepository: HouseRepository;
   locationRepository: LocationRepository;
+  amapService: AmapService;
 }
 
 const toolResultToJson = (result: ToolResult) => JSON.stringify(result);
@@ -76,6 +78,12 @@ const houseInputToolSchema = z.object({
   contactNotes: z.string().trim().optional().describe('联系备注'),
 });
 
+const createHouseToolSchema = houseInputToolSchema.extend({
+  bedroomCount: z.number().int().nonnegative().optional().describe('卧室数，未提供时默认 1'),
+  livingRoomCount: z.number().int().nonnegative().optional().describe('客厅数，未提供时默认 1'),
+  bathroomCount: z.number().int().nonnegative().optional().describe('卫生间数，未提供时默认 1'),
+});
+
 const updateHouseToolSchema = z.object({
   id: idParamsSchema.shape.id,
   data: houseInputToolSchema.partial(),
@@ -106,8 +114,8 @@ export function createAgentTools(context: AgentToolContext) {
       async (params) => toolResultToJson(await runAgentTool({ tool: 'create_house', params }, context)),
       {
         name: 'create_house',
-        description: '新增一套房源。只有当用户提供名称、地址、租金、卧室数、客厅数、卫生间数等必填信息时使用；缺少信息时先追问。',
-        schema: houseInputToolSchema,
+        description: '新增一套房源。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。',
+        schema: createHouseToolSchema,
       }
     ),
     tool(
@@ -236,9 +244,43 @@ function getHouse(params: Record<string, unknown>, { houseRepository }: AgentToo
   };
 }
 
-function createHouse(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
-  const input = createHouseSchema.parse(params);
-  const house = houseRepository.create(input);
+async function createHouse(params: Record<string, unknown>, { houseRepository, amapService }: AgentToolContext): Promise<ToolResult> {
+  const toolInput = createHouseToolSchema.parse(params);
+  let geocodeResult;
+
+  try {
+    geocodeResult = await amapService.geocode(toolInput.address);
+  } catch (error) {
+    return {
+      kind: 'invalid_params',
+      content: error instanceof Error ? error.message : '地址定位失败。',
+      houses: [],
+      reply: '房源还没有创建成功：地址定位失败。请确认地址足够完整，或稍后再试。',
+    };
+  }
+
+  if (!geocodeResult) {
+    return {
+      kind: 'invalid_params',
+      content: `无法定位地址：${toolInput.address}`,
+      houses: [],
+      reply: `房源还没有创建成功：无法定位地址「${toolInput.address}」。请提供更完整的城市、区县、小区或楼栋地址。`,
+    };
+  }
+
+  const input = createHouseSchema.parse({
+    ...toolInput,
+    bedroomCount: toolInput.bedroomCount ?? 1,
+    livingRoomCount: toolInput.livingRoomCount ?? 1,
+    bathroomCount: toolInput.bathroomCount ?? 1,
+  });
+
+  const house = houseRepository.create({
+    ...input,
+    address: geocodeResult.formattedAddress,
+    latitude: geocodeResult.latitude,
+    longitude: geocodeResult.longitude,
+  });
 
   return {
     kind: 'mutation',

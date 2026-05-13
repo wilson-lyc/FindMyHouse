@@ -76,14 +76,16 @@ function scheduleBoundsChange() {
 
 function createInfoWindow(content: string, position: [number, number]) {
   if (!amap.value || !map.value) return;
+  infoWindow?.close();
   infoWindow = new amap.value.InfoWindow({
-    content
+    content,
+    offset: new amap.value.Pixel(0, -32)
   });
   infoWindow.open(map.value, position);
 }
 
 function houseInfoContent(house: House) {
-  return `<div class="map-info"><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--primary el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
+  return `<div class="map-info map-house-info"><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="map-info-detail-button" data-house-id="${house.id}" type="button">详情</button></div></div>`;
 }
 
 function bindHouseInfoAction(house: House) {
@@ -106,10 +108,10 @@ function focusHouse(house: House, position: [number, number]) {
   if (!map.value) return;
 
   if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(houseFocusZoom, position);
+    map.value.setZoomAndCenter(houseFocusZoom, position, true, 0);
   } else {
-    map.value.setZoom?.(houseFocusZoom);
-    map.value.setCenter(position);
+    map.value.setZoom?.(houseFocusZoom, true, 0);
+    map.value.setCenter(position, true, 0);
   }
 
   openHouseInfoWindow(house, position);
@@ -269,7 +271,8 @@ onMounted(async () => {
     map.value = new amap.value.Map(mapContainer.value, {
       zoom: 11,
       center: [116.397428, 39.90923],
-      viewMode: '2D'
+      viewMode: '2D',
+      animateEnable: false
     });
     map.value.on('moveend', scheduleBoundsChange);
     map.value.on('zoomend', scheduleBoundsChange);
