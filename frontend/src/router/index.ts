@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { fetchLocations } from '../api/location/location-api';
 import MapView from '../views/map/MapView.vue';
-import OnboardingPage from '../views/onboarding/OnboardingPage.vue';
+import WelcomePage from '../views/welcome/WelcomePage.vue';
 
 const routes = [
   {
@@ -10,9 +10,9 @@ const routes = [
     component: MapView
   },
   {
-    path: '/onboarding',
-    name: 'onboarding',
-    component: OnboardingPage
+    path: '/welcome',
+    name: 'welcome',
+    component: WelcomePage
   }
 ];
 
@@ -33,12 +33,12 @@ async function hasFocusLocation(): Promise<boolean> {
 router.beforeEach(async (to) => {
   const hasFocus = await hasFocusLocation();
 
-  if (hasFocus && to.name === 'onboarding') {
+  if (hasFocus && to.name === 'welcome') {
     return { name: 'home' };
   }
 
-  if (!hasFocus && to.name !== 'onboarding') {
-    return { name: 'onboarding' };
+  if (!hasFocus && to.name !== 'welcome') {
+    return { name: 'welcome' };
   }
 });
 
