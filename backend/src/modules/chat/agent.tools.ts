@@ -138,7 +138,7 @@ export function createAgentTools(context: AgentToolContext) {
       async () => toolResultToJson(await runAgentTool({ tool: 'get_focus_location', params: {} }, context)),
       {
         name: 'get_focus_location',
-        description: '获取当前设置的焦点地点，例如工作地、学校或通勤参考点。',
+        description: '仅当用户明确询问焦点地点在哪里、是什么或要求查询焦点地点时使用。用户创建房源时提到“焦点地点是...”通常只是上下文，不要调用这个工具。',
         schema: z.object({}),
       }
     ),

@@ -10,12 +10,12 @@ import ChatPanel from '../../components/chat/ChatPanel.vue';
 import AmapHouseMap from '../../components/map/AmapHouseMap.vue';
 import { useHouses } from '../../composables/house/useHouses';
 import { useLocations } from '../../composables/location/useLocations';
-import { getDrivingDistance, getDrivingRoute } from '../../api/map/map-api';
+import { getDrivingRoute } from '../../api/map/map-api';
 import { normalizeHouseForm } from '../../lib/house/house-form';
 import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type House, type HouseForm } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location, LocationForm } from '../../model/location/location';
-import type { DrivingDistanceResult, DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
+import type { DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
 
 const {
   houses,
@@ -41,10 +41,9 @@ const currentMapBounds = ref<MapBoundsFilter | null>(null);
 const leftPanelWidth = ref(420);
 const minLeftPanelWidth = 360;
 const maxLeftPanelWidth = 760;
-const drivingDistances = ref<Map<string, DrivingDistanceResult>>(new Map());
-const loadingDistances = ref(false);
+const drivingRoutes = ref<Map<string, DrivingRouteResult>>(new Map());
 const routeData = ref<DrivingRouteResult | null>(null);
-const loadingRoute = ref(false);
+const activeRouteHouseId = ref<string | null>(null);
 const highlightedHouseIds = ref<string[]>([]);
 
 const focusLocation = computed<Location | null>(() =>
@@ -88,6 +87,12 @@ async function confirmDeleteHouse(house: House) {
     if (selectedHouse.value?.id === house.id) {
       selectedHouse.value = null;
     }
+    const nextRoutes = new Map(drivingRoutes.value);
+    nextRoutes.delete(house.id);
+    drivingRoutes.value = nextRoutes;
+    if (activeRouteHouseId.value === house.id) {
+      clearRoute();
+    }
   } catch {
     // User cancelled the confirmation dialog.
   }
@@ -122,73 +127,75 @@ function selectHouse(house: House) {
   selectedHouseFocusKey.value += 1;
 }
 
-async function showRoute(house: House) {
-  const focus = focusLocation.value;
-  if (!focus || house.longitude === undefined || house.latitude === undefined) return;
-
-  const origin = `${house.longitude},${house.latitude}`;
-  const destination = `${focus.longitude},${focus.latitude}`;
-
-  loadingRoute.value = true;
-  try {
-    const result = await getDrivingRoute(origin, destination);
-    routeData.value = result ?? null;
-  } catch (error) {
-    ElMessage.error('获取路线失败');
-    console.error('Failed to get driving route:', error);
-  } finally {
-    loadingRoute.value = false;
-  }
-}
-
-async function loadDistances() {
-  const focus = focusLocation.value;
-  if (!focus) {
-    drivingDistances.value = new Map();
+function showRoute(house: House) {
+  const route = drivingRoutes.value.get(house.id);
+  if (!route) {
+    ElMessage.info('路线数据正在加载，请稍后再试');
     return;
   }
 
-  const destination = `${focus.longitude},${focus.latitude}`;
+  routeData.value = route;
+  activeRouteHouseId.value = house.id;
+}
+
+function clearRoute() {
+  routeData.value = null;
+  activeRouteHouseId.value = null;
+}
+
+async function loadRoutes() {
+  const focus = focusLocation.value;
+  if (!focus) {
+    drivingRoutes.value = new Map();
+    clearRoute();
+    return;
+  }
+
   const targets = houses.value.filter(
-    (h) => h.latitude !== undefined && h.longitude !== undefined
+    (house) => house.latitude !== undefined && house.longitude !== undefined
   );
 
   if (targets.length === 0) {
-    drivingDistances.value = new Map();
+    drivingRoutes.value = new Map();
+    clearRoute();
     return;
   }
 
-  loadingDistances.value = true;
-  const results = new Map<string, DrivingDistanceResult>();
+  const destination = `${focus.longitude},${focus.latitude}`;
+  const results = new Map<string, DrivingRouteResult>();
 
   try {
-    const promises = targets.map(async (house) => {
-      const origin = `${house.longitude},${house.latitude}`;
-      const result = await getDrivingDistance(origin, destination);
-      if (result) {
-        results.set(house.id, result);
-      }
-    });
+    await Promise.all(
+      targets.map(async (house) => {
+        const origin = `${house.longitude},${house.latitude}`;
+        const result = await getDrivingRoute(origin, destination);
+        if (result) {
+          results.set(house.id, result);
+        }
+      })
+    );
 
-    await Promise.all(promises);
+    drivingRoutes.value = results;
+    if (activeRouteHouseId.value) {
+      routeData.value = results.get(activeRouteHouseId.value) ?? null;
+      if (!routeData.value) {
+        activeRouteHouseId.value = null;
+      }
+    }
   } catch (error) {
-    console.error('Failed to load driving distances:', error);
-  } finally {
-    drivingDistances.value = results;
-    loadingDistances.value = false;
+    console.error('Failed to load driving routes:', error);
   }
 }
 
 watch(focusLocation, () => {
-  loadDistances();
+  clearRoute();
+  void loadRoutes();
 });
 
 watch(
-  () => houses.value.map((h) => `${h.id}:${h.latitude},${h.longitude}`).join('|'),
+  () => houses.value.map((house) => `${house.id}:${house.latitude},${house.longitude}`).join('|'),
   () => {
-    if (focusLocation.value) {
-      loadDistances();
-    }
+    void loadRoutes();
   }
 );
 
@@ -251,6 +258,7 @@ async function confirmDeleteLocation(location: Location) {
 
 onMounted(async () => {
   await Promise.all([loadHouses(), loadLocations()]);
+  await loadRoutes();
 });
 </script>
 
@@ -310,7 +318,7 @@ onMounted(async () => {
                   v-for="house in houses"
                   :key="house.id"
                   :house="house"
-                  :driving-distance="drivingDistances.get(house.id)"
+                  :driving-distance="drivingRoutes.get(house.id)"
                   :focus-location-name="focusLocation?.name"
                   @select="selectHouse"
                   @edit="openEditDialog"
@@ -348,7 +356,7 @@ onMounted(async () => {
           @bounds-change="applyMapBounds"
           @edit-house="openEditDialog"
           @select-house="selectHouse"
-          @clear-route="routeData = null"
+          @clear-route="clearRoute"
         />
         </div>
       </el-splitter-panel>

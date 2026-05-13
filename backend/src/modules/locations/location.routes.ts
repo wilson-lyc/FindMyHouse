@@ -3,8 +3,12 @@ import { db } from '../../database/connection.js';
 import { createLocationSchema, idParamsSchema, listLocationsQuerySchema, updateLocationSchema } from './dto/location.schema.js';
 import { LocationRepository } from './location.repository.js';
 import { LocationService } from './location.service.js';
+import { RouteCacheRepository } from '../maps/route-cache.repository.js';
 
-const locationService = new LocationService(new LocationRepository(db));
+const locationService = new LocationService(
+  new LocationRepository(db),
+  new RouteCacheRepository(db)
+);
 
 export async function registerLocationRoutes(app: FastifyInstance) {
   app.get('/api/locations', async (request) => {
