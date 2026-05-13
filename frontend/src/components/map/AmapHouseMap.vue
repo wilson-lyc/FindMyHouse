@@ -16,6 +16,7 @@ const props = defineProps<{
   selectedHouseId?: string;
   selectedHouseFocusKey?: number;
   routeData?: DrivingRouteResult | null;
+  highlightedHouseIds?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -138,15 +139,20 @@ function renderMarkers() {
   map.value.clearMap();
   const markers = [];
 
+  const highlightedIds = new Set(props.highlightedHouseIds ?? []);
+
   for (const house of props.houses) {
     const position = housePosition(house);
     if (!position) continue;
+
+    const isHighlighted = highlightedIds.has(house.id);
+    const labelClass = isHighlighted ? 'map-marker-label house highlighted' : 'map-marker-label house';
 
     const marker = new amap.value.Marker({
       position,
       title: house.name,
       label: {
-        content: `<div class="map-marker-label house">¥${house.rentPrice}</div>`,
+        content: `<div class="${labelClass}">¥${house.rentPrice}</div>`,
         direction: 'top'
       }
     });

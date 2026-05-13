@@ -636,6 +636,14 @@ body {
   box-shadow: 0 4px 12px rgb(31 49 63 / 10%);
 }
 
+.map-marker-label.house.highlighted {
+  background: var(--el-color-warning-light-3, #fdf6ec);
+  border-color: var(--el-color-warning, #e6a23c);
+  color: var(--el-color-warning-dark-2, #b88230);
+  box-shadow: 0 4px 16px rgb(230 162 60 / 40%);
+  transform: scale(1.1);
+}
+
 .amap-marker-label {
   border: 0 !important;
   background: transparent !important;
