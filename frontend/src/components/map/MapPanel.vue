@@ -186,7 +186,12 @@ function applyInitialFocusLocation() {
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
   if (!focusLocation || !position) return false;
 
-  focusLocationById(focusLocation.id);
+  if (map.value.setZoomAndCenter) {
+    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
+  } else {
+    map.value.setZoom?.(locationFocusZoom, true, 0);
+    map.value.setCenter(position, true, 0);
+  }
 
   hasAppliedInitialFocus = true;
   return true;

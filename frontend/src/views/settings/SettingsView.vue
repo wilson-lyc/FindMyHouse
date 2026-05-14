@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, Refresh, Check } from '@element-plus/icons-vue';
+import { ArrowLeft } from '@element-plus/icons-vue';
 import { fetchConfig, saveConfig, type ConfigData } from '../../api/config/config-api';
 import type { FormInstance, FormRules } from 'element-plus';
 
@@ -169,10 +169,8 @@ onMounted(loadConfig);
             </section>
 
             <footer class="settings-actions">
-              <el-button class="settings-action-button" :icon="Refresh" :disabled="saving" @click="loadConfig">重新加载</el-button>
-              <el-button class="settings-action-button" type="primary" :icon="Check" :loading="saving" @click="submit">
-                保存设置
-              </el-button>
+              <el-button :disabled="saving" @click="loadConfig">重新加载</el-button>
+              <el-button type="primary" :loading="saving" @click="submit">保存设置</el-button>
             </footer>
           </el-form>
         </section>
@@ -296,15 +294,7 @@ onMounted(loadConfig);
   padding: 4px 0;
 }
 
-.settings-action-button {
-  height: 32px;
-  min-width: 96px;
-  border-radius: 6px;
-  font-weight: 600;
-}
-
-.settings-back-button :deep(.el-icon),
-.settings-action-button :deep(.el-icon) {
+.settings-back-button :deep(.el-icon) {
   font-size: 16px;
 }
 
