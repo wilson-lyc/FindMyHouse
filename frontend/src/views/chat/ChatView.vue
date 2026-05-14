@@ -11,5 +11,9 @@ if (!context) {
 </script>
 
 <template>
-  <ChatPanel @houses-found="context.onChatHousesFound" @select-house="context.onChatSelectHouse" />
+  <ChatPanel
+    @houses-found="context.onChatHousesFound"
+    @select-house="context.onChatSelectHouse"
+    @confirm-create-house="context.onAgentConfirmCreateHouse"
+  />
 </template>

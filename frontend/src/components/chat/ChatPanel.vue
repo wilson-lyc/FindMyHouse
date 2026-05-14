@@ -2,7 +2,12 @@
 import { computed, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import MarkdownIt from 'markdown-it';
-import { sendChatMessage } from '../../api/chat/chat-api';
+import {
+  sendChatMessage,
+  type AgentFrontendAction,
+  type ChatMessage as ApiChatMessage,
+  type ConfirmCreateHouseResult
+} from '../../api/chat/chat-api';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import { formatCurrency } from '../../lib/format';
@@ -11,6 +16,7 @@ interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   houses?: House[];
+  hidden?: boolean;
 }
 
 const messages = ref<ChatMessage[]>([]);
@@ -20,6 +26,7 @@ const inputRef = ref<HTMLTextAreaElement | null>(null);
 const composerPanelSize = ref('152px');
 
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
+const visibleMessages = computed(() => messages.value.filter((message) => !message.hidden));
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
@@ -30,6 +37,7 @@ const markdown = new MarkdownIt({
 const emit = defineEmits<{
   housesFound: [houses: House[]];
   selectHouse: [house: House];
+  confirmCreateHouse: [action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>, done: (result: ConfirmCreateHouseResult) => void];
 }>();
 
 async function handleSubmit() {
@@ -42,18 +50,82 @@ async function handleSubmit() {
 
   loading.value = true;
   try {
-    const result = await sendChatMessage(messages.value);
-    const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant' };
-    if (result.houses && result.houses.length > 0) {
-      assistantMessage.houses = result.houses;
-      emit('housesFound', result.houses);
-    }
-    messages.value.push(assistantMessage);
+    const result = await sendChatMessage(toApiMessages());
+    appendAssistantResponse(result);
+    await executeAgentActions(result.actions ?? []);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '请求失败');
   } finally {
     loading.value = false;
   }
+}
+
+function appendAssistantResponse(result: { reply: string; houses?: House[] }) {
+  const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant' };
+
+  if (result.houses && result.houses.length > 0) {
+    assistantMessage.houses = result.houses;
+    emit('housesFound', result.houses);
+  }
+
+  messages.value.push(assistantMessage);
+}
+
+function toApiMessages(): ApiChatMessage[] {
+  return messages.value.map((message) => ({
+    role: message.role,
+    content: message.content
+  }));
+}
+
+async function executeAgentActions(actions: AgentFrontendAction[]) {
+  for (const action of actions) {
+    if (action.type === 'confirm_create_house') {
+      const result = await requestCreateHouseConfirmation(action);
+
+      if (result.status === 'created') {
+        try {
+          await notifyAgentHouseCreated(result.house);
+        } catch (error) {
+          ElMessage.warning(error instanceof Error ? error.message : '创建成功，但回调助手失败');
+          appendAssistantResponse({
+            reply: `房源创建成功：${result.house.name}`,
+            houses: [result.house]
+          });
+        }
+      } else {
+        messages.value.push({ role: 'assistant', content: '已取消新增房源。' });
+      }
+    }
+  }
+}
+
+function requestCreateHouseConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>) {
+  return new Promise<ConfirmCreateHouseResult>((resolve) => {
+    emit('confirmCreateHouse', action, resolve);
+  });
+}
+
+async function notifyAgentHouseCreated(house: House) {
+  messages.value.push({
+    role: 'user',
+    hidden: true,
+    content: [
+      '前端执行器回调：用户已确认新增房源，入库操作已成功完成。',
+      `房源ID：${house.id}`,
+      `名称：${house.name}`,
+      `地址：${house.address}`,
+      `租金：${house.rentPrice}元/月`,
+      `户型：${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`,
+      `状态：${statusLabels[house.status]}`
+    ].join('\n')
+  });
+
+  const result = await sendChatMessage(toApiMessages());
+  appendAssistantResponse({
+    reply: result.reply,
+    houses: result.houses?.length ? result.houses : [house]
+  });
 }
 
 function handleInputKeydown(event: KeyboardEvent) {
@@ -92,7 +164,7 @@ function renderAssistantContent(content: string) {
               "找3个卧室的房子"
             </p>
           </div>
-          <div v-for="(msg, index) in messages" :key="index" class="chat-message-wrapper" :class="msg.role">
+          <div v-for="(msg, index) in visibleMessages" :key="index" class="chat-message-wrapper" :class="msg.role">
             <div class="chat-bubble">
               <div
                 v-if="msg.role === 'assistant'"

@@ -20,7 +20,11 @@ import { createEmptyHouseForm, houseToForm } from '../../lib/house/house-form';
 const props = defineProps<{
   modelValue: boolean;
   house: House | null;
+  initialForm?: HouseForm | null;
   saving: boolean;
+  title?: string;
+  cancelText?: string;
+  submitText?: string;
 }>();
 
 const emit = defineEmits<{
@@ -46,10 +50,10 @@ const rules: FormRules<HouseForm> = {
 };
 
 watch(
-  () => [props.modelValue, props.house] as const,
-  ([visible, house]) => {
+  () => [props.modelValue, props.house, props.initialForm] as const,
+  ([visible, house, initialForm]) => {
     if (!visible) return;
-    Object.assign(form, house ? houseToForm(house) : createEmptyHouseForm());
+    Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
   },
   { immediate: true }
@@ -94,7 +98,7 @@ async function submitForm() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="house ? '房源详情' : '新增房源'"
+    :title="title ?? (house ? '房源详情' : '新增房源')"
     width="760px"
     class="house-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
@@ -222,8 +226,8 @@ async function submitForm() {
       </el-form>
     </el-scrollbar>
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+      <el-button @click="emit('update:modelValue', false)">{{ cancelText ?? '取消' }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submitForm">{{ submitText ?? '保存' }}</el-button>
     </template>
   </el-dialog>
 </template>

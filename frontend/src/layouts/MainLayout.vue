@@ -7,6 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
+import type { ConfirmCreateHouseAction, ConfirmCreateHouseResult } from '../api/chat/chat-api';
 import { getDrivingRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
@@ -43,6 +44,11 @@ const {
 
 const dialogVisible = ref(false);
 const editingHouse = ref<House | null>(null);
+const houseDialogInitialForm = ref<HouseForm | null>(null);
+const houseDialogTitle = ref<string>();
+const houseDialogCancelText = ref<string>();
+const houseDialogSubmitText = ref<string>();
+const pendingAgentCreateDone = ref<((result: ConfirmCreateHouseResult) => void) | null>(null);
 const locationDialogVisible = ref(false);
 const editingLocation = ref<Location | null>(null);
 const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
@@ -64,22 +70,67 @@ const mappedHouses = computed(() =>
 );
 
 function openCreateDialog() {
+  resetHouseDialogOptions();
   editingHouse.value = null;
+  houseDialogInitialForm.value = null;
   dialogVisible.value = true;
 }
 
 function openEditDialog(house: House) {
+  resetHouseDialogOptions();
   editingHouse.value = house;
+  houseDialogInitialForm.value = null;
   dialogVisible.value = true;
 }
 
 async function submitHouse(form: HouseForm) {
   try {
-    await saveHouse(normalizeHouseForm(form), editingHouse.value);
-    dialogVisible.value = false;
+    const savedHouse = await saveHouse(normalizeHouseForm(form), editingHouse.value);
+
+    if (pendingAgentCreateDone.value && savedHouse) {
+      pendingAgentCreateDone.value({ status: 'created', house: savedHouse });
+      pendingAgentCreateDone.value = null;
+      onChatHousesFound([savedHouse]);
+    }
+
+    closeHouseDialog(false);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存失败');
   }
+}
+
+function resetHouseDialogOptions() {
+  if (pendingAgentCreateDone.value) {
+    pendingAgentCreateDone.value({ status: 'cancelled' });
+    pendingAgentCreateDone.value = null;
+  }
+
+  houseDialogTitle.value = undefined;
+  houseDialogCancelText.value = undefined;
+  houseDialogSubmitText.value = undefined;
+}
+
+function closeHouseDialog(cancelPending: boolean) {
+  if (cancelPending && pendingAgentCreateDone.value) {
+    pendingAgentCreateDone.value({ status: 'cancelled' });
+    pendingAgentCreateDone.value = null;
+  }
+
+  dialogVisible.value = false;
+  editingHouse.value = null;
+  houseDialogInitialForm.value = null;
+  houseDialogTitle.value = undefined;
+  houseDialogCancelText.value = undefined;
+  houseDialogSubmitText.value = undefined;
+}
+
+function handleHouseDialogVisibleChange(visible: boolean) {
+  if (!visible) {
+    closeHouseDialog(true);
+    return;
+  }
+
+  dialogVisible.value = true;
 }
 
 async function confirmDeleteHouse(house: House) {
@@ -215,6 +266,17 @@ function onChatSelectHouse(house: House) {
   selectHouse(house);
 }
 
+function onAgentConfirmCreateHouse(action: ConfirmCreateHouseAction, done: (result: ConfirmCreateHouseResult) => void) {
+  resetHouseDialogOptions();
+  editingHouse.value = null;
+  houseDialogInitialForm.value = action.payload;
+  houseDialogTitle.value = action.title;
+  houseDialogCancelText.value = '暂不新增';
+  houseDialogSubmitText.value = '确认新增';
+  pendingAgentCreateDone.value = done;
+  dialogVisible.value = true;
+}
+
 function notifyMapResize() {
   window.requestAnimationFrame(() => {
     mapPanelRef.value?.resize();
@@ -285,7 +347,8 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   confirmDeleteLocation,
   setLocationFocus,
   onChatHousesFound,
-  onChatSelectHouse
+  onChatSelectHouse,
+  onAgentConfirmCreateHouse
 });
 
 onMounted(async () => {
@@ -336,7 +399,17 @@ onMounted(async () => {
       </el-splitter-panel>
     </el-splitter>
 
-    <HouseFormDialog v-model="dialogVisible" :house="editingHouse" :saving="saving" @submit="submitHouse" />
+    <HouseFormDialog
+      :model-value="dialogVisible"
+      :house="editingHouse"
+      :initial-form="houseDialogInitialForm"
+      :saving="saving"
+      :title="houseDialogTitle"
+      :cancel-text="houseDialogCancelText"
+      :submit-text="houseDialogSubmitText"
+      @update:model-value="handleHouseDialogVisibleChange"
+      @submit="submitHouse"
+    />
     <LocationFormDialog
       v-model="locationDialogVisible"
       :location="editingLocation"

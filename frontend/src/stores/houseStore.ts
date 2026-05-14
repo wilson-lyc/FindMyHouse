@@ -27,15 +27,18 @@ export const useHouseStore = defineStore('house', () => {
   async function saveHouse(payload: HouseForm, editingHouse?: House | null) {
     saving.value = true;
     try {
+      let savedHouse: House;
+
       if (editingHouse) {
-        await updateHouse(editingHouse.id, payload);
+        savedHouse = await updateHouse(editingHouse.id, payload);
         ElMessage.success('房源已更新');
       } else {
-        await createHouse(payload);
+        savedHouse = await createHouse(payload);
         ElMessage.success('房源已创建');
       }
 
       await loadHouses();
+      return savedHouse;
     } finally {
       saving.value = false;
     }

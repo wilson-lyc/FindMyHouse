@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import { tool } from '@langchain/core/tools';
 import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters } from '../houses/domain/house.js';
 import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from '../houses/dto/house.schema.js';
@@ -22,10 +23,20 @@ export interface AgentToolCall {
   params?: Record<string, unknown>;
 }
 
+export interface ConfirmCreateHouseAction {
+  id: string;
+  type: 'confirm_create_house';
+  title: string;
+  payload: z.infer<typeof createHouseSchema>;
+}
+
+export type AgentFrontendAction = ConfirmCreateHouseAction;
+
 export interface ToolResult {
-  kind: 'houses' | 'house' | 'mutation' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
+  kind: 'houses' | 'house' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
   content: string;
   houses: House[];
+  actions?: AgentFrontendAction[];
   reply?: string;
 }
 
@@ -114,7 +125,7 @@ export function createAgentTools(context: AgentToolContext) {
       async (params) => toolResultToJson(await runAgentTool({ tool: 'create_house', params }, context)),
       {
         name: 'create_house',
-        description: '新增一套房源。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。',
+        description: '准备新增一套房源并交给前端弹窗让用户确认。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。调用后不会直接入库。',
         schema: createHouseToolSchema,
       }
     ),
@@ -244,7 +255,7 @@ function getHouse(params: Record<string, unknown>, { houseRepository }: AgentToo
   };
 }
 
-async function createHouse(params: Record<string, unknown>, { houseRepository, amapService }: AgentToolContext): Promise<ToolResult> {
+async function createHouse(params: Record<string, unknown>, { amapService }: AgentToolContext): Promise<ToolResult> {
   const toolInput = createHouseToolSchema.parse(params);
   let geocodeResult;
 
@@ -268,25 +279,33 @@ async function createHouse(params: Record<string, unknown>, { houseRepository, a
     };
   }
 
-  const input = createHouseSchema.parse({
+  const normalizedInput = createHouseSchema.parse({
     ...toolInput,
     bedroomCount: toolInput.bedroomCount ?? 1,
     livingRoomCount: toolInput.livingRoomCount ?? 1,
     bathroomCount: toolInput.bathroomCount ?? 1,
   });
 
-  const house = houseRepository.create({
-    ...input,
+  const input = createHouseSchema.parse({
+    ...normalizedInput,
     address: geocodeResult.formattedAddress,
     latitude: geocodeResult.latitude,
     longitude: geocodeResult.longitude,
   });
 
   return {
-    kind: 'mutation',
-    content: formatHouseDetails(house),
-    houses: [house],
-    reply: `已新增房源「${house.name}」。\n${formatHouseDetails(house)}`,
+    kind: 'frontend_action',
+    content: formatPendingHouseDetails(input),
+    houses: [],
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'confirm_create_house',
+        title: `确认新增房源「${input.name}」`,
+        payload: input,
+      },
+    ],
+    reply: `我已识别出一套待新增房源，请在弹窗中确认后再入库。\n${formatPendingHouseDetails(input)}`,
   };
 }
 
@@ -356,6 +375,28 @@ function getFocusLocation({ locationRepository }: AgentToolContext): ToolResult 
 
 function formatHouseLine(house: House): string {
   return `${house.name} | ID: ${house.id} | 租金: ${house.rentPrice}元/月 | ${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫 | ${house.address} | 状态: ${house.status}`;
+}
+
+function formatPendingHouseDetails(house: z.infer<typeof createHouseSchema>): string {
+  const optionalLines = [
+    house.sourceChannel ? `来源：${house.sourceChannel}` : undefined,
+    house.rentPaymentPeriods?.length ? `付款周期：${house.rentPaymentPeriods.join(', ')}` : undefined,
+    house.propertyFee !== undefined ? `物业费：${house.propertyFee}` : undefined,
+    house.waterFeePerTon !== undefined ? `水费：${house.waterFeePerTon}/吨` : undefined,
+    house.electricityFeePerKwh !== undefined ? `电费：${house.electricityFeePerKwh}/度` : undefined,
+    house.otherFee !== undefined ? `其他费用：${house.otherFee}` : undefined,
+    house.phone ? `电话：${house.phone}` : undefined,
+    house.wechat ? `微信：${house.wechat}` : undefined,
+    house.contactNotes ? `联系备注：${house.contactNotes}` : undefined,
+  ].filter(Boolean);
+
+  return [
+    `${house.name} | 租金: ${house.rentPrice}元/月 | ${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫 | ${house.address} | 状态: ${house.status}`,
+    house.latitude !== undefined && house.longitude !== undefined ? `坐标：${house.latitude}, ${house.longitude}` : undefined,
+    ...optionalLines,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function formatHouseDetails(house: House): string {
