@@ -1,4 +1,4 @@
-import { env } from '../../config/env.js';
+import { configService } from '../config/index.js';
 
 interface AmapGeocodeResponse {
   status: string;
@@ -40,12 +40,13 @@ export interface DrivingRouteResult {
 
 export class AmapService {
   async geocode(address: string, city?: string): Promise<GeocodeResult | undefined> {
-    if (!env.amapWebServiceKey) {
+    const amapKey = configService.getAmapWebServiceKey();
+    if (!amapKey) {
       throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
     }
 
     const params = new URLSearchParams({
-      key: env.amapWebServiceKey,
+      key: amapKey,
       address
     });
 
@@ -84,12 +85,13 @@ export class AmapService {
     origin: string,
     destination: string
   ): Promise<DrivingDistanceResult | undefined> {
-    if (!env.amapWebServiceKey) {
+    const amapKey = configService.getAmapWebServiceKey();
+    if (!amapKey) {
       throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
     }
 
     const params = new URLSearchParams({
-      key: env.amapWebServiceKey,
+      key: amapKey,
       origin,
       destination,
       extensions: 'base'
@@ -128,12 +130,13 @@ export class AmapService {
     origin: string,
     destination: string
   ): Promise<DrivingRouteResult | undefined> {
-    if (!env.amapWebServiceKey) {
+    const amapKey = configService.getAmapWebServiceKey();
+    if (!amapKey) {
       throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
     }
 
     const params = new URLSearchParams({
-      key: env.amapWebServiceKey,
+      key: amapKey,
       origin,
       destination,
       extensions: 'all'

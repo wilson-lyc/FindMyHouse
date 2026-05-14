@@ -4,7 +4,7 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Aim } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
-import CoordinatePickerMap from '../map/CoordinatePickerMap.vue';
+import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
   houseSourceChannelLabels,
   houseSourceChannels,
@@ -20,7 +20,11 @@ import { createEmptyHouseForm, houseToForm } from '../../lib/house/house-form';
 const props = defineProps<{
   modelValue: boolean;
   house: House | null;
+  initialForm?: HouseForm | null;
   saving: boolean;
+  title?: string;
+  cancelText?: string;
+  submitText?: string;
 }>();
 
 const emit = defineEmits<{
@@ -46,10 +50,10 @@ const rules: FormRules<HouseForm> = {
 };
 
 watch(
-  () => [props.modelValue, props.house] as const,
-  ([visible, house]) => {
+  () => [props.modelValue, props.house, props.initialForm] as const,
+  ([visible, house, initialForm]) => {
     if (!visible) return;
-    Object.assign(form, house ? houseToForm(house) : createEmptyHouseForm());
+    Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
   },
   { immediate: true }
@@ -75,10 +79,7 @@ async function geocode() {
   }
 }
 
-function applyPickedCoordinate(coordinate: { longitude: number; latitude: number }) {
-  form.longitude = coordinate.longitude;
-  form.latitude = coordinate.latitude;
-}
+
 
 function scrollToSection(sectionKey: string) {
   document.getElementById(`house-form-${sectionKey}`)?.scrollIntoView({
@@ -97,7 +98,7 @@ async function submitForm() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="house ? '房源详情' : '新增房源'"
+    :title="title ?? (house ? '房源详情' : '新增房源')"
     width="760px"
     class="house-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
@@ -160,12 +161,10 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="定位" class="span-2">
                 <div class="coordinate-map-field">
-                  <CoordinatePickerMap
+                  <CoordinatePicker
                     v-if="modelValue"
-                    :active="modelValue"
-                    :longitude="form.longitude"
-                    :latitude="form.latitude"
-                    @change="applyPickedCoordinate"
+                    v-model:longitude="form.longitude"
+                    v-model:latitude="form.latitude"
                   />
                 </div>
               </el-form-item>
@@ -227,8 +226,8 @@ async function submitForm() {
       </el-form>
     </el-scrollbar>
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+      <el-button @click="emit('update:modelValue', false)">{{ cancelText ?? '取消' }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submitForm">{{ submitText ?? '保存' }}</el-button>
     </template>
   </el-dialog>
 </template>

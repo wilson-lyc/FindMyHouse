@@ -71,26 +71,52 @@ export interface AMapNamespace {
   Pixel: new (x: number, y: number) => AMapPixel;
 }
 
+interface AmapConfig {
+  key: string;
+  securityJsCode: string;
+}
+
+let cachedConfig: AmapConfig | undefined;
+let configPromise: Promise<AmapConfig> | undefined;
+
+async function fetchAmapConfig(): Promise<AmapConfig> {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  if (configPromise) {
+    return configPromise;
+  }
+
+  configPromise = fetch('/api/config')
+    .then((res) => res.json())
+    .then((json: { data: { viteAmapJsKey: string; viteAmapSecurityJsCode: string } }) => {
+      const key = json.data.viteAmapJsKey;
+      if (!key) {
+        throw new Error('请在欢迎页配置高德 JS API Key');
+      }
+      cachedConfig = { key, securityJsCode: json.data.viteAmapSecurityJsCode };
+      return cachedConfig;
+    });
+
+  return configPromise;
+}
+
 let loadingPromise: Promise<AMapNamespace> | undefined;
 
-export function loadAmap() {
+export async function loadAmap(): Promise<AMapNamespace> {
   if (window.AMap) {
-    return Promise.resolve(window.AMap);
+    return window.AMap;
   }
 
   if (loadingPromise) {
     return loadingPromise;
   }
 
-  const key = import.meta.env.VITE_AMAP_JS_KEY as string | undefined;
-  const securityJsCode = import.meta.env.VITE_AMAP_SECURITY_JS_CODE as string | undefined;
+  const config = await fetchAmapConfig();
 
-  if (!key || key === 'your-amap-js-api-key') {
-    return Promise.reject(new Error('请在 .env 中配置 VITE_AMAP_JS_KEY'));
-  }
-
-  if (securityJsCode) {
-    window._AMapSecurityConfig = { securityJsCode };
+  if (config.securityJsCode) {
+    window._AMapSecurityConfig = { securityJsCode: config.securityJsCode };
   }
 
   loadingPromise = new Promise((resolve, reject) => {
@@ -115,7 +141,7 @@ export function loadAmap() {
     };
 
     const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}&callback=__initFindMyHouseAmap`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(config.key)}&callback=__initFindMyHouseAmap`;
     script.async = true;
     script.onerror = () => {
       cleanup();

@@ -6,7 +6,7 @@ import { Aim } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
 import { createEmptyLocationForm, locationToForm } from '../../lib/location/location-form';
 import { locationCategories, locationCategoryLabels, type Location, type LocationForm } from '../../model/location/location';
-import CoordinatePickerMap from '../map/CoordinatePickerMap.vue';
+import CoordinatePicker from '../map/CoordinatePicker.vue';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -58,10 +58,7 @@ async function geocode() {
   }
 }
 
-function applyPickedCoordinate(coordinate: { longitude: number; latitude: number }) {
-  form.longitude = coordinate.longitude;
-  form.latitude = coordinate.latitude;
-}
+
 
 async function submitForm() {
   const valid = await formRef.value?.validate().catch(() => false);
@@ -88,9 +85,6 @@ async function submitForm() {
             <el-option v-for="category in locationCategories" :key="category" :label="locationCategoryLabels[category]" :value="category" />
           </el-select>
         </el-form-item>
-        <el-form-item label="焦点">
-          <el-switch v-model="form.isFocus" active-text="设为地图默认点" />
-        </el-form-item>
         <el-form-item label="地址" prop="address">
           <div class="address-row">
             <el-input v-model="form.address" placeholder="输入关键地点地址" />
@@ -99,15 +93,13 @@ async function submitForm() {
         </el-form-item>
         <el-form-item label="定位">
           <div class="coordinate-map-field">
-            <CoordinatePickerMap
+            <CoordinatePicker
               v-if="modelValue"
-              :active="modelValue"
-              :longitude="form.longitude"
-              :latitude="form.latitude"
+              v-model:longitude="form.longitude"
+              v-model:latitude="form.latitude"
               marker-label="地点"
               marker-class="location"
               marker-title="地点坐标"
-              @change="applyPickedCoordinate"
             />
           </div>
         </el-form-item>

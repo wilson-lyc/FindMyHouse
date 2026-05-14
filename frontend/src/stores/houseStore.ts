@@ -1,9 +1,10 @@
+import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { createHouse, deleteHouse, fetchHouses, updateHouse } from '../../api/house/house-api';
-import type { House, HouseFilters, HouseForm } from '../../model/house/house';
+import { createHouse, deleteHouse, fetchHouses, updateHouse } from '../api/house/house-api';
+import type { House, HouseFilters, HouseForm } from '../model/house/house';
 
-export function useHouses() {
+export const useHouseStore = defineStore('house', () => {
   const houses = ref<House[]>([]);
   const loading = ref(false);
   const saving = ref(false);
@@ -58,4 +59,4 @@ export function useHouses() {
     saveHouse,
     removeHouse
   };
-}
+});

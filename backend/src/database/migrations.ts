@@ -60,6 +60,40 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_locations_category ON locations(category);
     CREATE INDEX IF NOT EXISTS idx_locations_updated_at ON locations(updated_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_single_focus ON locations(is_focus) WHERE is_focus = 1;
+
+    CREATE TABLE IF NOT EXISTS map_route_cache (
+      id TEXT PRIMARY KEY,
+      focus_location_id TEXT NOT NULL,
+      origin TEXT NOT NULL,
+      destination TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      distance REAL NOT NULL,
+      duration REAL NOT NULL,
+      polyline TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_map_route_cache_lookup
+      ON map_route_cache(focus_location_id, origin, destination, kind);
+    CREATE INDEX IF NOT EXISTS idx_map_route_cache_focus_location
+      ON map_route_cache(focus_location_id);
+
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      messages TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at);
   `);
 
   ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');

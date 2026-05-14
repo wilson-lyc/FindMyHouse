@@ -5,15 +5,18 @@ import { getLlm } from '../langchain/llm.js';
 import { db } from '../../database/connection.js';
 import { HouseRepository } from '../houses/house.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
+import { AmapService } from '../maps/amap.service.js';
 import type { House } from '../houses/domain/house.js';
-import { createAgentTools, type ToolResult } from './agent.tools.js';
+import { createAgentTools, type AgentFrontendAction, type ToolResult } from './agent.tools.js';
 
 const houseRepository = new HouseRepository(db);
 const locationRepository = new LocationRepository(db);
+const amapService = new AmapService();
 
 export interface AgentResult {
   reply: string;
   houses: House[];
+  actions: AgentFrontendAction[];
 }
 
 interface ChatMessage {
@@ -23,20 +26,25 @@ interface ChatMessage {
 
 const systemPrompt = `你是一个专业的找房助手，帮助用户搜索、管理和维护房源信息。
 
-你可以使用工具查询、新增、更新和删除房源，也可以获取焦点地点。请优先依赖工具返回的数据，不要编造房源、ID、价格、地址或联系人信息。
+你可以使用工具查询、准备新增、更新和删除房源，也可以获取焦点地点。请优先依赖工具返回的数据，不要编造房源、ID、价格、地址或联系人信息。
 
 工具使用原则：
 - 用户想找房、筛选、列出、比较、查看详情、更新或删除房源时，使用相应工具。
-- 新增房源时，如果名称、地址、租金、卧室数、客厅数、卫生间数等必填信息缺失，先追问，不要编造。
+- 新增房源时，如果名称、地址或租金缺失，先追问，不要编造；地址必须由工具解析出坐标后才能交给用户确认，卧室数、客厅数、卫生间数缺失时按 1室1厅1卫 准备。创建工具只会触发前端确认弹窗，不会直接入库。
+- 收到“前端执行器回调”且其中说明用户已确认并成功创建房源时，明确回复创建成功，并总结新增房源。
+- 当用户要求新增房源时，即使消息里包含“焦点地点是……”这类上下文，也不要把它当成查询焦点地点；应继续判断创建房源缺哪些必填项。
+- 只有用户明确询问“焦点地点在哪里/是什么/查询焦点地点”时，才使用获取焦点地点工具。
 - 更新或删除房源时，如果没有明确房源 ID，先搜索候选房源或请用户确认。
 - 删除不可逆，只有用户明确要求删除且能定位到房源 ID 时才删除。
 - 如果一个问题需要多步完成，可以连续使用工具，直到有足够信息回答。
+- 如果用户要求的事情超出当前工具或产品能力范围，不要假装可以完成，也不要编造结果；如实告诉用户“我还没有这个能力”，并欢迎用户到 https://github.com/wilson-lyc/FindMyHouse.git 提交 ISSUE。
 
 回答要求：
 - 用中文回复。
 - 简洁清晰地总结房源名称、租金、户型、地址、状态和关键备注。
 - 对搜索结果给出有用的建议和对比分析。
-- 当工具执行新增、更新、删除后，明确说明执行结果。`;
+- 对暂不支持的请求，简短说明当前还没有这个能力，并附上 https://github.com/wilson-lyc/FindMyHouse.git 作为 ISSUE 反馈地址。
+- 当工具执行准备新增、更新、删除，或收到前端创建回调后，明确说明执行结果。`;
 
 const AgentState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -48,6 +56,10 @@ const AgentState = Annotation.Root({
     default: () => [],
   }),
   toolResults: Annotation<ToolResult[]>({
+    reducer: (_left, right) => right,
+    default: () => [],
+  }),
+  actions: Annotation<AgentFrontendAction[]>({
     reducer: (_left, right) => right,
     default: () => [],
   }),
@@ -111,15 +123,33 @@ function getTrailingToolResults(messages: BaseMessage[]): ToolResult[] {
 
 function collectToolResults(state: AgentStateType) {
   const toolResults = getTrailingToolResults(state.messages);
+  const reply = createToolResultsReply(toolResults);
 
   return {
+    ...(reply ? { messages: [new AIMessage(reply)] } : {}),
     toolResults,
     houses: toolResults.flatMap((result) => result.houses),
+    actions: toolResults.flatMap((result) => result.actions ?? []),
   };
 }
 
+function createToolResultsReply(toolResults: ToolResult[]): string | null {
+  if (toolResults.length === 0) {
+    return null;
+  }
+
+  return toolResults
+    .map((result) => result.reply ?? result.content)
+    .filter((content) => content.trim().length > 0)
+    .join('\n\n');
+}
+
+function shouldFinishAfterToolResults(state: AgentStateType) {
+  return state.toolResults.length > 0 ? END : 'agent';
+}
+
 function createAgentGraph() {
-  const tools = createAgentTools({ houseRepository, locationRepository });
+  const tools = createAgentTools({ houseRepository, locationRepository, amapService });
   const toolNode = new ToolNode(tools);
 
   return new StateGraph(AgentState)
@@ -136,7 +166,7 @@ function createAgentGraph() {
     .addEdge(START, 'agent')
     .addConditionalEdges('agent', toolsCondition, ['tools', END])
     .addEdge('tools', 'collect_tool_results')
-    .addEdge('collect_tool_results', 'agent')
+    .addConditionalEdges('collect_tool_results', shouldFinishAfterToolResults, ['agent', END])
     .compile();
 }
 
@@ -145,7 +175,7 @@ export class AgentService {
 
   async chat(messages: ChatMessage[]): Promise<AgentResult> {
     const result = await this.graph.invoke(
-      { messages: toLangChainMessages(messages), houses: [], toolResults: [] },
+      { messages: toLangChainMessages(messages), houses: [], toolResults: [], actions: [] },
       { recursionLimit: 12 }
     );
     const lastAiMessage = getLastAiMessage(result.messages);
@@ -153,6 +183,7 @@ export class AgentService {
     return {
       reply: lastAiMessage ? responseContentToString(lastAiMessage.content) : '我暂时无法生成回复，请稍后再试。',
       houses: result.houses,
+      actions: result.actions,
     };
   }
 }

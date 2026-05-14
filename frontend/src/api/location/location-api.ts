@@ -20,3 +20,7 @@ export function updateLocation(id: string, payload: LocationForm) {
 export function deleteLocation(id: string) {
   return deleteData(`/api/locations/${id}`);
 }
+
+export function setFocusLocation(id: string) {
+  return patchData<Location, Record<string, never>>(`/api/locations/${id}/focus`, {});
+}

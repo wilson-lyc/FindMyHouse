@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Delete, Edit, Plus } from '@element-plus/icons-vue';
+import { Aim, Delete, Edit, Plus } from '@element-plus/icons-vue';
 import type { Location } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
 
@@ -12,6 +12,7 @@ const emit = defineEmits<{
   create: [];
   edit: [location: Location];
   delete: [location: Location];
+  'set-focus': [location: Location];
 }>();
 </script>
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
             </div>
           </div>
           <div class="house-card-actions">
+            <el-button v-if="!location.isFocus" link type="warning" :icon="Aim" @click="emit('set-focus', location)">设为焦点</el-button>
             <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>
           </div>
