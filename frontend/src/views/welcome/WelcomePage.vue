@@ -23,6 +23,8 @@ const locationFormRef = ref<FormInstance>();
 const configData = reactive<ConfigData>({
   openaiBaseUrl: 'https://api.deepseek.com',
   openaiApiKey: '',
+  openaiModel: 'deepseek-v4-flash',
+  openaiTemperature: 0,
   amapWebServiceKey: '',
   viteAmapJsKey: '',
   viteAmapSecurityJsCode: '',
@@ -31,6 +33,7 @@ const configData = reactive<ConfigData>({
 const configRules: FormRules<ConfigData> = {
   openaiBaseUrl: [{ required: true, message: '请输入 LLM Base URL', trigger: 'blur' }],
   openaiApiKey: [{ required: true, message: '请输入 LLM API Key', trigger: 'blur' }],
+  openaiModel: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
   amapWebServiceKey: [{ required: true, message: '请输入高德 Web Service Key', trigger: 'blur' }],
   viteAmapJsKey: [{ required: true, message: '请输入高德 JS API Key', trigger: 'blur' }],
   viteAmapSecurityJsCode: [{ required: true, message: '请输入高德 Security JS Code', trigger: 'blur' }],
@@ -56,11 +59,13 @@ async function loadConfig() {
     const data = await fetchConfig();
     if (data.openaiBaseUrl) configData.openaiBaseUrl = data.openaiBaseUrl;
     if (data.openaiApiKey) configData.openaiApiKey = data.openaiApiKey;
+    if (data.openaiModel) configData.openaiModel = data.openaiModel;
+    if (data.openaiTemperature !== undefined) configData.openaiTemperature = data.openaiTemperature;
     if (data.amapWebServiceKey) configData.amapWebServiceKey = data.amapWebServiceKey;
     if (data.viteAmapJsKey) configData.viteAmapJsKey = data.viteAmapJsKey;
     if (data.viteAmapSecurityJsCode) configData.viteAmapSecurityJsCode = data.viteAmapSecurityJsCode;
 
-    if (configData.openaiBaseUrl && configData.openaiApiKey && configData.amapWebServiceKey && configData.viteAmapJsKey && configData.viteAmapSecurityJsCode) {
+    if (configData.openaiBaseUrl && configData.openaiApiKey && configData.openaiModel && configData.amapWebServiceKey && configData.viteAmapJsKey && configData.viteAmapSecurityJsCode) {
       activeStep.value = 1;
     }
   } catch {
@@ -79,6 +84,8 @@ async function saveAndNext() {
     await saveConfig({
       openaiBaseUrl: configData.openaiBaseUrl.trim(),
       openaiApiKey: configData.openaiApiKey.trim(),
+      openaiModel: configData.openaiModel.trim(),
+      openaiTemperature: configData.openaiTemperature,
       amapWebServiceKey: configData.amapWebServiceKey.trim(),
       viteAmapJsKey: configData.viteAmapJsKey.trim(),
       viteAmapSecurityJsCode: configData.viteAmapSecurityJsCode?.trim() || '',
@@ -172,6 +179,12 @@ onMounted(loadConfig);
             </el-form-item>
             <el-form-item label="LLM API Key" prop="openaiApiKey">
               <el-input v-model="configData.openaiApiKey" type="password" show-password placeholder="输入 API Key" />
+            </el-form-item>
+            <el-form-item label="模型名称" prop="openaiModel">
+              <el-input v-model="configData.openaiModel" placeholder="例如 deepseek-v4-flash 或 deepseek-v4-pro" />
+            </el-form-item>
+            <el-form-item label="温度" prop="openaiTemperature">
+              <el-slider v-model="configData.openaiTemperature" :min="0" :max="2" :step="0.1" show-input />
             </el-form-item>
             <el-form-item label="高德 Web Service Key" prop="amapWebServiceKey">
               <el-input v-model="configData.amapWebServiceKey" type="password" show-password placeholder="输入高德 Web Service Key" />

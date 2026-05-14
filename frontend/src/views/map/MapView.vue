@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { House as HouseIcon, Location as LocationIcon, ChatDotSquare, Plus } from '@element-plus/icons-vue';
+import { House as HouseIcon, Location as LocationIcon, ChatDotSquare, Plus, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../../components/house/HouseFormDialog.vue';
 import HouseListCard from '../../components/house/HouseListCard.vue';
@@ -309,6 +309,13 @@ onMounted(async () => {
               <span>对话</span>
             </el-menu-item>
           </el-menu>
+          <div class="map-directory-bottom">
+            <el-tooltip content="设置" placement="right">
+              <router-link class="map-directory-icon-button" to="/settings" aria-label="设置">
+                <el-icon><Setting /></el-icon>
+              </router-link>
+            </el-tooltip>
+          </div>
         </nav>
 
         <section class="map-data-content">

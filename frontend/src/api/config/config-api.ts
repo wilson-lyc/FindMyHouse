@@ -3,6 +3,8 @@ import { getData, postData } from '../http';
 export interface ConfigData {
   openaiBaseUrl: string;
   openaiApiKey: string;
+  openaiModel: string;
+  openaiTemperature: number;
   amapWebServiceKey: string;
   viteAmapJsKey: string;
   viteAmapSecurityJsCode: string;

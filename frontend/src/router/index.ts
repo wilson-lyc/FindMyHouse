@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { fetchLocations } from '../api/location/location-api';
 import MapView from '../views/map/MapView.vue';
+import SettingsView from '../views/settings/SettingsView.vue';
 import WelcomePage from '../views/welcome/WelcomePage.vue';
 
 const routes = [
@@ -13,6 +14,11 @@ const routes = [
     path: '/welcome',
     name: 'welcome',
     component: WelcomePage
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: SettingsView
   }
 ];
 
@@ -37,7 +43,7 @@ router.beforeEach(async (to) => {
     return { name: 'home' };
   }
 
-  if (!hasFocus && to.name !== 'welcome') {
+  if (!hasFocus && to.name !== 'welcome' && to.name !== 'settings') {
     return { name: 'welcome' };
   }
 });

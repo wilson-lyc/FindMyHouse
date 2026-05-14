@@ -17,7 +17,7 @@ export class ConfigService {
   }
 
   getOpenaiModel(): string {
-    return this.repo.get('OPENAI_MODEL') ?? 'gpt-4o-mini';
+    return this.repo.get('OPENAI_MODEL') ?? 'deepseek-v4-flash';
   }
 
   getOpenaiTemperature(): number {
