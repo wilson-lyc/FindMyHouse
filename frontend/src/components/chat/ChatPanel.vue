@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { computed, onMounted, ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Delete, Plus, Setting } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
 import {
   sendChatMessage,
@@ -8,6 +9,15 @@ import {
   type ChatMessage as ApiChatMessage,
   type ConfirmCreateHouseResult
 } from '../../api/chat/chat-api';
+import {
+  createChatSession,
+  deleteChatSession,
+  deleteChatSessions,
+  fetchChatSession,
+  fetchChatSessions,
+  updateChatSession,
+  type ChatSessionSummary
+} from '../../api/chat/chat-session-api';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import { formatCurrency } from '../../lib/format';
@@ -22,11 +32,21 @@ interface ChatMessage {
 const messages = ref<ChatMessage[]>([]);
 const inputValue = ref('');
 const loading = ref(false);
+const sessionsLoading = ref(false);
+const sessionDialogVisible = ref(false);
+const currentSessionId = ref<string | null>(null);
+const sessions = ref<ChatSessionSummary[]>([]);
+const selectedSessionIds = ref<string[]>([]);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const composerPanelSize = ref('152px');
 
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
 const visibleMessages = computed(() => messages.value.filter((message) => !message.hidden));
+const hasSelectedSessions = computed(() => selectedSessionIds.value.length > 0);
+const currentSessionTitle = computed(() => {
+  if (!currentSessionId.value) return '新会话';
+  return sessions.value.find((session) => session.id === currentSessionId.value)?.title ?? '当前会话';
+});
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
@@ -40,6 +60,10 @@ const emit = defineEmits<{
   confirmCreateHouse: [action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>, done: (result: ConfirmCreateHouseResult) => void];
 }>();
 
+onMounted(() => {
+  void loadSessions();
+});
+
 async function handleSubmit() {
   const content = inputValue.value.trim();
   if (!content || loading.value) return;
@@ -50,8 +74,10 @@ async function handleSubmit() {
 
   loading.value = true;
   try {
+    await persistCurrentSession(content);
     const result = await sendChatMessage(toApiMessages());
     appendAssistantResponse(result);
+    await persistCurrentSession();
     await executeAgentActions(result.actions ?? []);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '请求失败');
@@ -71,6 +97,128 @@ function appendAssistantResponse(result: { reply: string; houses?: House[] }) {
   messages.value.push(assistantMessage);
 }
 
+async function loadSessions() {
+  sessionsLoading.value = true;
+  try {
+    sessions.value = await fetchChatSessions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载会话失败');
+  } finally {
+    sessionsLoading.value = false;
+  }
+}
+
+function createSessionTitle(content: string) {
+  const title = content.trim().replace(/\s+/g, ' ');
+  if (!title) return '新会话';
+  return title.length > 24 ? `${title.slice(0, 24)}...` : title;
+}
+
+async function persistCurrentSession(titleSource?: string) {
+  if (messages.value.length === 0) return;
+
+  if (!currentSessionId.value) {
+    const session = await createChatSession({
+      title: titleSource ? createSessionTitle(titleSource) : undefined,
+      messages: messages.value
+    });
+    currentSessionId.value = session.id;
+  } else {
+    await updateChatSession(currentSessionId.value, {
+      messages: messages.value
+    });
+  }
+
+  await loadSessions();
+}
+
+async function startNewSession() {
+  if (loading.value) return;
+  currentSessionId.value = null;
+  messages.value = [];
+  inputValue.value = '';
+}
+
+async function openSessionDialog() {
+  sessionDialogVisible.value = true;
+  await loadSessions();
+}
+
+async function restoreSession(id: string) {
+  if (loading.value || currentSessionId.value === id) return;
+
+  sessionsLoading.value = true;
+  try {
+    const session = await fetchChatSession(id);
+    currentSessionId.value = session.id;
+    messages.value = session.messages;
+    inputValue.value = '';
+    sessionDialogVisible.value = false;
+
+    const restoredHouses = messages.value.flatMap((message) => message.houses ?? []);
+    if (restoredHouses.length > 0) {
+      emit('housesFound', restoredHouses);
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '恢复会话失败');
+  } finally {
+    sessionsLoading.value = false;
+  }
+}
+
+function handleSessionSelectionChange(selection: ChatSessionSummary[]) {
+  selectedSessionIds.value = selection.map((session) => session.id);
+}
+
+async function removeSession(id: string) {
+  try {
+    await ElMessageBox.confirm('确认删除这条会话记录吗？', '删除会话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    });
+
+    await deleteChatSession(id);
+    selectedSessionIds.value = selectedSessionIds.value.filter((selectedId) => selectedId !== id);
+
+    if (currentSessionId.value === id) {
+      currentSessionId.value = null;
+      messages.value = [];
+    }
+
+    await loadSessions();
+    ElMessage.success('会话已删除');
+  } catch {
+    // User cancelled.
+  }
+}
+
+async function removeSelectedSessions() {
+  if (!hasSelectedSessions.value) return;
+
+  try {
+    await ElMessageBox.confirm(`确认删除选中的 ${selectedSessionIds.value.length} 条会话记录吗？`, '批量删除会话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    });
+
+    const ids = [...selectedSessionIds.value];
+    await deleteChatSessions(ids);
+
+    if (currentSessionId.value && ids.includes(currentSessionId.value)) {
+      currentSessionId.value = null;
+      messages.value = [];
+    }
+
+    selectedSessionIds.value = [];
+    await loadSessions();
+    ElMessage.success('已删除选中会话');
+  } catch {
+    // User cancelled.
+  }
+}
+
 function toApiMessages(): ApiChatMessage[] {
   return messages.value.map((message) => ({
     role: message.role,
@@ -86,15 +234,18 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
       if (result.status === 'created') {
         try {
           await notifyAgentHouseCreated(result.house);
+          await persistCurrentSession();
         } catch (error) {
           ElMessage.warning(error instanceof Error ? error.message : '创建成功，但回调助手失败');
           appendAssistantResponse({
             reply: `房源创建成功：${result.house.name}`,
             houses: [result.house]
           });
+          await persistCurrentSession();
         }
       } else {
         messages.value.push({ role: 'assistant', content: '已取消新增房源。' });
+        await persistCurrentSession();
       }
     }
   }
@@ -144,12 +295,40 @@ function handleSelectHouse(house: House) {
 function renderAssistantContent(content: string) {
   return markdown.render(content);
 }
+
+function formatSessionTime(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
 </script>
 
 <template>
   <div class="chat-panel">
     <div class="chat-header">
-      <span>对话</span>
+      <div class="chat-header-title">
+        <span>对话</span>
+        <el-tag type="info" effect="plain">{{ currentSessionTitle }}</el-tag>
+      </div>
+      <div class="chat-header-actions">
+        <el-button
+          text
+          :icon="Plus"
+          aria-label="新会话"
+          title="新会话"
+          @click="startNewSession"
+        />
+        <el-button
+          text
+          :icon="Setting"
+          aria-label="管理会话"
+          title="管理会话"
+          @click="openSessionDialog"
+        />
+      </div>
     </div>
 
     <el-splitter class="chat-splitter" layout="vertical">
@@ -231,6 +410,42 @@ function renderAssistantContent(content: string) {
         </div>
       </el-splitter-panel>
     </el-splitter>
+
+    <el-dialog v-model="sessionDialogVisible" title="管理会话" width="860px" class="chat-session-dialog">
+      <div class="chat-session-dialog-toolbar">
+        <el-button :icon="Delete" :disabled="!hasSelectedSessions" @click="removeSelectedSessions">
+          删除选中
+        </el-button>
+      </div>
+
+      <el-table
+        v-loading="sessionsLoading"
+        :data="sessions"
+        height="420"
+        empty-text="暂无历史会话"
+        @selection-change="handleSessionSelectionChange"
+      >
+        <el-table-column type="selection" width="42" />
+        <el-table-column label="会话" min-width="280">
+          <template #default="{ row }">
+            <div class="chat-session-table-title">{{ row.title }}</div>
+            <div class="chat-session-table-preview">{{ row.latestMessage || '空会话' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="messageCount" label="消息" width="80" />
+        <el-table-column label="更新时间" width="150">
+          <template #default="{ row }">
+            {{ formatSessionTime(row.updatedAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="restoreSession(row.id)">恢复</el-button>
+            <el-button link type="danger" @click="removeSession(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -253,11 +468,75 @@ function renderAssistantContent(content: string) {
 }
 
 .chat-header {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 12px 16px;
   font-size: 15px;
   font-weight: 600;
   border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.chat-header-title,
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-header-actions .el-button {
+  width: 32px;
+  height: 32px;
+  margin-left: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #526170;
+}
+
+.chat-header-actions .el-button:hover,
+.chat-header-actions .el-button:focus {
+  background: #e7ebef;
+  color: #17202a;
+}
+
+.chat-header-actions .el-button:active {
+  background: #d9e0e6;
+}
+
+.chat-header-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-session-dialog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.chat-session-table-title {
+  overflow: hidden;
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-session-table-preview {
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-messages {
