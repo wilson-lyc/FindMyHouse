@@ -9,7 +9,6 @@ coverage/
 # Environment
 .env
 .env.*
-!.env.example
 
 # Logs
 *.log
@@ -32,3 +31,7 @@ data/
 # Claude/Codex local state
 .claude/
 .codex/
+.agents/
+
+# Trae generated
+skills-lock.json
