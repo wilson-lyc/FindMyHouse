@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { createLocation, deleteLocation, fetchLocations, updateLocation } from '../../api/location/location-api';
+import { createLocation, deleteLocation, fetchLocations, setFocusLocation as setFocusLocationApi, updateLocation } from '../../api/location/location-api';
 import { normalizeLocationForm } from '../../lib/location/location-form';
 import type { Location, LocationFilters, LocationForm } from '../../model/location/location';
 
@@ -47,6 +47,17 @@ export function useLocations() {
     await loadLocations();
   }
 
+  async function setLocationFocus(location: Location) {
+    saving.value = true;
+    try {
+      await setFocusLocationApi(location.id);
+      ElMessage.success(`已将「${location.name}」设为焦点地点`);
+      await loadLocations();
+    } finally {
+      saving.value = false;
+    }
+  }
+
   return {
     locations,
     loading,
@@ -54,6 +65,7 @@ export function useLocations() {
     filters,
     loadLocations,
     saveLocation,
-    removeLocation
+    removeLocation,
+    setLocationFocus
   };
 }

@@ -5,17 +5,13 @@ import { Location } from '@element-plus/icons-vue';
 import { loadAmap, type AMapMap, type AMapMouseEvent, type AMapNamespace } from '../../lib/map/amap-loader';
 
 const props = defineProps<{
-  active?: boolean;
-  longitude?: number;
-  latitude?: number;
   markerLabel?: string;
   markerClass?: string;
   markerTitle?: string;
 }>();
 
-const emit = defineEmits<{
-  change: [coordinate: { longitude: number; latitude: number }];
-}>();
+const longitude = defineModel<number | undefined>('longitude');
+const latitude = defineModel<number | undefined>('latitude');
 
 const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
@@ -25,8 +21,8 @@ const loadError = ref('');
 const defaultCenter: [number, number] = [116.397428, 39.90923];
 
 function currentCenter(): [number, number] {
-  if (props.longitude !== undefined && props.latitude !== undefined) {
-    return [props.longitude, props.latitude];
+  if (longitude.value !== undefined && latitude.value !== undefined) {
+    return [longitude.value, latitude.value];
   }
 
   return defaultCenter;
@@ -36,20 +32,20 @@ function eventCoordinate(event?: AMapMouseEvent): [number, number] | undefined {
   const lnglat = event?.lnglat;
   if (!lnglat) return undefined;
 
-  const longitude = typeof lnglat.getLng === 'function' ? lnglat.getLng() : lnglat.lng;
-  const latitude = typeof lnglat.getLat === 'function' ? lnglat.getLat() : lnglat.lat;
-  if (longitude === undefined || latitude === undefined) return undefined;
+  const lng = typeof lnglat.getLng === 'function' ? lnglat.getLng() : lnglat.lng;
+  const lat = typeof lnglat.getLat === 'function' ? lnglat.getLat() : lnglat.lat;
+  if (lng === undefined || lat === undefined) return undefined;
 
-  return [longitude, latitude];
+  return [lng, lat];
 }
 
 function renderMarker() {
   if (!map.value || !amap.value) return;
 
   map.value.clearMap();
-  if (props.longitude === undefined || props.latitude === undefined) return;
+  if (longitude.value === undefined || latitude.value === undefined) return;
 
-  const position: [number, number] = [props.longitude, props.latitude];
+  const position: [number, number] = [longitude.value, latitude.value];
   const markerLabel = props.markerLabel ?? '房源';
   const markerClass = props.markerClass ?? 'house';
   map.value.add(
@@ -64,7 +60,7 @@ function renderMarker() {
   );
 }
 
-function syncMapToProps() {
+function syncCenterAndMarker() {
   if (!map.value) return;
 
   map.value.setCenter(currentCenter());
@@ -72,20 +68,18 @@ function syncMapToProps() {
 }
 
 function selectCoordinate(position: [number, number]) {
-  emit('change', {
-    longitude: Number(position[0].toFixed(6)),
-    latitude: Number(position[1].toFixed(6))
-  });
+  longitude.value = Number(position[0].toFixed(6));
+  latitude.value = Number(position[1].toFixed(6));
 }
 
 async function initializeMap() {
-  if (!mapContainer.value || map.value || props.active === false) return;
+  if (!mapContainer.value || map.value) return;
 
   try {
     amap.value = await loadAmap();
     await nextTick();
     map.value = new amap.value.Map(mapContainer.value, {
-      zoom: props.longitude !== undefined && props.latitude !== undefined ? 16 : 11,
+      zoom: longitude.value !== undefined && latitude.value !== undefined ? 16 : 11,
       center: currentCenter(),
       viewMode: '2D'
     });
@@ -93,33 +87,20 @@ async function initializeMap() {
       const coordinate = eventCoordinate(event);
       if (coordinate) selectCoordinate(coordinate);
     });
-    syncMapToProps();
+    syncCenterAndMarker();
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '地图加载失败';
     ElMessage.warning(loadError.value);
   }
 }
 
-function scheduleInitialize() {
+onMounted(() => {
   window.setTimeout(() => {
     void initializeMap();
   }, 80);
-}
+});
 
-watch(
-  () => props.active,
-  (active) => {
-    if (active === false) return;
-    scheduleInitialize();
-  }
-);
-
-watch(
-  () => [props.longitude, props.latitude] as const,
-  () => syncMapToProps()
-);
-
-onMounted(scheduleInitialize);
+watch([longitude, latitude], () => syncCenterAndMarker());
 
 onBeforeUnmount(() => {
   map.value?.destroy();

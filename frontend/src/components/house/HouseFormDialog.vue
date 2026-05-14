@@ -4,7 +4,7 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Aim } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
-import CoordinatePickerMap from '../map/CoordinatePickerMap.vue';
+import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
   houseSourceChannelLabels,
   houseSourceChannels,
@@ -75,10 +75,7 @@ async function geocode() {
   }
 }
 
-function applyPickedCoordinate(coordinate: { longitude: number; latitude: number }) {
-  form.longitude = coordinate.longitude;
-  form.latitude = coordinate.latitude;
-}
+
 
 function scrollToSection(sectionKey: string) {
   document.getElementById(`house-form-${sectionKey}`)?.scrollIntoView({
@@ -160,12 +157,10 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="定位" class="span-2">
                 <div class="coordinate-map-field">
-                  <CoordinatePickerMap
+                  <CoordinatePicker
                     v-if="modelValue"
-                    :active="modelValue"
-                    :longitude="form.longitude"
-                    :latitude="form.latitude"
-                    @change="applyPickedCoordinate"
+                    v-model:longitude="form.longitude"
+                    v-model:latitude="form.latitude"
                   />
                 </div>
               </el-form-item>

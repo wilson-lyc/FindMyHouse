@@ -1,25 +1,45 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { env } from '../../config/env.js';
+import { configService } from '../config/index.js';
 
 let llm: ChatOpenAI | null = null;
+let lastApiKey: string | undefined;
+let lastBaseUrl: string | undefined;
+let lastModel: string | undefined;
+let lastTemperature: number | undefined;
 
 export function getLlm(): ChatOpenAI {
-  if (llm) {
+  const apiKey = configService.getOpenaiApiKey();
+  const baseUrl = configService.getOpenaiBaseUrl();
+  const model = configService.getOpenaiModel();
+  const temperature = configService.getOpenaiTemperature();
+
+  if (
+    llm &&
+    lastApiKey === apiKey &&
+    lastBaseUrl === baseUrl &&
+    lastModel === model &&
+    lastTemperature === temperature
+  ) {
     return llm;
   }
 
-  if (!env.openaiApiKey) {
+  if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured');
   }
 
   llm = new ChatOpenAI({
-    model: env.openaiModel,
-    temperature: env.openaiTemperature,
-    apiKey: env.openaiApiKey,
+    model,
+    temperature,
+    apiKey,
     configuration: {
-      baseURL: env.openaiBaseUrl,
+      baseURL: baseUrl,
     },
   });
+
+  lastApiKey = apiKey;
+  lastBaseUrl = baseUrl;
+  lastModel = model;
+  lastTemperature = temperature;
 
   return llm;
 }

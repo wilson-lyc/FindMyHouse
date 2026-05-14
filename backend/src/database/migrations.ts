@@ -78,6 +78,12 @@ export function migrate() {
       ON map_route_cache(focus_location_id, origin, destination, kind);
     CREATE INDEX IF NOT EXISTS idx_map_route_cache_focus_location
       ON map_route_cache(focus_location_id);
+
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');

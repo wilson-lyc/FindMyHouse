@@ -31,6 +31,10 @@ export class LocationService {
     return location;
   }
 
+  setFocusLocation(id: string): Location | undefined {
+    return this.updateLocation(id, { isFocus: true });
+  }
+
   deleteLocation(id: string): boolean {
     const previousFocus = this.getFocusSignature();
     const deleted = this.repository.delete(id);

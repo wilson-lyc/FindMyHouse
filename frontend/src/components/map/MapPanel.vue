@@ -1,23 +1,16 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { Close, Location } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
+import { useMapStore } from '../../stores/mapStore';
 import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
-import type { DrivingRouteResult, MapBoundsFilter } from '../../model/map/geocode';
-
-const props = defineProps<{
-  houses: House[];
-  locations: KeyLocation[];
-  selectedHouseId?: string;
-  selectedHouseFocusKey?: number;
-  routeData?: DrivingRouteResult | null;
-  highlightedHouseIds?: string[];
-}>();
+import type { MapBoundsFilter } from '../../model/map/geocode';
 
 const emit = defineEmits<{
   boundsChange: [bounds: MapBoundsFilter];
@@ -26,53 +19,25 @@ const emit = defineEmits<{
   clearRoute: [];
 }>();
 
+const mapStore = useMapStore();
+const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds } = storeToRefs(mapStore);
+
+// ==================== 地图实例 ====================
+
 const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
-let infoWindow: AMapInfoWindow | undefined;
-let boundsTimer: number | undefined;
-let resizeObserver: ResizeObserver | undefined;
-let routePolyline: AMapPolyline | undefined;
-let routeInfoWindow: AMapInfoWindow | undefined;
+
 const houseFocusZoom = 16;
 const locationFocusZoom = 14;
+
 let hasAppliedInitialFocus = false;
+let resizeObserver: ResizeObserver | undefined;
 
-function housePosition(house: House): [number, number] | undefined {
-  if (house.longitude === undefined || house.latitude === undefined) {
-    return undefined;
-  }
+// ==================== 信息窗口 ====================
 
-  return [house.longitude, house.latitude];
-}
-
-function locationPosition(location: KeyLocation): [number, number] | undefined {
-  if (location.longitude === undefined || location.latitude === undefined) {
-    return undefined;
-  }
-
-  return [location.longitude, location.latitude];
-}
-
-function emitBounds() {
-  if (!map.value) return;
-  const bounds = map.value.getBounds();
-  const southWest = bounds.getSouthWest();
-  const northEast = bounds.getNorthEast();
-
-  emit('boundsChange', {
-    minLatitude: southWest.lat,
-    maxLatitude: northEast.lat,
-    minLongitude: southWest.lng,
-    maxLongitude: northEast.lng
-  });
-}
-
-function scheduleBoundsChange() {
-  window.clearTimeout(boundsTimer);
-  boundsTimer = window.setTimeout(emitBounds, 300);
-}
+let infoWindow: AMapInfoWindow | undefined;
 
 function createInfoWindow(content: string, position: [number, number]) {
   if (!amap.value || !map.value) return;
@@ -104,6 +69,48 @@ function openHouseInfoWindow(house: House, position: [number, number]) {
   bindHouseInfoAction(house);
 }
 
+// ==================== 视野与边界 ====================
+
+let boundsTimer: number | undefined;
+
+function emitBounds() {
+  if (!map.value) return;
+  const bounds = map.value.getBounds();
+  const southWest = bounds.getSouthWest();
+  const northEast = bounds.getNorthEast();
+
+  emit('boundsChange', {
+    minLatitude: southWest.lat,
+    maxLatitude: northEast.lat,
+    minLongitude: southWest.lng,
+    maxLongitude: northEast.lng
+  });
+}
+
+function scheduleBoundsChange() {
+  window.clearTimeout(boundsTimer);
+  boundsTimer = window.setTimeout(emitBounds, 300);
+}
+
+// ==================== 示例大头针 ====================
+
+function housePosition(house: House): [number, number] | undefined {
+  if (house.longitude === undefined || house.latitude === undefined) {
+    return undefined;
+  }
+
+  return [house.longitude, house.latitude];
+}
+
+function locationPosition(location: KeyLocation): [number, number] | undefined {
+  if (location.longitude === undefined || location.latitude === undefined) {
+    return undefined;
+  }
+
+  return [location.longitude, location.latitude];
+}
+
+/** 聚焦到指定房源，放大地图并弹出信息窗口 */
 function focusHouse(house: House, position: [number, number]) {
   if (!map.value) return;
 
@@ -117,10 +124,11 @@ function focusHouse(house: House, position: [number, number]) {
   openHouseInfoWindow(house, position);
 }
 
+/** 首次加载时跳转到焦点地点 */
 function applyInitialFocusLocation() {
   if (!map.value || hasAppliedInitialFocus) return false;
 
-  const focusLocation = props.locations.find((location) => location.isFocus);
+  const focusLocation = locations.value.find((location) => location.isFocus);
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
   if (!position) return false;
 
@@ -135,15 +143,16 @@ function applyInitialFocusLocation() {
   return true;
 }
 
+/** 渲染所有房源和地点的大头针 */
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
   map.value.clearMap();
   const markers = [];
 
-  const highlightedIds = new Set(props.highlightedHouseIds ?? []);
+  const highlightedIds = new Set(highlightedHouseIds.value ?? []);
 
-  for (const house of props.houses) {
+  for (const house of houses.value) {
     const position = housePosition(house);
     if (!position) continue;
 
@@ -166,7 +175,7 @@ function renderMarkers() {
     markers.push(marker);
   }
 
-  for (const location of props.locations) {
+  for (const location of locations.value) {
     const position = locationPosition(location);
     if (!position) continue;
 
@@ -195,6 +204,11 @@ function renderMarkers() {
   renderRoutePolyline();
 }
 
+// ==================== 路线 ====================
+
+let routePolyline: AMapPolyline | undefined;
+let routeInfoWindow: AMapInfoWindow | undefined;
+
 function formatDistanceShort(meters: number): string {
   if (meters >= 1000) {
     return (meters / 1000).toFixed(1) + 'km';
@@ -215,10 +229,23 @@ function formatDurationShort(seconds: number): string {
   return Math.round(seconds) + 's';
 }
 
-function renderRoutePolyline() {
-  if (!map.value || !amap.value || !props.routeData) return;
+/** 清除路线折线和信息窗口 */
+function clearRoutePolyline() {
+  if (routePolyline) {
+    routePolyline.setMap(null);
+    routePolyline = undefined;
+  }
+  if (routeInfoWindow) {
+    routeInfoWindow.close();
+    routeInfoWindow = undefined;
+  }
+}
 
-  const path = props.routeData.polyline;
+/** 绘制路线折线并显示距离时长标签 */
+function renderRoutePolyline() {
+  if (!map.value || !amap.value || !routeData.value) return;
+
+  const path = routeData.value.polyline;
   if (!path || path.length < 2) return;
 
   clearRoutePolyline();
@@ -239,7 +266,7 @@ function renderRoutePolyline() {
   const midIndex = Math.floor(path.length / 2);
   const midPoint = path[midIndex];
 
-  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(props.routeData.distance)} · ${formatDurationShort(props.routeData.duration)}</div>`;
+  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
   routeInfoWindow = new amap.value.InfoWindow({
     content: routeInfoContent,
     offset: new amap.value.Pixel(0, 0)
@@ -247,16 +274,7 @@ function renderRoutePolyline() {
   routeInfoWindow.open(map.value, midPoint);
 }
 
-function clearRoutePolyline() {
-  if (routePolyline) {
-    routePolyline.setMap(null);
-    routePolyline = undefined;
-  }
-  if (routeInfoWindow) {
-    routeInfoWindow.close();
-    routeInfoWindow = undefined;
-  }
-}
+// ==================== 地图生命周期 ====================
 
 function resizeMap() {
   map.value?.resize?.();
@@ -291,8 +309,16 @@ onMounted(async () => {
   }
 });
 
+onBeforeUnmount(() => {
+  window.clearTimeout(boundsTimer);
+  resizeObserver?.disconnect();
+  map.value?.destroy();
+});
+
+// ==================== 响应式监听 ====================
+
 watch(
-  () => [props.houses, props.locations],
+  [houses, locations],
   () => {
     renderMarkers();
     if (applyInitialFocusLocation()) {
@@ -303,9 +329,9 @@ watch(
 );
 
 watch(
-  () => [props.selectedHouseId, props.selectedHouseFocusKey] as const,
+  [selectedHouseId, selectedHouseFocusKey],
   ([id]) => {
-    const house = props.houses.find((item) => item.id === id);
+    const house = houses.value.find((item) => item.id === id);
     const position = house ? housePosition(house) : undefined;
     if (!house || !position) return;
     focusHouse(house, position);
@@ -313,19 +339,13 @@ watch(
 );
 
 watch(
-  () => props.routeData,
+  routeData,
   () => {
     if (!map.value || !amap.value) return;
     clearRoutePolyline();
     renderRoutePolyline();
   }
 );
-
-onBeforeUnmount(() => {
-  window.clearTimeout(boundsTimer);
-  resizeObserver?.disconnect();
-  map.value?.destroy();
-});
 </script>
 
 <template>
@@ -337,7 +357,7 @@ onBeforeUnmount(() => {
     </div>
     <div ref="mapContainer" class="amap-container" />
     <button
-      v-if="props.routeData"
+      v-if="routeData"
       class="map-clear-route-btn"
       title="关闭路线"
       @click.stop="emit('clearRoute')"
