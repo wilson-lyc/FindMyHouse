@@ -10,13 +10,9 @@ import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
-import type { MapBoundsFilter } from '../../model/map/geocode';
 
 const emit = defineEmits<{
-  boundsChange: [bounds: MapBoundsFilter];
-  selectHouse: [house: House];
   editHouse: [house: House];
-  clearRoute: [];
 }>();
 
 const mapStore = useMapStore();
@@ -50,7 +46,16 @@ function createInfoWindow(content: string, position: [number, number]) {
 }
 
 function houseInfoContent(house: House) {
-  return `<div class="map-info map-house-info"><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="map-info-detail-button" data-house-id="${house.id}" type="button">详情</button></div></div>`;
+  return `<div class="map-info map-house-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
+}
+
+function bindInfoCloseAction() {
+  window.setTimeout(() => {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.map-info-close-button');
+    for (const button of buttons) {
+      button.onclick = () => infoWindow?.close();
+    }
+  }, 0);
 }
 
 function bindHouseInfoAction(house: House) {
@@ -66,7 +71,12 @@ function bindHouseInfoAction(house: House) {
 
 function openHouseInfoWindow(house: House, position: [number, number]) {
   createInfoWindow(houseInfoContent(house), position);
+  bindInfoCloseAction();
   bindHouseInfoAction(house);
+}
+
+function locationInfoContent(location: KeyLocation) {
+  return `<div class="map-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${location.name}</strong><span>${locationCategoryLabels[location.category]} · ${location.address}</span></div>`;
 }
 
 // ==================== 视野与边界 ====================
@@ -79,7 +89,7 @@ function emitBounds() {
   const southWest = bounds.getSouthWest();
   const northEast = bounds.getNorthEast();
 
-  emit('boundsChange', {
+  mapStore.setCurrentBounds({
     minLatitude: southWest.lat,
     maxLatitude: northEast.lat,
     minLongitude: southWest.lng,
@@ -124,20 +134,59 @@ function focusHouse(house: House, position: [number, number]) {
   openHouseInfoWindow(house, position);
 }
 
+function focusHouseById(houseId: string) {
+  const house = houses.value.find((item) => item.id === houseId);
+  const position = house ? housePosition(house) : undefined;
+  if (!house || !position || !map.value) return false;
+
+  focusHouse(house, position);
+  return true;
+}
+
+function selectHouseById(houseId: string) {
+  mapStore.selectHouse(houseId);
+  return focusHouseById(houseId);
+}
+
+function focusLocation(location: KeyLocation, position: [number, number]) {
+  if (!map.value) return;
+
+  if (map.value.setZoomAndCenter) {
+    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
+  } else {
+    map.value.setZoom?.(locationFocusZoom, true, 0);
+    map.value.setCenter(position, true, 0);
+  }
+
+  createInfoWindow(locationInfoContent(location), position);
+  bindInfoCloseAction();
+}
+
+function focusLocationById(locationId: string) {
+  const location = locations.value.find((item) => item.id === locationId);
+  const position = location ? locationPosition(location) : undefined;
+  if (!location || !position || !map.value) return false;
+
+  focusLocation(location, position);
+  return true;
+}
+
+function focusFocusLocation() {
+  const focusLocation = locations.value.find((location) => location.isFocus);
+  if (!focusLocation) return false;
+
+  return focusLocationById(focusLocation.id);
+}
+
 /** 首次加载时跳转到焦点地点 */
 function applyInitialFocusLocation() {
   if (!map.value || hasAppliedInitialFocus) return false;
 
   const focusLocation = locations.value.find((location) => location.isFocus);
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
-  if (!position) return false;
+  if (!focusLocation || !position) return false;
 
-  if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(locationFocusZoom, position);
-  } else {
-    map.value.setZoom?.(locationFocusZoom);
-    map.value.setCenter(position);
-  }
+  focusLocationById(focusLocation.id);
 
   hasAppliedInitialFocus = true;
   return true;
@@ -169,8 +218,7 @@ function renderMarkers() {
     });
 
     marker.on('click', () => {
-      emit('selectHouse', house);
-      openHouseInfoWindow(house, position);
+      selectHouseById(house.id);
     });
     markers.push(marker);
   }
@@ -189,10 +237,7 @@ function renderMarkers() {
     });
 
     marker.on('click', () => {
-      createInfoWindow(
-        `<div class="map-info"><strong>${location.name}</strong><span>${locationCategoryLabels[location.category]} · ${location.address}</span></div>`,
-        position
-      );
+      focusLocation(location, position);
     });
     markers.push(marker);
   }
@@ -280,6 +325,33 @@ function resizeMap() {
   map.value?.resize?.();
 }
 
+function fitView() {
+  if (!map.value) return false;
+
+  map.value.setFitView();
+  emitBounds();
+  return true;
+}
+
+function refreshBounds() {
+  if (!map.value) return false;
+
+  emitBounds();
+  return true;
+}
+
+function clearRoute() {
+  mapStore.clearRoute();
+}
+
+function showRouteByHouseId(houseId: string) {
+  return mapStore.showRoute(houseId);
+}
+
+function setHighlightedHouseIds(houseIds: string[]) {
+  mapStore.setHighlightedHouseIds(houseIds);
+}
+
 onMounted(async () => {
   if (!mapContainer.value) return;
 
@@ -346,6 +418,19 @@ watch(
     renderRoutePolyline();
   }
 );
+
+defineExpose({
+  resize: resizeMap,
+  fitView,
+  refreshBounds,
+  selectHouseById,
+  focusHouseById,
+  focusLocationById,
+  focusFocusLocation,
+  clearRoute,
+  showRouteByHouseId,
+  setHighlightedHouseIds
+});
 </script>
 
 <template>
@@ -360,7 +445,7 @@ watch(
       v-if="routeData"
       class="map-clear-route-btn"
       title="关闭路线"
-      @click.stop="emit('clearRoute')"
+      @click.stop="clearRoute"
     >
       <el-icon><Close /></el-icon>
     </button>

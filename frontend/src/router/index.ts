@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { fetchLocations } from '../api/location/location-api';
-import MapView from '../views/map/MapView.vue';
+import MainLayout from '../layouts/MainLayout.vue';
+import ChatView from '../views/chat/ChatView.vue';
+import HousesView from '../views/houses/HousesView.vue';
+import LocationsView from '../views/locations/LocationsView.vue';
 import SettingsView from '../views/settings/SettingsView.vue';
 import WelcomePage from '../views/welcome/WelcomePage.vue';
 
@@ -8,7 +11,25 @@ const routes = [
   {
     path: '/',
     name: 'home',
-    component: MapView
+    component: MainLayout,
+    redirect: { name: 'houses' },
+    children: [
+      {
+        path: 'houses',
+        name: 'houses',
+        component: HousesView
+      },
+      {
+        path: 'locations',
+        name: 'locations',
+        component: LocationsView
+      },
+      {
+        path: 'chat',
+        name: 'chat',
+        component: ChatView
+      }
+    ]
   },
   {
     path: '/welcome',

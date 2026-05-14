@@ -24,19 +24,47 @@ const configData = reactive<ConfigData>({
   openaiBaseUrl: 'https://api.deepseek.com',
   openaiApiKey: '',
   openaiModel: 'deepseek-v4-flash',
-  openaiTemperature: 0,
+  openaiTemperature: 0.7,
   amapWebServiceKey: '',
   viteAmapJsKey: '',
   viteAmapSecurityJsCode: '',
 });
 
+function requiredTextRule(message: string) {
+  return {
+    required: true,
+    validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+      if (value?.trim()) {
+        callback();
+        return;
+      }
+
+      callback(new Error(message));
+    },
+    trigger: 'blur'
+  };
+}
+
+function hasCompleteConfig() {
+  return Boolean(
+    configData.openaiBaseUrl.trim() &&
+    configData.openaiApiKey.trim() &&
+    configData.openaiModel.trim() &&
+    configData.openaiTemperature !== undefined &&
+    configData.amapWebServiceKey.trim() &&
+    configData.viteAmapJsKey.trim() &&
+    configData.viteAmapSecurityJsCode.trim()
+  );
+}
+
 const configRules: FormRules<ConfigData> = {
-  openaiBaseUrl: [{ required: true, message: '请输入 LLM Base URL', trigger: 'blur' }],
-  openaiApiKey: [{ required: true, message: '请输入 LLM API Key', trigger: 'blur' }],
-  openaiModel: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-  amapWebServiceKey: [{ required: true, message: '请输入高德 Web Service Key', trigger: 'blur' }],
-  viteAmapJsKey: [{ required: true, message: '请输入高德 JS API Key', trigger: 'blur' }],
-  viteAmapSecurityJsCode: [{ required: true, message: '请输入高德 Security JS Code', trigger: 'blur' }],
+  openaiBaseUrl: [requiredTextRule('请输入 LLM Base URL')],
+  openaiApiKey: [requiredTextRule('请输入 LLM API Key')],
+  openaiModel: [requiredTextRule('请输入模型名称')],
+  openaiTemperature: [{ required: true, message: '请选择温度', trigger: 'change' }],
+  amapWebServiceKey: [requiredTextRule('请输入高德 Web Service Key')],
+  viteAmapJsKey: [requiredTextRule('请输入高德 JS API Key')],
+  viteAmapSecurityJsCode: [requiredTextRule('请输入高德 Security JS Code')],
 };
 
 const locationForm = reactive<LocationForm>({
@@ -65,7 +93,7 @@ async function loadConfig() {
     if (data.viteAmapJsKey) configData.viteAmapJsKey = data.viteAmapJsKey;
     if (data.viteAmapSecurityJsCode) configData.viteAmapSecurityJsCode = data.viteAmapSecurityJsCode;
 
-    if (configData.openaiBaseUrl && configData.openaiApiKey && configData.openaiModel && configData.amapWebServiceKey && configData.viteAmapJsKey && configData.viteAmapSecurityJsCode) {
+    if (hasCompleteConfig()) {
       activeStep.value = 1;
     }
   } catch {
@@ -88,7 +116,7 @@ async function saveAndNext() {
       openaiTemperature: configData.openaiTemperature,
       amapWebServiceKey: configData.amapWebServiceKey.trim(),
       viteAmapJsKey: configData.viteAmapJsKey.trim(),
-      viteAmapSecurityJsCode: configData.viteAmapSecurityJsCode?.trim() || '',
+      viteAmapSecurityJsCode: configData.viteAmapSecurityJsCode.trim(),
     });
     ElMessage.success('配置已保存');
     activeStep.value = 1;
@@ -147,166 +175,280 @@ onMounted(loadConfig);
 </script>
 
 <template>
-  <div class="welcome-page">
-    <el-card class="welcome-card" shadow="never">
-      <template #header>
-        <div class="welcome-header">
-          <h1>欢迎使用 FindMyHouse</h1>
-        </div>
-      </template>
-
-      <div class="steps-wrap">
-        <el-steps :active="activeStep" align-center>
-          <el-step title="服务配置" />
-          <el-step title="焦点地点" />
-        </el-steps>
+  <el-container class="welcome-page" direction="vertical">
+    <el-header class="welcome-header">
+      <div class="welcome-title-row">
+        <h1>欢迎使用 FindMyHouse</h1>
       </div>
+    </el-header>
 
-      <div v-loading="loading" class="step-content">
-        <!-- Step 0: Service Configuration -->
-        <template v-if="activeStep === 0">
-          <el-alert
-            title="请配置 LLM 和高德地图服务，用于 AI 对话和地图功能"
-            type="info"
-            :closable="false"
-            show-icon
-            class="step-alert"
-          />
+    <el-main class="welcome-main">
+      <el-scrollbar class="welcome-scrollbar">
+        <section v-loading="loading" class="welcome-content">
+          <div class="welcome-step-shell">
+            <el-steps :active="activeStep" align-center>
+              <el-step title="服务配置" />
+              <el-step title="焦点地点" />
+            </el-steps>
+          </div>
 
-          <el-form ref="configFormRef" :model="configData" :rules="configRules" label-width="180px" class="welcome-form">
-            <el-form-item label="LLM Base URL" prop="openaiBaseUrl">
-              <el-input v-model="configData.openaiBaseUrl" placeholder="仅支持 OpenAI 兼容协议" />
-            </el-form-item>
-            <el-form-item label="LLM API Key" prop="openaiApiKey">
-              <el-input v-model="configData.openaiApiKey" type="password" show-password placeholder="输入 API Key" />
-            </el-form-item>
-            <el-form-item label="模型名称" prop="openaiModel">
-              <el-input v-model="configData.openaiModel" placeholder="例如 deepseek-v4-flash 或 deepseek-v4-pro" />
-            </el-form-item>
-            <el-form-item label="温度" prop="openaiTemperature">
-              <el-slider v-model="configData.openaiTemperature" :min="0" :max="2" :step="0.1" show-input />
-            </el-form-item>
-            <el-form-item label="高德 Web Service Key" prop="amapWebServiceKey">
-              <el-input v-model="configData.amapWebServiceKey" type="password" show-password placeholder="输入高德 Web Service Key" />
-            </el-form-item>
-            <el-form-item label="高德 JS API Key" prop="viteAmapJsKey">
-              <el-input v-model="configData.viteAmapJsKey" type="password" show-password placeholder="输入高德 JS API Key" />
-            </el-form-item>
-            <el-form-item label="高德 Security JS Code" prop="viteAmapSecurityJsCode">
-              <el-input v-model="configData.viteAmapSecurityJsCode" type="password" show-password placeholder="输入高德 Security JS Code" />
-            </el-form-item>
-          </el-form>
-        </template>
-
-        <!-- Step 1: Focus Location -->
-        <template v-if="activeStep === 1">
-          <el-alert
-            title="请创建焦点地点（例如公司或学校）作为通勤路线的终点"
-            type="info"
-            :closable="false"
-            show-icon
-            class="step-alert"
-          />
-
-          <el-form ref="locationFormRef" :model="locationForm" :rules="locationRules" label-width="70px" class="welcome-form">
-            <el-form-item label="名称" prop="name">
-              <el-input v-model="locationForm.name" placeholder="例如：公司" />
-            </el-form-item>
-            <el-form-item label="类型" prop="category">
-              <el-select v-model="locationForm.category">
-                <el-option
-                  v-for="category in locationCategories"
-                  :key="category"
-                  :label="locationCategoryLabels[category]"
-                  :value="category"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="地址" prop="address">
-              <div class="address-row">
-                <el-input v-model="locationForm.address" placeholder="输入焦点地点地址" />
-                <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
-              </div>
-            </el-form-item>
-            <el-form-item label="定位">
-              <div class="coordinate-map-field">
-                <CoordinatePicker
-                  v-model:longitude="locationForm.longitude"
-                  v-model:latitude="locationForm.latitude"
-                  marker-label="焦点"
-                  marker-class="location"
-                  marker-title="焦点地点坐标"
-                />
-              </div>
-            </el-form-item>
-          </el-form>
-        </template>
-      </div>
-
-      <template #footer>
-        <div class="welcome-footer">
-          <el-button v-if="activeStep === 1" @click="activeStep = 0">上一步</el-button>
-          <el-button
+          <el-form
             v-if="activeStep === 0"
-            type="primary"
-            :loading="saving"
-            @click="saveAndNext"
+            ref="configFormRef"
+            :model="configData"
+            :rules="configRules"
+            label-position="top"
+            class="welcome-form"
           >
-            下一步
-          </el-button>
-          <el-button
+            <section class="welcome-section">
+              <div class="welcome-section-heading">
+                <h2>模型服务</h2>
+              </div>
+
+              <el-alert title="仅支持 OpenAI 协议" type="info" :closable="false" show-icon />
+
+              <div class="welcome-grid">
+                <el-form-item label="Base URL" prop="openaiBaseUrl">
+                  <el-input v-model="configData.openaiBaseUrl" placeholder="https://api.deepseek.com" />
+                </el-form-item>
+                <el-form-item label="模型名称" prop="openaiModel">
+                  <el-input v-model="configData.openaiModel" placeholder="deepseek-v4-flash" />
+                </el-form-item>
+                <el-form-item class="welcome-grid-wide" label="API Key" prop="openaiApiKey">
+                  <el-input v-model="configData.openaiApiKey" type="password" show-password placeholder="输入 LLM API Key" />
+                </el-form-item>
+                <el-form-item class="welcome-grid-wide" label="温度" prop="openaiTemperature">
+                  <el-input-number
+                    v-model="configData.openaiTemperature"
+                    :min="0"
+                    :max="2"
+                    :step="0.1"
+                    :precision="1"
+                  />
+                </el-form-item>
+              </div>
+            </section>
+
+            <section class="welcome-section">
+              <div class="welcome-section-heading">
+                <h2>高德地图</h2>
+              </div>
+
+              <div class="welcome-grid">
+                <el-form-item label="Web Service Key" prop="amapWebServiceKey">
+                  <el-input
+                    v-model="configData.amapWebServiceKey"
+                    type="password"
+                    show-password
+                    placeholder="输入高德 Web Service Key"
+                  />
+                </el-form-item>
+                <el-form-item label="JS API Key" prop="viteAmapJsKey">
+                  <el-input v-model="configData.viteAmapJsKey" type="password" show-password placeholder="输入高德 JS API Key" />
+                </el-form-item>
+                <el-form-item class="welcome-grid-wide" label="Security JS Code" prop="viteAmapSecurityJsCode">
+                  <el-input
+                    v-model="configData.viteAmapSecurityJsCode"
+                    type="password"
+                    show-password
+                    placeholder="输入高德 Security JS Code"
+                  />
+                </el-form-item>
+              </div>
+            </section>
+
+            <footer class="welcome-actions">
+              <el-button type="primary" :loading="saving" @click="saveAndNext">下一步</el-button>
+            </footer>
+          </el-form>
+
+          <el-form
             v-if="activeStep === 1"
-            type="primary"
-            :loading="saving"
-            @click="submitForm"
+            ref="locationFormRef"
+            :model="locationForm"
+            :rules="locationRules"
+            label-position="top"
+            class="welcome-form"
           >
-            创建并开始使用
-          </el-button>
-        </div>
-      </template>
-    </el-card>
-  </div>
+            <section class="welcome-section">
+              <div class="welcome-section-heading">
+                <h2>焦点地点</h2>
+              </div>
+
+              <el-alert title="创建公司、学校等焦点地点，作为通勤路线的终点" type="info" :closable="false" show-icon />
+
+              <div class="welcome-grid">
+                <el-form-item label="名称" prop="name">
+                  <el-input v-model="locationForm.name" placeholder="例如：公司" />
+                </el-form-item>
+                <el-form-item label="类型" prop="category">
+                  <el-select v-model="locationForm.category">
+                    <el-option
+                      v-for="category in locationCategories"
+                      :key="category"
+                      :label="locationCategoryLabels[category]"
+                      :value="category"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item class="welcome-grid-wide" label="地址" prop="address">
+                  <div class="address-row">
+                    <el-input v-model="locationForm.address" placeholder="输入焦点地点地址" />
+                    <el-button class="welcome-action-button" :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item class="welcome-grid-wide" label="定位">
+                  <div class="coordinate-map-field">
+                    <CoordinatePicker
+                      v-model:longitude="locationForm.longitude"
+                      v-model:latitude="locationForm.latitude"
+                      marker-label="焦点"
+                      marker-class="location"
+                      marker-title="焦点地点坐标"
+                    />
+                  </div>
+                </el-form-item>
+              </div>
+            </section>
+
+            <footer class="welcome-actions">
+              <el-button :disabled="saving" @click="activeStep = 0">上一步</el-button>
+              <el-button type="primary" :loading="saving" @click="submitForm">
+                创建并开始使用
+              </el-button>
+            </footer>
+          </el-form>
+        </section>
+      </el-scrollbar>
+    </el-main>
+  </el-container>
 </template>
 
 <style scoped>
 .welcome-page {
-  display: flex;
-  min-height: 100dvh;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--el-bg-color-page);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: #f3f6f8;
+  color: #17202a;
 }
 
-.welcome-card {
-  width: min(100%, 800px);
+.welcome-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  height: auto;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e9ee;
+  background: #ffffff;
+}
+
+.welcome-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcome-header h1,
+.welcome-section-heading h2 {
+  margin: 0;
+  font-weight: 700;
 }
 
 .welcome-header h1 {
-  margin: 0;
   font-size: 20px;
-  font-weight: 600;
 }
 
-.steps-wrap {
-  margin-bottom: 24px;
+.welcome-main {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-.step-content {
-  min-height: 280px;
+.welcome-scrollbar {
+  height: 100%;
 }
 
-.step-alert {
-  margin-bottom: 18px;
+.welcome-content {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.welcome-step-shell {
+  display: grid;
+  gap: 18px;
+  border: 1px solid #e2e9ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+  margin-bottom: 16px;
 }
 
 .welcome-form {
-  margin: 0;
+  display: grid;
+  gap: 16px;
 }
 
-.welcome-footer {
+.welcome-section {
+  display: grid;
+  gap: 18px;
+  border: 1px solid #e2e9ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.welcome-section-heading {
+  border-bottom: 1px solid #edf1f4;
+  padding-bottom: 14px;
+}
+
+.welcome-section-heading h2 {
+  font-size: 17px;
+}
+
+.welcome-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 16px;
+}
+
+.welcome-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.welcome-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.welcome-action-button {
+  height: 32px;
+  min-width: 96px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.welcome-action-button :deep(.el-icon) {
+  font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  .welcome-header {
+    padding: 10px 16px;
+  }
+
+  .welcome-content {
+    padding: 14px;
+  }
+
+  .welcome-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

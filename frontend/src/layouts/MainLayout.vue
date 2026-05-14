@@ -1,0 +1,347 @@
+<script setup lang="ts">
+import { computed, onMounted, provide, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useRoute, useRouter } from 'vue-router';
+import { ChatDotSquare, House as HouseIcon, Location as LocationIcon, Setting } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import HouseFormDialog from '../components/house/HouseFormDialog.vue';
+import LocationFormDialog from '../components/location/LocationFormDialog.vue';
+import MapPanel from '../components/map/MapPanel.vue';
+import { getDrivingRoute } from '../api/map/map-api';
+import { useHouses } from '../composables/house/useHouses';
+import { useLocations } from '../composables/location/useLocations';
+import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
+import { normalizeHouseForm } from '../lib/house/house-form';
+import type { House, HouseForm } from '../model/house/house';
+import type { Location, LocationForm } from '../model/location/location';
+import type { DrivingRouteResult } from '../model/map/geocode';
+import { useMapStore } from '../stores/mapStore';
+
+const {
+  houses,
+  loading,
+  saving,
+  filters,
+  loadHouses,
+  saveHouse,
+  removeHouse
+} = useHouses();
+const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation, setLocationFocus } =
+  useLocations();
+
+const route = useRoute();
+const router = useRouter();
+const mapStore = useMapStore();
+const {
+  currentBounds,
+  onlyViewportHouses,
+  drivingRoutes,
+  activeRouteHouseId,
+  selectedHouseId,
+  routeData
+} = storeToRefs(mapStore);
+
+const dialogVisible = ref(false);
+const editingHouse = ref<House | null>(null);
+const locationDialogVisible = ref(false);
+const editingLocation = ref<Location | null>(null);
+const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
+const contentPanelWidth = ref(420);
+const minContentPanelWidth = 360;
+const maxContentPanelWidth = 760;
+
+const activeMenu = computed(() => {
+  if (route.name === 'locations' || route.name === 'chat') return String(route.name);
+  return 'houses';
+});
+
+const focusLocation = computed<Location | null>(() =>
+  locations.value.find((loc) => loc.isFocus && loc.latitude !== undefined && loc.longitude !== undefined) ?? null
+);
+
+const mappedHouses = computed(() =>
+  houses.value.filter((house) => house.latitude !== undefined && house.longitude !== undefined)
+);
+
+function openCreateDialog() {
+  editingHouse.value = null;
+  dialogVisible.value = true;
+}
+
+function openEditDialog(house: House) {
+  editingHouse.value = house;
+  dialogVisible.value = true;
+}
+
+async function submitHouse(form: HouseForm) {
+  try {
+    await saveHouse(normalizeHouseForm(form), editingHouse.value);
+    dialogVisible.value = false;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存失败');
+  }
+}
+
+async function confirmDeleteHouse(house: House) {
+  try {
+    await ElMessageBox.confirm(`确认删除「${house.name}」吗？`, '删除房源', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    });
+
+    await removeHouse(house);
+    if (selectedHouseId.value === house.id) {
+      mapStore.selectHouse(undefined);
+    }
+    mapStore.removeDrivingRoute(house.id);
+    if (activeRouteHouseId.value === house.id) {
+      clearRoute();
+    }
+  } catch {
+    // User cancelled the confirmation dialog.
+  }
+}
+
+async function applyHouseFilters() {
+  if (onlyViewportHouses.value && currentBounds.value) {
+    Object.assign(filters, currentBounds.value);
+  } else {
+    filters.minLatitude = undefined;
+    filters.maxLatitude = undefined;
+    filters.minLongitude = undefined;
+    filters.maxLongitude = undefined;
+  }
+
+  await loadHouses();
+}
+
+async function toggleViewportHouses(enabled: boolean) {
+  mapStore.setOnlyViewportHouses(enabled);
+  await applyHouseFilters();
+}
+
+function selectHouse(house: House) {
+  mapPanelRef.value?.selectHouseById(house.id);
+}
+
+function showRoute(house: House) {
+  if (!mapPanelRef.value?.showRouteByHouseId(house.id)) {
+    ElMessage.info('路线数据正在加载，请稍后再试');
+  }
+}
+
+function clearRoute() {
+  mapPanelRef.value?.clearRoute();
+}
+
+async function loadRoutes() {
+  const focus = focusLocation.value;
+  if (!focus) {
+    mapStore.setDrivingRoutes(new Map());
+    clearRoute();
+    return;
+  }
+
+  const targets = houses.value.filter((house) => house.latitude !== undefined && house.longitude !== undefined);
+
+  if (targets.length === 0) {
+    mapStore.setDrivingRoutes(new Map());
+    clearRoute();
+    return;
+  }
+
+  const destination = `${focus.longitude},${focus.latitude}`;
+  const results = new Map<string, DrivingRouteResult>();
+
+  try {
+    await Promise.all(
+      targets.map(async (house) => {
+        const origin = `${house.longitude},${house.latitude}`;
+        const result = await getDrivingRoute(origin, destination);
+        if (result) {
+          results.set(house.id, result);
+        }
+      })
+    );
+
+    mapStore.setDrivingRoutes(results);
+  } catch (error) {
+    console.error('Failed to load driving routes:', error);
+  }
+}
+
+function openCreateLocationDialog() {
+  editingLocation.value = null;
+  locationDialogVisible.value = true;
+}
+
+function openEditLocationDialog(location: Location) {
+  editingLocation.value = location;
+  locationDialogVisible.value = true;
+}
+
+async function submitLocation(form: LocationForm) {
+  try {
+    await saveLocation(form, editingLocation.value);
+    locationDialogVisible.value = false;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存地点失败');
+  }
+}
+
+async function confirmDeleteLocation(location: Location) {
+  try {
+    await ElMessageBox.confirm(`确认删除「${location.name}」吗？`, '删除地点', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    });
+
+    await removeLocation(location);
+  } catch {
+    // User cancelled the confirmation dialog.
+  }
+}
+
+function onChatHousesFound(foundHouses: House[]) {
+  const ids = foundHouses.map((h) => h.id);
+  mapPanelRef.value?.setHighlightedHouseIds(ids);
+}
+
+function onChatSelectHouse(house: House) {
+  const ids = [house.id];
+  mapPanelRef.value?.setHighlightedHouseIds(ids);
+  selectHouse(house);
+}
+
+function notifyMapResize() {
+  window.requestAnimationFrame(() => {
+    mapPanelRef.value?.resize();
+    mapPanelRef.value?.refreshBounds();
+  });
+}
+
+async function navigateTo(name: string) {
+  await router.push({ name });
+}
+
+watch(focusLocation, () => {
+  clearRoute();
+  void loadRoutes();
+});
+
+watch(currentBounds, () => {
+  if (onlyViewportHouses.value) {
+    void applyHouseFilters();
+  }
+});
+
+watch(
+  () => houses.value.map((house) => `${house.id}:${house.latitude},${house.longitude}`).join('|'),
+  () => {
+    void loadRoutes();
+  }
+);
+
+watch(
+  mappedHouses,
+  (val) => {
+    mapStore.setHouses(val);
+  },
+  { deep: true }
+);
+
+watch(
+  locations,
+  (val) => {
+    mapStore.setLocations(val);
+  },
+  { deep: true }
+);
+
+provide<MainLayoutContext>(mainLayoutContextKey, {
+  houses,
+  loading,
+  saving,
+  filters,
+  drivingRoutes,
+  focusLocation,
+  onlyViewportHouses,
+  locations,
+  locationsLoading,
+  locationSaving,
+  openCreateDialog,
+  openEditDialog,
+  submitHouse,
+  confirmDeleteHouse,
+  applyHouseFilters,
+  toggleViewportHouses,
+  selectHouse,
+  showRoute,
+  openCreateLocationDialog,
+  openEditLocationDialog,
+  submitLocation,
+  confirmDeleteLocation,
+  setLocationFocus,
+  onChatHousesFound,
+  onChatSelectHouse
+});
+
+onMounted(async () => {
+  await Promise.all([loadHouses(), loadLocations()]);
+  await loadRoutes();
+});
+</script>
+
+<template>
+  <main class="main-layout">
+    <aside class="main-layout-nav" aria-label="主导航">
+      <el-menu class="map-directory-menu" :default-active="activeMenu" @select="navigateTo">
+        <el-menu-item index="houses">
+          <el-icon><HouseIcon /></el-icon>
+          <span>房源</span>
+        </el-menu-item>
+        <el-menu-item index="locations">
+          <el-icon><LocationIcon /></el-icon>
+          <span>地点</span>
+        </el-menu-item>
+        <el-menu-item index="chat">
+          <el-icon><ChatDotSquare /></el-icon>
+          <span>对话</span>
+        </el-menu-item>
+      </el-menu>
+      <div class="map-directory-bottom">
+        <el-tooltip content="设置" placement="right">
+          <router-link class="map-directory-icon-button" to="/settings" aria-label="设置">
+            <el-icon><Setting /></el-icon>
+          </router-link>
+        </el-tooltip>
+      </div>
+    </aside>
+
+    <el-splitter class="main-layout-splitter" @resize-end="notifyMapResize">
+      <el-splitter-panel v-model:size="contentPanelWidth" :min="minContentPanelWidth" :max="maxContentPanelWidth">
+        <section class="map-data-content">
+          <router-view />
+        </section>
+      </el-splitter-panel>
+      <el-splitter-panel>
+        <div class="map-canvas-panel">
+          <MapPanel
+            ref="mapPanelRef"
+            @edit-house="openEditDialog"
+          />
+        </div>
+      </el-splitter-panel>
+    </el-splitter>
+
+    <HouseFormDialog v-model="dialogVisible" :house="editingHouse" :saving="saving" @submit="submitHouse" />
+    <LocationFormDialog
+      v-model="locationDialogVisible"
+      :location="editingLocation"
+      :saving="locationSaving"
+      @submit="submitLocation"
+    />
+  </main>
+</template>

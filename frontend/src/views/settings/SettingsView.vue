@@ -16,7 +16,7 @@ const defaultConfig: ConfigData = {
   openaiBaseUrl: 'https://api.deepseek.com',
   openaiApiKey: '',
   openaiModel: 'deepseek-v4-flash',
-  openaiTemperature: 0,
+  openaiTemperature: 0.7,
   amapWebServiceKey: '',
   viteAmapJsKey: '',
   viteAmapSecurityJsCode: ''
@@ -24,14 +24,29 @@ const defaultConfig: ConfigData = {
 
 const form = reactive<ConfigData>({ ...defaultConfig });
 
+function requiredTextRule(message: string) {
+  return {
+    required: true,
+    validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+      if (value?.trim()) {
+        callback();
+        return;
+      }
+
+      callback(new Error(message));
+    },
+    trigger: 'blur'
+  };
+}
+
 const rules: FormRules<ConfigData> = {
-  openaiBaseUrl: [{ required: true, message: '请输入 LLM Base URL', trigger: 'blur' }],
-  openaiApiKey: [{ required: true, message: '请输入 LLM API Key', trigger: 'blur' }],
-  openaiModel: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  openaiBaseUrl: [requiredTextRule('请输入 LLM Base URL')],
+  openaiApiKey: [requiredTextRule('请输入 LLM API Key')],
+  openaiModel: [requiredTextRule('请输入模型名称')],
   openaiTemperature: [{ required: true, message: '请选择温度', trigger: 'change' }],
-  amapWebServiceKey: [{ required: true, message: '请输入高德 Web Service Key', trigger: 'blur' }],
-  viteAmapJsKey: [{ required: true, message: '请输入高德 JS API Key', trigger: 'blur' }],
-  viteAmapSecurityJsCode: [{ required: true, message: '请输入高德 Security JS Code', trigger: 'blur' }]
+  amapWebServiceKey: [requiredTextRule('请输入高德 Web Service Key')],
+  viteAmapJsKey: [requiredTextRule('请输入高德 JS API Key')],
+  viteAmapSecurityJsCode: [requiredTextRule('请输入高德 Security JS Code')]
 };
 
 function applyConfig(data: Partial<ConfigData>) {
