@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const chatMessageSchema = z.object({
+export const agentMessageSchema = z.object({
   messages: z.array(
     z.object({
       role: z.enum(['user', 'assistant']),
@@ -9,4 +9,4 @@ export const chatMessageSchema = z.object({
   ).min(1, '消息列表不能为空'),
 });
 
-export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
+export type AgentMessageInput = z.infer<typeof agentMessageSchema>;

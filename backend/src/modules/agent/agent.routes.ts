@@ -1,20 +1,20 @@
 import type { FastifyInstance } from 'fastify';
-import { chatMessageSchema } from './chat.schema.js';
-import { ChatService } from './chat.service.js';
+import { agentMessageSchema } from './agent.schema.js';
+import { AgentService } from './agent.service.js';
 import { getLlm } from '../langchain/llm.js';
 import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 
-const chatService = new ChatService();
+const agentService = new AgentService();
 
-export async function registerChatRoutes(app: FastifyInstance) {
+export async function registerAgentRoutes(app: FastifyInstance) {
   app.post('/api/chat', async (request, reply) => {
-    const { messages } = chatMessageSchema.parse(request.body);
-    const result = await chatService.chat(messages);
+    const { messages } = agentMessageSchema.parse(request.body);
+    const result = await agentService.chat(messages);
     return { data: result };
   });
 
   app.post('/api/chat/debug', async (request) => {
-    const { messages } = chatMessageSchema.parse(request.body);
+    const { messages } = agentMessageSchema.parse(request.body);
     const llm = getLlm();
     const langchainMessages = [
       new SystemMessage('你是一个助手，回答要简短。'),
