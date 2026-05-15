@@ -26,6 +26,7 @@ interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   houses?: House[];
+  housesTitle?: string;
   hidden?: boolean;
 }
 
@@ -43,10 +44,6 @@ const composerPanelSize = ref('152px');
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
 const visibleMessages = computed(() => messages.value.filter((message) => !message.hidden));
 const hasSelectedSessions = computed(() => selectedSessionIds.value.length > 0);
-const currentSessionTitle = computed(() => {
-  if (!currentSessionId.value) return '新会话';
-  return sessions.value.find((session) => session.id === currentSessionId.value)?.title ?? '当前会话';
-});
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
@@ -86,11 +83,12 @@ async function handleSubmit() {
   }
 }
 
-function appendAssistantResponse(result: { reply: string; houses?: House[] }) {
+function appendAssistantResponse(result: { reply: string; houses?: House[]; housesTitle?: string }) {
   const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant' };
 
   if (result.houses && result.houses.length > 0) {
     assistantMessage.houses = result.houses;
+    assistantMessage.housesTitle = result.housesTitle ?? `找到 ${result.houses.length} 套房源`;
     emit('housesFound', result.houses);
   }
 
@@ -228,21 +226,17 @@ function toApiMessages(): ApiChatMessage[] {
 
 async function executeAgentActions(actions: AgentFrontendAction[]) {
   for (const action of actions) {
+    if (action.type === 'show_house_search_results') {
+      emit('housesFound', action.houses);
+      continue;
+    }
+
     if (action.type === 'confirm_create_house') {
       const result = await requestCreateHouseConfirmation(action);
 
       if (result.status === 'created') {
-        try {
-          await notifyAgentHouseCreated(result.house);
-          await persistCurrentSession();
-        } catch (error) {
-          ElMessage.warning(error instanceof Error ? error.message : '创建成功，但回调助手失败');
-          appendAssistantResponse({
-            reply: `房源创建成功：${result.house.name}`,
-            houses: [result.house]
-          });
-          await persistCurrentSession();
-        }
+        appendCreatedHouseResponse(result.house);
+        await persistCurrentSession();
       } else {
         messages.value.push({ role: 'assistant', content: '已取消新增房源。' });
         await persistCurrentSession();
@@ -257,26 +251,42 @@ function requestCreateHouseConfirmation(action: Extract<AgentFrontendAction, { t
   });
 }
 
-async function notifyAgentHouseCreated(house: House) {
-  messages.value.push({
-    role: 'user',
-    hidden: true,
-    content: [
-      '前端执行器回调：用户已确认新增房源，入库操作已成功完成。',
-      `房源ID：${house.id}`,
-      `名称：${house.name}`,
-      `地址：${house.address}`,
-      `租金：${house.rentPrice}元/月`,
-      `户型：${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`,
-      `状态：${statusLabels[house.status]}`
-    ].join('\n')
-  });
-
-  const result = await sendChatMessage(toApiMessages());
+function appendCreatedHouseResponse(house: House) {
   appendAssistantResponse({
-    reply: result.reply,
-    houses: result.houses?.length ? result.houses : [house]
+    reply: createHouseCreatedReply(house),
+    houses: [house],
+    housesTitle: '新增一套房源'
   });
+}
+
+function createHouseCreatedReply(house: House) {
+  const rows = [
+    ['名称', house.name],
+    ['地址', house.address],
+    ['租金', `${formatCurrency(house.rentPrice)}/月`],
+    ['户型', `${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`],
+    ['状态', statusLabels[house.status]],
+    ['水费', house.waterFeePerTon !== undefined ? `${house.waterFeePerTon} 元/吨` : undefined],
+    ['电费', house.electricityFeePerKwh !== undefined ? `${house.electricityFeePerKwh} 元/度` : undefined],
+    ['物业费', house.propertyFee !== undefined ? `${house.propertyFee} 元` : undefined],
+    ['其他费用', house.otherFee !== undefined ? `${house.otherFee} 元` : undefined],
+    ['付款周期', house.rentPaymentPeriods?.length ? house.rentPaymentPeriods.join('、') : undefined],
+    ['联系电话', house.phone || undefined],
+    ['微信', house.wechat || undefined],
+    ['联系备注', house.contactNotes || undefined]
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+
+  return [
+    '房源创建成功，以下是新增房源的信息：',
+    '',
+    '| 项目 | 内容 |',
+    '| --- | --- |',
+    ...rows.map(([label, value]) => `| ${escapeMarkdownTableCell(label)} | ${escapeMarkdownTableCell(value)} |`)
+  ].join('\n');
+}
+
+function escapeMarkdownTableCell(value: string) {
+  return value.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
 }
 
 function handleInputKeydown(event: KeyboardEvent) {
@@ -311,7 +321,6 @@ function formatSessionTime(value: string) {
     <div class="chat-header">
       <div class="chat-header-title">
         <span>对话</span>
-        <el-tag type="info" effect="plain">{{ currentSessionTitle }}</el-tag>
       </div>
       <div class="chat-header-actions">
         <el-button
@@ -331,6 +340,8 @@ function formatSessionTime(value: string) {
       </div>
     </div>
 
+    <div class="chat-notice">AI 内容仅供参考，请以实际信息为准</div>
+
     <el-splitter class="chat-splitter" layout="vertical">
       <el-splitter-panel min="160px">
         <div class="chat-messages">
@@ -347,13 +358,13 @@ function formatSessionTime(value: string) {
             <div class="chat-bubble">
               <div
                 v-if="msg.role === 'assistant'"
-                class="chat-bubble-markdown"
+                class="chat-bubble-markdown markdown-body"
                 v-html="renderAssistantContent(msg.content)"
               />
               <div v-else class="chat-bubble-text">{{ msg.content }}</div>
               <div v-if="msg.houses && msg.houses.length > 0" class="chat-house-results">
                 <div class="chat-house-results-header">
-                  找到 {{ msg.houses.length }} 套房源
+                  {{ msg.housesTitle ?? `找到 ${msg.houses.length} 套房源` }}
                 </div>
                 <div
                   v-for="house in msg.houses"
@@ -513,6 +524,17 @@ function formatSessionTime(value: string) {
   white-space: nowrap;
 }
 
+.chat-notice {
+  flex: 0 0 auto;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #b45309;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  text-align: center;
+  line-height: 1.4;
+}
+
 .chat-session-dialog-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -608,64 +630,10 @@ function formatSessionTime(value: string) {
 }
 
 .chat-bubble-markdown {
-  white-space: normal;
-}
-
-.chat-bubble-markdown :deep(p) {
-  margin: 0;
-}
-
-.chat-bubble-markdown :deep(p + p),
-.chat-bubble-markdown :deep(ul),
-.chat-bubble-markdown :deep(ol),
-.chat-bubble-markdown :deep(pre),
-.chat-bubble-markdown :deep(blockquote),
-.chat-bubble-markdown :deep(table) {
-  margin-top: 8px;
-}
-
-.chat-bubble-markdown :deep(ul),
-.chat-bubble-markdown :deep(ol) {
-  padding-left: 18px;
-}
-
-.chat-bubble-markdown :deep(li + li) {
-  margin-top: 3px;
-}
-
-.chat-bubble-markdown :deep(code) {
-  border-radius: 5px;
-  background: rgb(17 24 39 / 8%);
-  padding: 1px 5px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 0.92em;
-}
-
-.chat-bubble-markdown :deep(pre) {
-  overflow-x: auto;
-  border-radius: 8px;
-  background: #111827;
-  padding: 10px 12px;
-  color: #f8fafc;
-}
-
-.chat-bubble-markdown :deep(pre code) {
   background: transparent;
-  padding: 0;
-  color: inherit;
-}
-
-.chat-bubble-markdown :deep(a) {
-  color: #1d4ed8;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.chat-bubble-markdown :deep(blockquote) {
-  border-left: 3px solid #c6ced7;
-  margin-left: 0;
-  padding-left: 10px;
-  color: #526170;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: normal;
 }
 
 .chat-loading {

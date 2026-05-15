@@ -5,6 +5,7 @@ export interface PersistedChatMessage {
   role: 'user' | 'assistant';
   content: string;
   houses?: House[];
+  housesTitle?: string;
   hidden?: boolean;
 }
 

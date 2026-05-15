@@ -19,7 +19,14 @@ export interface ConfirmCreateHouseAction {
   payload: HouseForm;
 }
 
-export type AgentFrontendAction = ConfirmCreateHouseAction;
+export interface ShowHouseSearchResultsAction {
+  id: string;
+  type: 'show_house_search_results';
+  title: string;
+  houses: House[];
+}
+
+export type AgentFrontendAction = ConfirmCreateHouseAction | ShowHouseSearchResultsAction;
 
 export type ConfirmCreateHouseResult =
   | { status: 'created'; house: House }

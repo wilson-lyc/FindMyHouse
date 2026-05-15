@@ -2,7 +2,7 @@
 import { computed, onMounted, provide, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
-import { ChatDotSquare, House as HouseIcon, Location as LocationIcon, Setting } from '@element-plus/icons-vue';
+import { ChatDotSquare, House as HouseIcon, Location as LocationIcon, QuestionFilled, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
@@ -261,8 +261,6 @@ function onChatHousesFound(foundHouses: House[]) {
 }
 
 function onChatSelectHouse(house: House) {
-  const ids = [house.id];
-  mapPanelRef.value?.setHighlightedHouseIds(ids);
   selectHouse(house);
 }
 
@@ -375,6 +373,11 @@ onMounted(async () => {
         </el-menu-item>
       </el-menu>
       <div class="map-directory-bottom">
+        <el-tooltip content="帮助" placement="right">
+          <router-link class="map-directory-icon-button" to="/help" aria-label="帮助">
+            <el-icon><QuestionFilled /></el-icon>
+          </router-link>
+        </el-tooltip>
         <el-tooltip content="设置" placement="right">
           <router-link class="map-directory-icon-button" to="/settings" aria-label="设置">
             <el-icon><Setting /></el-icon>

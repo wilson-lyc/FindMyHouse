@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { Close, Location } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { useMapStore } from '../../stores/mapStore';
-import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
+import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapMarker, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
@@ -24,6 +24,7 @@ const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
+const isSearchResultMode = computed(() => highlightedHouseIds.value.length > 0);
 
 const houseFocusZoom = 16;
 const locationFocusZoom = 14;
@@ -197,27 +198,28 @@ function applyInitialFocusLocation() {
   return true;
 }
 
-/** 渲染所有房源和地点的大头针 */
+/** 渲染房源和地点的大头针；搜索结果模式下只渲染匹配房源。 */
+let houseMarkersById = new Map<string, AMapMarker>();
+
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
   map.value.clearMap();
   const markers = [];
+  houseMarkersById = new Map();
 
   const highlightedIds = new Set(highlightedHouseIds.value ?? []);
+  const visibleHouses = highlightedIds.size > 0 ? houses.value.filter((house) => highlightedIds.has(house.id)) : houses.value;
 
-  for (const house of houses.value) {
+  for (const house of visibleHouses) {
     const position = housePosition(house);
     if (!position) continue;
-
-    const isHighlighted = highlightedIds.has(house.id);
-    const labelClass = isHighlighted ? 'map-marker-label house highlighted' : 'map-marker-label house';
 
     const marker = new amap.value.Marker({
       position,
       title: house.name,
       label: {
-        content: `<div class="${labelClass}">¥${house.rentPrice}</div>`,
+        content: `<div class="map-marker-label house">¥${house.rentPrice}</div>`,
         direction: 'top'
       }
     });
@@ -225,26 +227,29 @@ function renderMarkers() {
     marker.on('click', () => {
       selectHouseById(house.id);
     });
+    houseMarkersById.set(house.id, marker);
     markers.push(marker);
   }
 
-  for (const location of locations.value) {
-    const position = locationPosition(location);
-    if (!position) continue;
+  if (highlightedIds.size === 0) {
+    for (const location of locations.value) {
+      const position = locationPosition(location);
+      if (!position) continue;
 
-    const marker = new amap.value.Marker({
-      position,
-      title: location.name,
-      label: {
-        content: `<div class="map-marker-label location">${location.name}</div>`,
-        direction: 'top'
-      }
-    });
+      const marker = new amap.value.Marker({
+        position,
+        title: location.name,
+        label: {
+          content: `<div class="map-marker-label location">${location.name}</div>`,
+          direction: 'top'
+        }
+      });
 
-    marker.on('click', () => {
-      focusLocation(location, position);
-    });
-    markers.push(marker);
+      marker.on('click', () => {
+        focusLocation(location, position);
+      });
+      markers.push(marker);
+    }
   }
 
   if (markers.length) {
@@ -252,6 +257,20 @@ function renderMarkers() {
   }
 
   renderRoutePolyline();
+}
+
+function fitSearchResultView() {
+  if (!map.value || highlightedHouseIds.value.length === 0) return false;
+
+  const resultMarkers = highlightedHouseIds.value
+    .map((houseId) => houseMarkersById.get(houseId))
+    .filter((marker): marker is AMapMarker => Boolean(marker));
+
+  if (!resultMarkers.length) return false;
+
+  map.value.setFitView(resultMarkers);
+  emitBounds();
+  return true;
 }
 
 // ==================== 路线 ====================
@@ -349,6 +368,10 @@ function clearRoute() {
   mapStore.clearRoute();
 }
 
+function clearSearchResults() {
+  mapStore.clearHighlightedHouseIds();
+}
+
 function showRouteByHouseId(houseId: string) {
   return mapStore.showRoute(houseId);
 }
@@ -398,8 +421,22 @@ watch(
   [houses, locations],
   () => {
     renderMarkers();
+    if (highlightedHouseIds.value.length > 0) {
+      fitSearchResultView();
+    }
     if (applyInitialFocusLocation()) {
       emitBounds();
+    }
+  },
+  { deep: true }
+);
+
+watch(
+  highlightedHouseIds,
+  () => {
+    renderMarkers();
+    if (highlightedHouseIds.value.length > 0) {
+      fitSearchResultView();
     }
   },
   { deep: true }
@@ -433,6 +470,7 @@ defineExpose({
   focusLocationById,
   focusFocusLocation,
   clearRoute,
+  clearSearchResults,
   showRouteByHouseId,
   setHighlightedHouseIds
 });
@@ -448,9 +486,17 @@ defineExpose({
     <div ref="mapContainer" class="amap-container" />
     <button
       v-if="routeData"
-      class="map-clear-route-btn"
+      class="map-panel-close-btn map-clear-route-btn"
       title="关闭路线"
       @click.stop="clearRoute"
+    >
+      <el-icon><Close /></el-icon>
+    </button>
+    <button
+      v-if="isSearchResultMode"
+      class="map-panel-close-btn map-clear-search-results-btn"
+      title="退出搜索结果"
+      @click.stop="clearSearchResults"
     >
       <el-icon><Close /></el-icon>
     </button>

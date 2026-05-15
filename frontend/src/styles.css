@@ -538,11 +538,10 @@ body {
   overflow: hidden;
 }
 
-.map-clear-route-btn {
+.map-panel-close-btn {
   position: absolute;
   z-index: 1000;
   top: 10px;
-  right: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -558,7 +557,19 @@ body {
   transition: background 0.15s;
 }
 
-.map-clear-route-btn:hover {
+.map-clear-search-results-btn {
+  right: 10px;
+}
+
+.map-clear-route-btn {
+  right: 10px;
+}
+
+.map-clear-route-btn:has(+ .map-clear-search-results-btn) {
+  right: 50px;
+}
+
+.map-panel-close-btn:hover {
   background: #ffffff;
   color: #303133;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
@@ -658,14 +669,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   box-shadow: 0 4px 12px rgb(31 49 63 / 10%);
-}
-
-.map-marker-label.house.highlighted {
-  background: var(--el-color-warning-light-3, #fdf6ec);
-  border-color: var(--el-color-warning, #e6a23c);
-  color: var(--el-color-warning-dark-2, #b88230);
-  box-shadow: 0 4px 16px rgb(230 162 60 / 40%);
-  transform: scale(1.1);
 }
 
 .amap-marker-label {
