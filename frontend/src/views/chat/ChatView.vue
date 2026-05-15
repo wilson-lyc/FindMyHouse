@@ -15,5 +15,6 @@ if (!context) {
     @houses-found="context.onChatHousesFound"
     @select-house="context.onChatSelectHouse"
     @confirm-create-house="context.onAgentConfirmCreateHouse"
+    @confirm-create-location="context.onAgentConfirmCreateLocation"
   />
 </template>

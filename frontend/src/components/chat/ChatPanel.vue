@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Delete, Plus, Setting } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
@@ -7,7 +7,8 @@ import {
   sendChatMessage,
   type AgentFrontendAction,
   type ChatMessage as ApiChatMessage,
-  type ConfirmCreateHouseResult
+  type ConfirmCreateHouseResult,
+  type ConfirmCreateLocationResult
 } from '../../api/chat/chat-api';
 import {
   createChatSession,
@@ -19,6 +20,8 @@ import {
   type ChatSessionSummary
 } from '../../api/chat/chat-session-api';
 import type { House } from '../../model/house/house';
+import type { Location } from '../../model/location/location';
+import { locationCategoryLabels, type LocationCategory } from '../../model/location/location';
 import { statusLabels } from '../../model/house/house-status';
 import { formatCurrency } from '../../lib/format';
 
@@ -39,6 +42,7 @@ const currentSessionId = ref<string | null>(null);
 const sessions = ref<ChatSessionSummary[]>([]);
 const selectedSessionIds = ref<string[]>([]);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+const messagesContainerRef = ref<HTMLDivElement | null>(null);
 const composerPanelSize = ref('152px');
 
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
@@ -55,6 +59,7 @@ const emit = defineEmits<{
   housesFound: [houses: House[]];
   selectHouse: [house: House];
   confirmCreateHouse: [action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>, done: (result: ConfirmCreateHouseResult) => void];
+  confirmCreateLocation: [action: Extract<AgentFrontendAction, { type: 'confirm_create_location' }>, done: (result: ConfirmCreateLocationResult) => void];
 }>();
 
 onMounted(() => {
@@ -231,6 +236,10 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
       continue;
     }
 
+    if (action.type === 'show_location_search_results') {
+      continue;
+    }
+
     if (action.type === 'confirm_create_house') {
       const result = await requestCreateHouseConfirmation(action);
 
@@ -239,6 +248,18 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
         await persistCurrentSession();
       } else {
         messages.value.push({ role: 'assistant', content: '已取消新增房源。' });
+        await persistCurrentSession();
+      }
+    }
+
+    if (action.type === 'confirm_create_location') {
+      const result = await requestCreateLocationConfirmation(action);
+
+      if (result.status === 'created') {
+        appendCreatedLocationResponse(result.location);
+        await persistCurrentSession();
+      } else {
+        messages.value.push({ role: 'assistant', content: '已取消新增地点。' });
         await persistCurrentSession();
       }
     }
@@ -251,11 +272,23 @@ function requestCreateHouseConfirmation(action: Extract<AgentFrontendAction, { t
   });
 }
 
+function requestCreateLocationConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_create_location' }>) {
+  return new Promise<ConfirmCreateLocationResult>((resolve) => {
+    emit('confirmCreateLocation', action, resolve);
+  });
+}
+
 function appendCreatedHouseResponse(house: House) {
   appendAssistantResponse({
     reply: createHouseCreatedReply(house),
     houses: [house],
     housesTitle: '新增一套房源'
+  });
+}
+
+function appendCreatedLocationResponse(location: Location) {
+  appendAssistantResponse({
+    reply: createLocationCreatedReply(location)
   });
 }
 
@@ -278,6 +311,24 @@ function createHouseCreatedReply(house: House) {
 
   return [
     '房源创建成功，以下是新增房源的信息：',
+    '',
+    '| 项目 | 内容 |',
+    '| --- | --- |',
+    ...rows.map(([label, value]) => `| ${escapeMarkdownTableCell(label)} | ${escapeMarkdownTableCell(value)} |`)
+  ].join('\n');
+}
+
+function createLocationCreatedReply(location: Location) {
+  const rows = [
+    ['名称', location.name],
+    ['地址', location.address],
+    ['分类', locationCategoryLabels[location.category as LocationCategory] ?? location.category],
+    ['焦点地点', location.isFocus ? '是' : '否'],
+    ['备注', location.notes || undefined]
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+
+  return [
+    '地点创建成功，以下是新增地点的信息：',
     '',
     '| 项目 | 内容 |',
     '| --- | --- |',
@@ -314,6 +365,19 @@ function formatSessionTime(value: string) {
     minute: '2-digit'
   }).format(new Date(value));
 }
+
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainerRef.value) {
+      messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight;
+    }
+  });
+}
+
+watch(visibleMessages, () => scrollToBottom(), { deep: true });
+watch(loading, () => {
+  if (!loading.value) scrollToBottom();
+});
 </script>
 
 <template>
@@ -344,7 +408,7 @@ function formatSessionTime(value: string) {
 
     <el-splitter class="chat-splitter" layout="vertical">
       <el-splitter-panel min="160px">
-        <div class="chat-messages">
+        <div ref="messagesContainerRef" class="chat-messages">
           <div v-if="messages.length === 0" class="chat-empty">
             <p>你好！我是你的找房助手，有什么可以帮你的吗？</p>
             <p class="chat-hints">

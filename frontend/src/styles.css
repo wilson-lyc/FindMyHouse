@@ -257,6 +257,213 @@ body {
   padding-right: 2px;
 }
 
+.stats-page {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 100%;
+  padding: 14px;
+}
+
+.stats-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stats-header h1 {
+  margin: 0;
+  color: #162636;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.stats-header p {
+  margin: 6px 0 0;
+  color: #667786;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stats-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-summary-card,
+.stats-panel {
+  border: 1px solid #e0e8ed;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.stats-summary-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.stats-summary-card span,
+.stats-summary-card small,
+.stats-panel header span,
+.stats-candidate-row small {
+  color: #6d7b88;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.stats-summary-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #162636;
+  font-size: 20px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-panel {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.stats-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border-bottom: 1px solid #edf2f5;
+  padding: 10px 12px;
+}
+
+.stats-panel h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #1d2d3c;
+  font-size: 14px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-chart {
+  width: 100%;
+  height: 230px;
+  min-width: 0;
+}
+
+.stats-chart--compact {
+  height: 210px;
+}
+
+.stats-panel--list {
+  gap: 0;
+}
+
+.stats-candidate-list,
+.stats-rank-list {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.stats-candidate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid #e5edf2;
+  border-radius: 8px;
+  background: #fbfdfe;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 10px;
+  text-align: left;
+}
+
+.stats-candidate-row:hover {
+  border-color: #b5c8d2;
+  background: #f4f8fa;
+}
+
+.stats-candidate-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.stats-candidate-row > span:last-child {
+  justify-items: end;
+}
+
+.stats-candidate-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #1d2d3c;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-candidate-row b {
+  color: #b23b3b;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.stats-rank-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 22px;
+  gap: 8px;
+  align-items: center;
+  color: #304457;
+  font-size: 13px;
+}
+
+.stats-rank-row > span,
+.stats-rank-row > b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-rank-row > div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf3f6;
+}
+
+.stats-rank-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f6f73;
+}
+
+@media (max-width: 620px) {
+  .stats-summary-grid,
+  .stats-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .house-card {
   display: grid;
   width: 100%;

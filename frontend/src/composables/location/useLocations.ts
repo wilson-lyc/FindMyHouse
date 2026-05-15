@@ -23,19 +23,22 @@ export function useLocations() {
     }
   }
 
-  async function saveLocation(form: LocationForm, editingLocation?: Location | null) {
+  async function saveLocation(form: LocationForm, editingLocation?: Location | null): Promise<Location | undefined> {
     saving.value = true;
     try {
       const payload = normalizeLocationForm(form);
+      let saved: Location | undefined;
+
       if (editingLocation) {
-        await updateLocation(editingLocation.id, payload);
+        saved = await updateLocation(editingLocation.id, payload);
         ElMessage.success('地点已更新');
       } else {
-        await createLocation(payload);
+        saved = await createLocation(payload);
         ElMessage.success('地点已创建');
       }
 
       await loadLocations();
+      return saved;
     } finally {
       saving.value = false;
     }

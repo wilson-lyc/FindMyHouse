@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { tool } from '@langchain/core/tools';
 import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters } from '../houses/domain/house.js';
 import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from '../houses/dto/house.schema.js';
+import { locationCategories, type Location } from '../locations/domain/location.js';
+import { createLocationSchema } from '../locations/dto/location.schema.js';
 import type { HouseRepository } from '../houses/house.repository.js';
 import type { LocationRepository } from '../locations/location.repository.js';
 import type { AmapService } from '../maps/amap.service.js';
@@ -13,6 +15,11 @@ export const agentToolNames = [
   'create_house',
   'update_house',
   'delete_house',
+  'search_locations',
+  'get_location',
+  'create_location',
+  'update_location',
+  'delete_location',
   'get_focus_location',
 ] as const;
 
@@ -30,6 +37,13 @@ export interface ConfirmCreateHouseAction {
   payload: z.infer<typeof createHouseSchema>;
 }
 
+export interface ConfirmCreateLocationAction {
+  id: string;
+  type: 'confirm_create_location';
+  title: string;
+  payload: z.infer<typeof createLocationSchema>;
+}
+
 export interface ShowHouseSearchResultsAction {
   id: string;
   type: 'show_house_search_results';
@@ -37,7 +51,14 @@ export interface ShowHouseSearchResultsAction {
   houses: House[];
 }
 
-export type AgentFrontendAction = ConfirmCreateHouseAction | ShowHouseSearchResultsAction;
+export interface ShowLocationSearchResultsAction {
+  id: string;
+  type: 'show_location_search_results';
+  title: string;
+  locations: Location[];
+}
+
+export type AgentFrontendAction = ConfirmCreateHouseAction | ConfirmCreateLocationAction | ShowHouseSearchResultsAction | ShowLocationSearchResultsAction;
 
 export interface ToolResult {
   kind: 'houses' | 'house' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
@@ -110,6 +131,30 @@ const updateHouseToolSchema = z.object({
 const deleteHouseToolSchema = idParamsSchema;
 const getHouseToolSchema = idParamsSchema;
 
+const searchLocationsToolSchema = z.object({
+  category: z.enum(locationCategories).optional().describe('地点分类'),
+});
+
+const locationInputToolSchema = z.object({
+  name: z.string().trim().min(1).describe('地点名称'),
+  category: z.enum(locationCategories).optional().describe('地点分类，默认 other'),
+  address: z.string().trim().min(1).describe('地址'),
+  latitude: optionalNumberToolSchema.describe('纬度'),
+  longitude: optionalNumberToolSchema.describe('经度'),
+  isFocus: z.boolean().optional().describe('是否设为焦点地点'),
+  notes: z.string().trim().optional().describe('备注'),
+});
+
+const createLocationToolSchema = locationInputToolSchema;
+
+const updateLocationToolSchema = z.object({
+  id: idParamsSchema.shape.id,
+  data: locationInputToolSchema.partial(),
+});
+
+const deleteLocationToolSchema = idParamsSchema;
+const getLocationToolSchema = idParamsSchema;
+
 export function createAgentTools(context: AgentToolContext) {
   return [
     tool(
@@ -150,6 +195,46 @@ export function createAgentTools(context: AgentToolContext) {
         name: 'delete_house',
         description: '删除一套房源。删除不可逆，只有用户明确要求删除且提供明确房源 ID 时使用；否则先搜索或要求确认。',
         schema: deleteHouseToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'search_locations', params }, context)),
+      {
+        name: 'search_locations',
+        description: '根据分类搜索地点。用户想找、列出或查看地点时使用。',
+        schema: searchLocationsToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'get_location', params }, context)),
+      {
+        name: 'get_location',
+        description: '根据明确的地点 ID 查询单条地点详情。',
+        schema: getLocationToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'create_location', params }, context)),
+      {
+        name: 'create_location',
+        description: '准备新增一个地点并交给前端弹窗让用户确认。必填项：名称、地址；工具会根据地址获取坐标，缺少名称/地址或无法定位时不能创建。调用后不会直接入库。',
+        schema: createLocationToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'update_location', params }, context)),
+      {
+        name: 'update_location',
+        description: '更新一个已存在地点。必须有明确地点 ID 和要更新的字段；如果用户只描述地点名称或特征，先搜索候选地点。',
+        schema: updateLocationToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'delete_location', params }, context)),
+      {
+        name: 'delete_location',
+        description: '删除一个地点。删除不可逆，只有用户明确要求删除且提供明确地点 ID 时使用；否则先搜索或要求确认。',
+        schema: deleteLocationToolSchema,
       }
     ),
     tool(
@@ -196,6 +281,26 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
 
     if (toolCall.tool === 'delete_house') {
       return deleteHouse(params, context);
+    }
+
+    if (toolCall.tool === 'search_locations') {
+      return searchLocations(params, context);
+    }
+
+    if (toolCall.tool === 'get_location') {
+      return getLocation(params, context);
+    }
+
+    if (toolCall.tool === 'create_location') {
+      return createLocation(params, context);
+    }
+
+    if (toolCall.tool === 'update_location') {
+      return updateLocation(params, context);
+    }
+
+    if (toolCall.tool === 'delete_location') {
+      return deleteLocation(params, context);
     }
 
     if (toolCall.tool === 'get_focus_location') {
@@ -386,6 +491,173 @@ function getFocusLocation({ locationRepository }: AgentToolContext): ToolResult 
     houses: [],
     reply: `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`,
   };
+}
+
+function searchLocations(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
+  const locations = locationRepository.list(searchLocationsToolSchema.parse(params));
+
+  if (locations.length === 0) {
+    return {
+      kind: 'empty',
+      content: '没有找到匹配的地点。',
+      houses: [],
+      reply: '没有找到匹配的地点。',
+    };
+  }
+
+  return {
+    kind: 'houses',
+    content: formatLocationSummary(locations),
+    houses: [],
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'show_location_search_results',
+        title: `找到 ${locations.length} 个地点`,
+        locations,
+      },
+    ],
+  };
+}
+
+function getLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
+  const { id } = getLocationToolSchema.parse(params);
+  const location = locationRepository.findById(id);
+
+  if (!location) {
+    return {
+      kind: 'empty',
+      content: `未找到 ID 为 ${id} 的地点。`,
+      houses: [],
+      reply: `没有找到 ID 为 ${id} 的地点。`,
+    };
+  }
+
+  return {
+    kind: 'house',
+    content: formatLocationDetails(location),
+    houses: [],
+    reply: `找到这个地点：\n${formatLocationDetails(location)}`,
+  };
+}
+
+async function createLocation(params: Record<string, unknown>, { amapService }: AgentToolContext): Promise<ToolResult> {
+  const toolInput = createLocationToolSchema.parse(params);
+  let geocodeResult;
+
+  try {
+    geocodeResult = await amapService.geocode(toolInput.address);
+  } catch (error) {
+    return {
+      kind: 'invalid_params',
+      content: error instanceof Error ? error.message : '地址定位失败。',
+      houses: [],
+      reply: '地点还没有创建成功：地址定位失败。请确认地址足够完整，或稍后再试。',
+    };
+  }
+
+  if (!geocodeResult) {
+    return {
+      kind: 'invalid_params',
+      content: `无法定位地址：${toolInput.address}`,
+      houses: [],
+      reply: `地点还没有创建成功：无法定位地址「${toolInput.address}」。请提供更完整的城市、区县、小区或楼栋地址。`,
+    };
+  }
+
+  const input = createLocationSchema.parse({
+    ...toolInput,
+    address: geocodeResult.formattedAddress,
+    latitude: geocodeResult.latitude,
+    longitude: geocodeResult.longitude,
+  });
+
+  return {
+    kind: 'frontend_action',
+    content: formatPendingLocationDetails(input),
+    houses: [],
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'confirm_create_location',
+        title: `确认新增地点「${input.name}」`,
+        payload: input,
+      },
+    ],
+    reply: `我已识别出一个待新增地点，请在弹窗中确认后再入库。\n${formatPendingLocationDetails(input)}`,
+  };
+}
+
+function updateLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
+  const { id, data } = updateLocationToolSchema.parse(params);
+  const location = locationRepository.update(id, data);
+
+  if (!location) {
+    return {
+      kind: 'empty',
+      content: `未找到 ID 为 ${id} 的地点。`,
+      houses: [],
+      reply: `没有找到 ID 为 ${id} 的地点，无法更新。`,
+    };
+  }
+
+  return {
+    kind: 'mutation',
+    content: formatLocationDetails(location),
+    houses: [],
+    reply: `已更新地点「${location.name}」。\n${formatLocationDetails(location)}`,
+  };
+}
+
+function deleteLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
+  const { id } = deleteLocationToolSchema.parse(params);
+  const location = locationRepository.findById(id);
+
+  if (!location) {
+    return {
+      kind: 'empty',
+      content: `未找到 ID 为 ${id} 的地点。`,
+      houses: [],
+      reply: `没有找到 ID 为 ${id} 的地点，无法删除。`,
+    };
+  }
+
+  locationRepository.delete(id);
+
+  return {
+    kind: 'mutation',
+    content: `已删除地点：${formatLocationLine(location)}`,
+    houses: [],
+    reply: `已删除地点「${location.name}」。`,
+  };
+}
+
+function formatLocationLine(location: Location): string {
+  return `${location.name} | ID: ${location.id} | 地址: ${location.address} | 分类: ${location.category}${location.isFocus ? ' | 焦点地点' : ''}`;
+}
+
+function formatLocationSummary(locations: Location[]): string {
+  return locations.map((location) => `- ${formatLocationLine(location)}`).join('\n');
+}
+
+function formatLocationDetails(location: Location): string {
+  const lines = [
+    formatLocationLine(location),
+    location.latitude !== undefined && location.longitude !== undefined ? `坐标：${location.latitude}, ${location.longitude}` : undefined,
+    location.notes ? `备注：${location.notes}` : undefined,
+  ].filter(Boolean);
+
+  return lines.join('\n');
+}
+
+function formatPendingLocationDetails(location: z.infer<typeof createLocationSchema>): string {
+  const lines = [
+    formatLocationLine(location as Location),
+    location.latitude !== undefined && location.longitude !== undefined ? `坐标：${location.latitude}, ${location.longitude}` : undefined,
+    location.notes ? `备注：${location.notes}` : undefined,
+  ].filter(Boolean);
+
+  return lines.join('\n');
 }
 
 function formatHouseLine(house: House): string {
