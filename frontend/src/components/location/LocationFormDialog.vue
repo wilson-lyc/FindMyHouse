@@ -11,7 +11,11 @@ import CoordinatePicker from '../map/CoordinatePicker.vue';
 const props = defineProps<{
   modelValue: boolean;
   location: Location | null;
+  initialForm?: LocationForm | null;
   saving: boolean;
+  title?: string;
+  cancelText?: string;
+  submitText?: string;
 }>();
 
 const emit = defineEmits<{
@@ -29,10 +33,10 @@ const rules: FormRules<LocationForm> = {
 };
 
 watch(
-  () => [props.modelValue, props.location] as const,
-  ([visible, location]) => {
+  () => [props.modelValue, props.location, props.initialForm] as const,
+  ([visible, location, initialForm]) => {
     if (!visible) return;
-    Object.assign(form, location ? locationToForm(location) : createEmptyLocationForm());
+    Object.assign(form, location ? locationToForm(location) : { ...createEmptyLocationForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
   },
   { immediate: true }
@@ -70,7 +74,7 @@ async function submitForm() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="location ? '编辑地点' : '新增地点'"
+    :title="title ?? (location ? '编辑地点' : '新增地点')"
     width="760px"
     class="house-form-dialog location-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
@@ -109,8 +113,8 @@ async function submitForm() {
       </el-form>
     </el-scrollbar>
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+      <el-button @click="emit('update:modelValue', false)">{{ cancelText ?? '取消' }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submitForm">{{ submitText ?? '保存' }}</el-button>
     </template>
   </el-dialog>
 </template>

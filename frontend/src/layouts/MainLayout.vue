@@ -7,7 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
-import type { ConfirmCreateHouseAction, ConfirmCreateHouseResult } from '../api/chat/chat-api';
+import type { ConfirmCreateHouseAction, ConfirmCreateHouseResult, ConfirmCreateLocationAction, ConfirmCreateLocationResult } from '../api/chat/chat-api';
 import { getDrivingRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
@@ -51,6 +51,11 @@ const houseDialogSubmitText = ref<string>();
 const pendingAgentCreateDone = ref<((result: ConfirmCreateHouseResult) => void) | null>(null);
 const locationDialogVisible = ref(false);
 const editingLocation = ref<Location | null>(null);
+const locationDialogInitialForm = ref<LocationForm | null>(null);
+const locationDialogTitle = ref<string>();
+const locationDialogCancelText = ref<string>();
+const locationDialogSubmitText = ref<string>();
+const pendingAgentLocationCreateDone = ref<((result: ConfirmCreateLocationResult) => void) | null>(null);
 const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
 const contentPanelWidth = ref(420);
 const minContentPanelWidth = 360;
@@ -234,11 +239,51 @@ function openEditLocationDialog(location: Location) {
 
 async function submitLocation(form: LocationForm) {
   try {
-    await saveLocation(form, editingLocation.value);
-    locationDialogVisible.value = false;
+    const savedLocation = await saveLocation(form, editingLocation.value);
+
+    if (pendingAgentLocationCreateDone.value && savedLocation) {
+      pendingAgentLocationCreateDone.value({ status: 'created', location: savedLocation });
+      pendingAgentLocationCreateDone.value = null;
+    }
+
+    closeLocationDialog(false);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存地点失败');
   }
+}
+
+function resetLocationDialogOptions() {
+  if (pendingAgentLocationCreateDone.value) {
+    pendingAgentLocationCreateDone.value({ status: 'cancelled' });
+    pendingAgentLocationCreateDone.value = null;
+  }
+
+  locationDialogTitle.value = undefined;
+  locationDialogCancelText.value = undefined;
+  locationDialogSubmitText.value = undefined;
+}
+
+function closeLocationDialog(cancelPending: boolean) {
+  if (cancelPending && pendingAgentLocationCreateDone.value) {
+    pendingAgentLocationCreateDone.value({ status: 'cancelled' });
+    pendingAgentLocationCreateDone.value = null;
+  }
+
+  locationDialogVisible.value = false;
+  editingLocation.value = null;
+  locationDialogInitialForm.value = null;
+  locationDialogTitle.value = undefined;
+  locationDialogCancelText.value = undefined;
+  locationDialogSubmitText.value = undefined;
+}
+
+function handleLocationDialogVisibleChange(visible: boolean) {
+  if (!visible) {
+    closeLocationDialog(true);
+    return;
+  }
+
+  locationDialogVisible.value = true;
 }
 
 async function confirmDeleteLocation(location: Location) {
@@ -273,6 +318,17 @@ function onAgentConfirmCreateHouse(action: ConfirmCreateHouseAction, done: (resu
   houseDialogSubmitText.value = '确认新增';
   pendingAgentCreateDone.value = done;
   dialogVisible.value = true;
+}
+
+function onAgentConfirmCreateLocation(action: ConfirmCreateLocationAction, done: (result: ConfirmCreateLocationResult) => void) {
+  resetLocationDialogOptions();
+  editingLocation.value = null;
+  locationDialogInitialForm.value = action.payload;
+  locationDialogTitle.value = action.title;
+  locationDialogCancelText.value = '暂不新增';
+  locationDialogSubmitText.value = '确认新增';
+  pendingAgentLocationCreateDone.value = done;
+  locationDialogVisible.value = true;
 }
 
 function notifyMapResize() {
@@ -346,7 +402,8 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   setLocationFocus,
   onChatHousesFound,
   onChatSelectHouse,
-  onAgentConfirmCreateHouse
+  onAgentConfirmCreateHouse,
+  onAgentConfirmCreateLocation
 });
 
 onMounted(async () => {
@@ -414,9 +471,14 @@ onMounted(async () => {
       @submit="submitHouse"
     />
     <LocationFormDialog
-      v-model="locationDialogVisible"
+      :model-value="locationDialogVisible"
       :location="editingLocation"
+      :initial-form="locationDialogInitialForm"
       :saving="locationSaving"
+      :title="locationDialogTitle"
+      :cancel-text="locationDialogCancelText"
+      :submit-text="locationDialogSubmitText"
+      @update:model-value="handleLocationDialogVisibleChange"
       @submit="submitLocation"
     />
   </main>
