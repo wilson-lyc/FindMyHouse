@@ -4,6 +4,7 @@ import MainLayout from '../layouts/MainLayout.vue';
 import ChatView from '../views/chat/ChatView.vue';
 import HousesView from '../views/houses/HousesView.vue';
 import LocationsView from '../views/locations/LocationsView.vue';
+import StatsView from '../views/stats/StatsView.vue';
 import HelpPage from '../views/help/HelpPage.vue';
 import SettingsView from '../views/settings/SettingsView.vue';
 import WelcomePage from '../views/welcome/WelcomePage.vue';
@@ -29,6 +30,11 @@ const routes = [
         path: 'chat',
         name: 'chat',
         component: ChatView
+      },
+      {
+        path: 'stats',
+        name: 'stats',
+        component: StatsView
       }
     ]
   },
@@ -70,7 +76,7 @@ router.beforeEach(async (to) => {
     return { name: 'home' };
   }
 
-  if (!hasFocus && to.name !== 'welcome' && to.name !== 'settings' && to.name !== 'help') {
+  if (!hasFocus && to.name !== 'welcome' && to.name !== 'settings' && to.name !== 'help' && to.name !== 'stats') {
     return { name: 'welcome' };
   }
 });

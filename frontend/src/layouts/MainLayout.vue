@@ -2,7 +2,7 @@
 import { computed, onMounted, provide, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
-import { ChatDotSquare, House as HouseIcon, Location as LocationIcon, QuestionFilled, Setting } from '@element-plus/icons-vue';
+import { ChatDotSquare, DataAnalysis, House as HouseIcon, Location as LocationIcon, QuestionFilled, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
@@ -62,7 +62,7 @@ const minContentPanelWidth = 360;
 const maxContentPanelWidth = 760;
 
 const activeMenu = computed(() => {
-  if (route.name === 'locations' || route.name === 'chat') return String(route.name);
+  if (route.name === 'locations' || route.name === 'chat' || route.name === 'stats') return String(route.name);
   return 'houses';
 });
 
@@ -427,6 +427,10 @@ onMounted(async () => {
         <el-menu-item index="chat">
           <el-icon><ChatDotSquare /></el-icon>
           <span>对话</span>
+        </el-menu-item>
+        <el-menu-item index="stats">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>统计</span>
         </el-menu-item>
       </el-menu>
       <div class="map-directory-bottom">
