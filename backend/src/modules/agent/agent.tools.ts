@@ -30,7 +30,14 @@ export interface ConfirmCreateHouseAction {
   payload: z.infer<typeof createHouseSchema>;
 }
 
-export type AgentFrontendAction = ConfirmCreateHouseAction;
+export interface ShowHouseSearchResultsAction {
+  id: string;
+  type: 'show_house_search_results';
+  title: string;
+  houses: House[];
+}
+
+export type AgentFrontendAction = ConfirmCreateHouseAction | ShowHouseSearchResultsAction;
 
 export interface ToolResult {
   kind: 'houses' | 'house' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
@@ -231,6 +238,14 @@ function searchHouses(params: Record<string, unknown>, { houseRepository }: Agen
     kind: 'houses',
     content: formatHouseSummary(houses),
     houses,
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'show_house_search_results',
+        title: `找到 ${houses.length} 套房源`,
+        houses,
+      },
+    ],
   };
 }
 

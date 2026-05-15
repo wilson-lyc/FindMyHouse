@@ -5,6 +5,7 @@ const chatSessionMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
   houses: z.array(z.unknown()).optional(),
+  housesTitle: z.string().optional(),
   hidden: z.boolean().optional(),
 });
 

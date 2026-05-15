@@ -72,6 +72,10 @@ export const useMapStore = defineStore('map', () => {
     highlightedHouseIds.value = ids;
   }
 
+  function clearHighlightedHouseIds() {
+    highlightedHouseIds.value = [];
+  }
+
   return {
     houses,
     locations,
@@ -92,6 +96,7 @@ export const useMapStore = defineStore('map', () => {
     removeDrivingRoute,
     showRoute,
     clearRoute,
-    setHighlightedHouseIds
+    setHighlightedHouseIds,
+    clearHighlightedHouseIds
   };
 });
