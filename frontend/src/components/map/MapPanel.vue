@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
-import { Close, Location } from '@element-plus/icons-vue';
+import { Close, House as HouseIcon, Location as LocationIcon, OfficeBuilding } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { useMapStore } from '../../stores/mapStore';
 import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapMarker, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
@@ -13,7 +13,14 @@ import { locationCategoryLabels } from '../../model/location/location';
 
 const emit = defineEmits<{
   editHouse: [house: House];
+  createHouse: [position: MapContextMenuPosition];
+  createLocation: [position: MapContextMenuPosition];
 }>();
+
+interface MapContextMenuPosition {
+  longitude: number;
+  latitude: number;
+}
 
 const mapStore = useMapStore();
 const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds } = storeToRefs(mapStore);
@@ -31,6 +38,71 @@ const locationFocusZoom = 14;
 
 let hasAppliedInitialFocus = false;
 let resizeObserver: ResizeObserver | undefined;
+
+// ==================== 右键菜单 ====================
+
+const contextMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+  longitude: number;
+  latitude: number;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  longitude: 0,
+  latitude: 0
+});
+
+function closeContextMenu() {
+  contextMenu.value.visible = false;
+}
+
+function getEventLngLat(event?: { lnglat?: { lng?: number; lat?: number; getLng?: () => number; getLat?: () => number } }) {
+  const longitude = event?.lnglat?.getLng?.() ?? event?.lnglat?.lng;
+  const latitude = event?.lnglat?.getLat?.() ?? event?.lnglat?.lat;
+  if (longitude === undefined || latitude === undefined) return undefined;
+
+  return { longitude, latitude };
+}
+
+function getEventPixel(event?: { pixel?: { x?: number; y?: number; getX?: () => number; getY?: () => number } }) {
+  const x = event?.pixel?.getX?.() ?? event?.pixel?.x;
+  const y = event?.pixel?.getY?.() ?? event?.pixel?.y;
+  if (x === undefined || y === undefined) return undefined;
+
+  return { x, y };
+}
+
+function openContextMenu(event?: Parameters<AMapMap['on']>[1] extends (mapEvent?: infer E) => void ? E : never) {
+  const position = getEventLngLat(event);
+  const pixel = getEventPixel(event);
+  if (!position || !pixel) return;
+
+  contextMenu.value = {
+    visible: true,
+    x: pixel.x,
+    y: pixel.y,
+    ...position
+  };
+}
+
+function createHouseFromContextMenu() {
+  emit('createHouse', {
+    longitude: contextMenu.value.longitude,
+    latitude: contextMenu.value.latitude
+  });
+  closeContextMenu();
+}
+
+function createLocationFromContextMenu() {
+  emit('createLocation', {
+    longitude: contextMenu.value.longitude,
+    latitude: contextMenu.value.latitude
+  });
+  closeContextMenu();
+}
 
 // ==================== 信息窗口 ====================
 
@@ -321,7 +393,7 @@ function renderRoutePolyline() {
 
   routePolyline = new amap.value.Polyline({
     path,
-    strokeColor: '#2b7de1',
+    strokeColor: getComputedStyle(document.documentElement).getPropertyValue('--el-color-primary').trim(),
     strokeWeight: 5,
     strokeOpacity: 0.8,
     lineJoin: 'round',
@@ -394,6 +466,8 @@ onMounted(async () => {
     });
     map.value.on('moveend', scheduleBoundsChange);
     map.value.on('zoomend', scheduleBoundsChange);
+    map.value.on('click', closeContextMenu);
+    map.value.on('rightclick', openContextMenu);
     resizeObserver = new ResizeObserver(resizeMap);
     resizeObserver.observe(mapContainer.value);
     renderMarkers();
@@ -479,11 +553,27 @@ defineExpose({
 <template>
   <section class="map-panel">
     <div v-if="loadError" class="map-empty">
-      <el-icon><Location /></el-icon>
+      <el-icon><LocationIcon /></el-icon>
       <strong>高德地图未就绪</strong>
       <span>{{ loadError }}</span>
     </div>
-    <div ref="mapContainer" class="amap-container" />
+    <div ref="mapContainer" class="amap-container" @contextmenu.prevent />
+    <div
+      v-if="contextMenu.visible"
+      class="map-context-menu"
+      :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+      @click.stop
+      @contextmenu.prevent
+    >
+      <button type="button" @click="createHouseFromContextMenu">
+        <el-icon><HouseIcon /></el-icon>
+        <span>新增房源</span>
+      </button>
+      <button type="button" @click="createLocationFromContextMenu">
+        <el-icon><OfficeBuilding /></el-icon>
+        <span>新增地点</span>
+      </button>
+    </div>
     <button
       v-if="routeData"
       class="map-panel-close-btn map-clear-route-btn"

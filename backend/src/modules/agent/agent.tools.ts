@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { tool } from '@langchain/core/tools';
-import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters } from '../houses/domain/house.js';
+import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters, type HouseStatus } from '../houses/domain/house.js';
 import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from '../houses/dto/house.schema.js';
 import { locationCategories, type Location } from '../locations/domain/location.js';
 import { createLocationSchema } from '../locations/dto/location.schema.js';
@@ -11,6 +11,7 @@ import type { AmapService } from '../maps/amap.service.js';
 
 export const agentToolNames = [
   'search_houses',
+  'search_houses_near_location',
   'get_house',
   'create_house',
   'update_house',
@@ -61,7 +62,7 @@ export interface ShowLocationSearchResultsAction {
 export type AgentFrontendAction = ConfirmCreateHouseAction | ConfirmCreateLocationAction | ShowHouseSearchResultsAction | ShowLocationSearchResultsAction;
 
 export interface ToolResult {
-  kind: 'houses' | 'house' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
+  kind: 'houses' | 'house' | 'locations' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
   content: string;
   houses: House[];
   actions?: AgentFrontendAction[];
@@ -77,6 +78,14 @@ interface AgentToolContext {
 const toolResultToJson = (result: ToolResult) => JSON.stringify(result);
 
 const optionalNumberToolSchema = z.number().finite().optional();
+
+const houseStatusLabels: Record<HouseStatus, string> = {
+  watching: '观望中',
+  interested: '感兴趣',
+  negotiating: '谈判中',
+  abandoned: '已放弃',
+  signed: '已签约',
+};
 
 const searchHousesToolSchema = z.object({
   status: z.enum(houseStatuses).optional().describe('房源状态'),
@@ -95,6 +104,18 @@ const searchHousesToolSchema = z.object({
   maxLongitude: optionalNumberToolSchema.describe('最大经度'),
   limit: z.number().int().positive().max(100).optional().describe('返回数量限制，默认20'),
 });
+
+const searchHousesNearLocationToolSchema = searchHousesToolSchema
+  .omit({
+    minLatitude: true,
+    maxLatitude: true,
+    minLongitude: true,
+    maxLongitude: true,
+  })
+  .extend({
+    locationName: z.string().trim().min(1).describe('地点名称，例如拱北口岸、公司、学校或已保存地点名称'),
+    radiusKm: z.number().positive().max(50).default(1).describe('搜索半径，单位公里'),
+  });
 
 const houseInputToolSchema = z.object({
   name: z.string().trim().min(1).describe('房源名称'),
@@ -132,6 +153,7 @@ const deleteHouseToolSchema = idParamsSchema;
 const getHouseToolSchema = idParamsSchema;
 
 const searchLocationsToolSchema = z.object({
+  q: z.string().trim().min(1).optional().describe('地点名称或地址关键词'),
   category: z.enum(locationCategories).optional().describe('地点分类'),
 });
 
@@ -163,6 +185,14 @@ export function createAgentTools(context: AgentToolContext) {
         name: 'search_houses',
         description: '根据租金、户型、状态、来源渠道或坐标范围搜索房源。用户想找、筛选、列出或比较房源时使用。',
         schema: searchHousesToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'search_houses_near_location', params }, context)),
+      {
+        name: 'search_houses_near_location',
+        description: '按某个已保存地点附近的距离搜索房源。用户说“某地点附近/周边/N公里内的房子”时使用；不要先把地点列表回复给用户。',
+        schema: searchHousesNearLocationToolSchema,
       }
     ),
     tool(
@@ -256,7 +286,14 @@ export function toolParamsAsSearchFilters(params: Record<string, unknown> = {}):
 }
 
 export function formatHouseSummary(houses: House[]): string {
-  return houses.map((house) => `- ${formatHouseLine(house)}`).join('\n');
+  return [
+    '| 房源 | 租金 | 户型 | 状态 | 地址 |',
+    '| --- | ---: | --- | --- | --- |',
+    ...houses.map(
+      (house) =>
+        `| ${escapeMarkdownTableCell(house.name)} | ${house.rentPrice} 元/月 | ${formatHouseLayout(house)} | ${houseStatusLabels[house.status]} | ${escapeMarkdownTableCell(house.address)} |`
+    ),
+  ].join('\n');
 }
 
 export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolContext): Promise<ToolResult> {
@@ -265,6 +302,10 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
   try {
     if (toolCall.tool === 'search_houses') {
       return searchHouses(params, context);
+    }
+
+    if (toolCall.tool === 'search_houses_near_location') {
+      return searchHousesNearLocation(params, context);
     }
 
     if (toolCall.tool === 'get_house') {
@@ -327,15 +368,42 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
   };
 }
 
-function searchHouses(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
-  const houses = houseRepository.list(toolParamsAsSearchFilters(params));
+function searchHousesNearLocation(params: Record<string, unknown>, { houseRepository, locationRepository }: AgentToolContext): ToolResult {
+  const { locationName, radiusKm, ...houseFilterParams } = searchHousesNearLocationToolSchema.parse(params);
+  const searchConditions = formatHouseSearchConditions(houseFilterParams, {
+    locationName,
+    radiusKm,
+  });
+  const locations = locationRepository.list({ q: locationName });
+  const location = pickBestLocationMatch(locations, locationName);
+
+  if (!location || location.latitude === undefined || location.longitude === undefined) {
+    return {
+      kind: 'empty',
+      content: '没有找到可用于附近房源搜索的地点。',
+      houses: [],
+      reply: `${searchConditions}\n\n没有找到可用于搜索的地点「${locationName}」，所以暂时无法筛选附近房源。`,
+    };
+  }
+
+  const bounds = createCoordinateBounds(location.latitude, location.longitude, radiusKm);
+  const filters = toolParamsAsSearchFilters({
+    ...houseFilterParams,
+    ...bounds,
+    limit: undefined,
+  });
+  const limit = typeof houseFilterParams.limit === 'number' ? houseFilterParams.limit : undefined;
+  const houses = houseRepository
+    .list(filters)
+    .filter((house) => isHouseWithinRadius(house, location, radiusKm))
+    .slice(0, limit);
 
   if (houses.length === 0) {
     return {
       kind: 'empty',
-      content: '没有找到匹配的房源。',
+      content: '没有找到符合条件的房源。',
       houses: [],
-      reply: '没有找到匹配的房源，建议调整预算、户型、状态或来源渠道后再试。',
+      reply: `${searchConditions}\n\n没有找到符合这些条件的房源，建议放宽距离、预算、户型或状态后再试。`,
     };
   }
 
@@ -343,6 +411,37 @@ function searchHouses(params: Record<string, unknown>, { houseRepository }: Agen
     kind: 'houses',
     content: formatHouseSummary(houses),
     houses,
+    reply: `${searchConditions}\n\n共有 ${houses.length} 套房源：\n\n${formatHouseSummary(houses)}`,
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'show_house_search_results',
+        title: `找到 ${houses.length} 套房源`,
+        houses,
+      },
+    ],
+  };
+}
+
+function searchHouses(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
+  const filters = toolParamsAsSearchFilters(params);
+  const houses = houseRepository.list(filters);
+  const searchConditions = formatHouseSearchConditions(filters);
+
+  if (houses.length === 0) {
+    return {
+      kind: 'empty',
+      content: '没有找到匹配的房源。',
+      houses: [],
+      reply: `${searchConditions}\n\n没有找到匹配的房源，建议调整预算、户型、状态或来源渠道后再试。`,
+    };
+  }
+
+  return {
+    kind: 'houses',
+    content: formatHouseSummary(houses),
+    houses,
+    reply: `${searchConditions}\n\n共有 ${houses.length} 套房源：\n\n${formatHouseSummary(houses)}`,
     actions: [
       {
         id: randomUUID(),
@@ -361,9 +460,9 @@ function getHouse(params: Record<string, unknown>, { houseRepository }: AgentToo
   if (!house) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的房源。`,
+      content: '未找到这套房源。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的房源。`,
+      reply: '没有找到这套房源。',
     };
   }
 
@@ -436,9 +535,9 @@ function updateHouse(params: Record<string, unknown>, { houseRepository }: Agent
   if (!house) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的房源。`,
+      content: '未找到这套房源。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的房源，无法更新。`,
+      reply: '没有找到这套房源，无法更新。',
     };
   }
 
@@ -457,9 +556,9 @@ function deleteHouse(params: Record<string, unknown>, { houseRepository }: Agent
   if (!house) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的房源。`,
+      content: '未找到这套房源。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的房源，无法删除。`,
+      reply: '没有找到这套房源，无法删除。',
     };
   }
 
@@ -506,9 +605,10 @@ function searchLocations(params: Record<string, unknown>, { locationRepository }
   }
 
   return {
-    kind: 'houses',
+    kind: 'locations',
     content: formatLocationSummary(locations),
     houses: [],
+    reply: `找到 ${locations.length} 个地点：\n${formatLocationSummary(locations)}`,
     actions: [
       {
         id: randomUUID(),
@@ -527,9 +627,9 @@ function getLocation(params: Record<string, unknown>, { locationRepository }: Ag
   if (!location) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的地点。`,
+      content: '未找到这个地点。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的地点。`,
+      reply: '没有找到这个地点。',
     };
   }
 
@@ -595,9 +695,9 @@ function updateLocation(params: Record<string, unknown>, { locationRepository }:
   if (!location) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的地点。`,
+      content: '未找到这个地点。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的地点，无法更新。`,
+      reply: '没有找到这个地点，无法更新。',
     };
   }
 
@@ -616,9 +716,9 @@ function deleteLocation(params: Record<string, unknown>, { locationRepository }:
   if (!location) {
     return {
       kind: 'empty',
-      content: `未找到 ID 为 ${id} 的地点。`,
+      content: '未找到这个地点。',
       houses: [],
-      reply: `没有找到 ID 为 ${id} 的地点，无法删除。`,
+      reply: '没有找到这个地点，无法删除。',
     };
   }
 
@@ -633,7 +733,7 @@ function deleteLocation(params: Record<string, unknown>, { locationRepository }:
 }
 
 function formatLocationLine(location: Location): string {
-  return `${location.name} | ID: ${location.id} | 地址: ${location.address} | 分类: ${location.category}${location.isFocus ? ' | 焦点地点' : ''}`;
+  return `${location.name} | 地址: ${location.address} | 分类: ${location.category}${location.isFocus ? ' | 焦点地点' : ''}`;
 }
 
 function formatLocationSummary(locations: Location[]): string {
@@ -661,7 +761,106 @@ function formatPendingLocationDetails(location: z.infer<typeof createLocationSch
 }
 
 function formatHouseLine(house: House): string {
-  return `${house.name} | ID: ${house.id} | 租金: ${house.rentPrice}元/月 | ${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫 | ${house.address} | 状态: ${house.status}`;
+  return `${house.name} | 租金: ${house.rentPrice}元/月 | ${formatHouseLayout(house)} | ${house.address} | 状态: ${houseStatusLabels[house.status]}`;
+}
+
+function formatHouseSearchConditions(
+  filters: HouseFilters,
+  locationScope?: { locationName: string; radiusKm: number }
+): string {
+  const conditions = [
+    locationScope ? `地点：「${locationScope.locationName}」附近 ${formatDistanceKm(locationScope.radiusKm)} 内` : undefined,
+    filters.minRentPrice !== undefined && filters.maxRentPrice !== undefined
+      ? `租金：${filters.minRentPrice}-${filters.maxRentPrice} 元/月`
+      : undefined,
+    filters.minRentPrice !== undefined && filters.maxRentPrice === undefined ? `租金：不低于 ${filters.minRentPrice} 元/月` : undefined,
+    filters.maxRentPrice !== undefined && filters.minRentPrice === undefined ? `租金：不高于 ${filters.maxRentPrice} 元/月` : undefined,
+    formatRangeCondition('卧室', filters.minBedroomCount, filters.maxBedroomCount),
+    formatRangeCondition('客厅', filters.minLivingRoomCount, filters.maxLivingRoomCount),
+    formatRangeCondition('卫生间', filters.minBathroomCount, filters.maxBathroomCount),
+    filters.status ? `状态：${houseStatusLabels[filters.status]}` : undefined,
+    filters.sourceChannel ? `来源：${filters.sourceChannel}` : undefined,
+    hasCoordinateBounds(filters) ? '位置：按地图范围筛选' : undefined,
+    filters.limit !== undefined ? `最多返回：${filters.limit} 套` : undefined,
+  ].filter((condition): condition is string => Boolean(condition));
+
+  if (conditions.length === 0) {
+    return '我把你的需求转换成了搜索条件：全部房源。';
+  }
+
+  return `我把你的需求转换成了这些搜索条件：${conditions.join('；')}。`;
+}
+
+function formatRangeCondition(label: string, min?: number, max?: number): string | undefined {
+  if (min === undefined && max === undefined) return undefined;
+  if (min !== undefined && max !== undefined && min === max) return `${label}：${min} 个`;
+  if (min !== undefined && max !== undefined) return `${label}：${min}-${max} 个`;
+  if (min !== undefined) return `${label}：不少于 ${min} 个`;
+  return `${label}：不多于 ${max} 个`;
+}
+
+function hasCoordinateBounds(filters: HouseFilters): boolean {
+  return (
+    filters.minLatitude !== undefined ||
+    filters.maxLatitude !== undefined ||
+    filters.minLongitude !== undefined ||
+    filters.maxLongitude !== undefined
+  );
+}
+
+function pickBestLocationMatch(locations: Location[], query: string): Location | undefined {
+  const normalizedQuery = query.trim().toLowerCase();
+  return (
+    locations.find((location) => location.name.trim().toLowerCase() === normalizedQuery) ??
+    locations.find((location) => location.name.includes(query) || location.address.includes(query)) ??
+    locations[0]
+  );
+}
+
+function createCoordinateBounds(latitude: number, longitude: number, radiusKm: number) {
+  const latitudeDelta = radiusKm / 111.32;
+  const longitudeDelta = radiusKm / (111.32 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.01));
+
+  return {
+    minLatitude: latitude - latitudeDelta,
+    maxLatitude: latitude + latitudeDelta,
+    minLongitude: longitude - longitudeDelta,
+    maxLongitude: longitude + longitudeDelta,
+  };
+}
+
+function isHouseWithinRadius(house: House, location: Location, radiusKm: number): boolean {
+  if (
+    house.latitude === undefined ||
+    house.longitude === undefined ||
+    location.latitude === undefined ||
+    location.longitude === undefined
+  ) {
+    return false;
+  }
+
+  return calculateDistanceKm(house.latitude, house.longitude, location.latitude, location.longitude) <= radiusKm;
+}
+
+function calculateDistanceKm(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number): number {
+  const earthRadiusKm = 6371;
+  const latitudeDelta = degreesToRadians(toLatitude - fromLatitude);
+  const longitudeDelta = degreesToRadians(toLongitude - fromLongitude);
+  const fromLatitudeRadians = degreesToRadians(fromLatitude);
+  const toLatitudeRadians = degreesToRadians(toLatitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLatitudeRadians) * Math.cos(toLatitudeRadians) * Math.sin(longitudeDelta / 2) ** 2;
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function degreesToRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+function formatDistanceKm(value: number): string {
+  return Number.isInteger(value) ? `${value} 公里` : `${value.toFixed(1)} 公里`;
 }
 
 function formatPendingHouseDetails(house: z.infer<typeof createHouseSchema>): string {
@@ -678,12 +877,20 @@ function formatPendingHouseDetails(house: z.infer<typeof createHouseSchema>): st
   ].filter(Boolean);
 
   return [
-    `${house.name} | 租金: ${house.rentPrice}元/月 | ${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫 | ${house.address} | 状态: ${house.status}`,
+    `${house.name} | 租金: ${house.rentPrice}元/月 | ${formatHouseLayout(house)} | ${house.address} | 状态: ${houseStatusLabels[house.status]}`,
     house.latitude !== undefined && house.longitude !== undefined ? `坐标：${house.latitude}, ${house.longitude}` : undefined,
     ...optionalLines,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+function formatHouseLayout(house: Pick<House, 'bedroomCount' | 'livingRoomCount' | 'bathroomCount'>): string {
+  return `${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`;
+}
+
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
 }
 
 function formatHouseDetails(house: House): string {

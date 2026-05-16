@@ -2,6 +2,55 @@
   box-sizing: border-box;
 }
 
+:root {
+  --el-color-primary: #409eff;
+  --el-color-primary-light-3: #79bbff;
+  --el-color-primary-light-5: #a0cfff;
+  --el-color-primary-light-7: #c6e2ff;
+  --el-color-primary-light-8: #d9ecff;
+  --el-color-primary-light-9: #ecf5ff;
+  --el-color-primary-dark-2: #337ecc;
+  --el-color-success: #67c23a;
+  --el-color-success-light-3: #95d475;
+  --el-color-success-light-8: #e1f3d8;
+  --el-color-success-light-9: #f0f9eb;
+  --el-color-warning: #e6a23c;
+  --el-color-warning-light-3: #eebe77;
+  --el-color-warning-light-8: #faecd8;
+  --el-color-warning-light-9: #fdf6ec;
+  --el-color-warning-dark-2: #b88230;
+  --el-color-danger: #f56c6c;
+  --el-color-danger-light-3: #f89898;
+  --el-color-danger-light-8: #fde2e2;
+  --el-color-danger-light-9: #fef0f0;
+  --el-color-error: var(--el-color-danger);
+  --el-color-info: #909399;
+  --el-color-info-light-3: #b1b3b8;
+  --el-color-info-light-8: #e9e9eb;
+  --el-color-info-light-9: #f4f4f5;
+  --el-text-color-primary: #303133;
+  --el-text-color-regular: #606266;
+  --el-text-color-secondary: #909399;
+  --el-text-color-placeholder: #a8abb2;
+  --el-border-color: #dcdfe6;
+  --el-border-color-light: #e4e7ed;
+  --el-border-color-lighter: #ebeef5;
+  --el-fill-color-light: #f5f7fa;
+  --el-fill-color-lighter: #fafafa;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f2f3f5;
+  --app-bg-page: var(--el-bg-color-page);
+  --app-bg-soft: var(--el-fill-color-lighter);
+  --app-fill-light: var(--el-fill-color-light);
+  --app-border-base: var(--el-border-color);
+  --app-border-light: var(--el-border-color-light);
+  --app-border-lighter: var(--el-border-color-lighter);
+  --app-text-primary: var(--el-text-color-primary);
+  --app-text-regular: var(--el-text-color-regular);
+  --app-shadow-color: rgb(48 49 51 / 12%);
+  --app-shadow-color-strong: rgb(48 49 51 / 18%);
+}
+
 html,
 #app {
   height: 100%;
@@ -11,8 +60,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: #17202a;
-  background: #f3f6f8;
+  color: var(--app-text-primary);
+  background: var(--app-bg-page);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -22,7 +71,7 @@ body {
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
-  background: #eef2f5;
+  background: var(--app-fill-light);
 }
 
 .map-page > .el-splitter,
@@ -41,8 +90,8 @@ body {
   grid-template-rows: 1fr auto;
   min-height: 0;
   gap: 10px;
-  border-right: 1px solid #e4eaef;
-  background: #f8fafb;
+  border-right: 1px solid var(--app-border-light);
+  background: var(--app-bg-soft);
   padding: 10px 7px;
 }
 
@@ -58,7 +107,7 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--el-bg-color);
 }
 
 .map-directory-rail {
@@ -66,8 +115,8 @@ body {
   grid-template-rows: 1fr auto;
   min-height: 0;
   gap: 10px;
-  border-right: 1px solid #e4eaef;
-  background: #f8fafb;
+  border-right: 1px solid var(--app-border-light);
+  background: var(--app-bg-soft);
   padding: 10px 7px;
 }
 
@@ -81,10 +130,10 @@ body {
   min-width: 0;
   border-right: 0;
   background: transparent;
-  --el-menu-active-color: #ffffff;
+  --el-menu-active-color: var(--el-bg-color);
   --el-menu-bg-color: transparent;
   --el-menu-hover-bg-color: transparent;
-  --el-menu-text-color: #596775;
+  --el-menu-text-color: var(--el-text-color-secondary);
 }
 
 .map-directory-menu.el-menu {
@@ -106,7 +155,7 @@ body {
   margin: 0;
   padding: 7px 4px !important;
   border: 1px solid transparent;
-  color: #596775;
+  color: var(--el-text-color-secondary);
   background: transparent;
   line-height: 1;
 }
@@ -125,21 +174,21 @@ body {
 .map-directory-menu .el-menu-item:focus {
   border-color: transparent;
   background: transparent;
-  color: #596775;
+  color: var(--el-text-color-secondary);
 }
 
 .map-directory-menu .el-menu-item.is-active {
-  border-color: #111111;
-  background: #111111;
-  color: #ffffff;
-  box-shadow: 0 4px 10px rgb(17 17 17 / 14%);
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
+  box-shadow: 0 4px 10px rgb(64 158 255 / 18%);
 }
 
 .map-directory-menu .el-menu-item.is-active:hover,
 .map-directory-menu .el-menu-item.is-active:focus {
-  border-color: #111111;
-  background: #111111;
-  color: #ffffff;
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
 }
 
 .map-directory-icon-button {
@@ -150,7 +199,7 @@ body {
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  color: #596775;
+  color: var(--el-text-color-secondary);
   cursor: pointer;
   text-decoration: none;
 }
@@ -158,7 +207,7 @@ body {
 .map-directory-icon-button:hover {
   border-color: transparent;
   background: transparent;
-  color: #596775;
+  color: var(--el-text-color-secondary);
 }
 
 .map-directory-icon-button {
@@ -173,7 +222,7 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  background: #f7f9fb;
+  background: var(--app-bg-soft);
   padding: 0;
 }
 
@@ -232,7 +281,7 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #d7e2e8;
+  background: var(--el-color-info-light-8);
 }
 
 .map-canvas-panel > .map-panel {
@@ -274,14 +323,14 @@ body {
 
 .stats-header h1 {
   margin: 0;
-  color: #162636;
+  color: var(--app-text-primary);
   font-size: 22px;
   line-height: 1.2;
 }
 
 .stats-header p {
   margin: 6px 0 0;
-  color: #667786;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -294,9 +343,9 @@ body {
 
 .stats-summary-card,
 .stats-panel {
-  border: 1px solid #e0e8ed;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
 }
 
 .stats-summary-card {
@@ -310,7 +359,7 @@ body {
 .stats-summary-card small,
 .stats-panel header span,
 .stats-candidate-row small {
-  color: #6d7b88;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -318,7 +367,7 @@ body {
 .stats-summary-card strong {
   min-width: 0;
   overflow: hidden;
-  color: #162636;
+  color: var(--app-text-primary);
   font-size: 20px;
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -343,7 +392,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  border-bottom: 1px solid #edf2f5;
+  border-bottom: 1px solid var(--app-border-lighter);
   padding: 10px 12px;
 }
 
@@ -351,7 +400,7 @@ body {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: #1d2d3c;
+  color: var(--app-text-primary);
   font-size: 14px;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -386,9 +435,9 @@ body {
   align-items: center;
   width: 100%;
   min-height: 58px;
-  border: 1px solid #e5edf2;
+  border: 1px solid var(--app-border-lighter);
   border-radius: 8px;
-  background: #fbfdfe;
+  background: var(--app-bg-soft);
   color: inherit;
   cursor: pointer;
   font: inherit;
@@ -397,8 +446,8 @@ body {
 }
 
 .stats-candidate-row:hover {
-  border-color: #b5c8d2;
-  background: #f4f8fa;
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
 }
 
 .stats-candidate-row > span {
@@ -414,14 +463,14 @@ body {
 .stats-candidate-row strong {
   min-width: 0;
   overflow: hidden;
-  color: #1d2d3c;
+  color: var(--app-text-primary);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .stats-candidate-row b {
-  color: #b23b3b;
+  color: var(--el-color-danger);
   font-size: 14px;
   white-space: nowrap;
 }
@@ -431,7 +480,7 @@ body {
   grid-template-columns: 58px minmax(0, 1fr) 22px;
   gap: 8px;
   align-items: center;
-  color: #304457;
+  color: var(--app-text-regular);
   font-size: 13px;
 }
 
@@ -447,14 +496,14 @@ body {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #edf3f6;
+  background: var(--app-fill-light);
 }
 
 .stats-rank-row i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #2f6f73;
+  background: var(--el-color-success);
 }
 
 @media (max-width: 620px) {
@@ -468,9 +517,9 @@ body {
   display: grid;
   width: 100%;
   gap: 8px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 12px;
   color: inherit;
   text-align: left;
@@ -498,18 +547,18 @@ body {
 }
 
 .house-card small {
-  color: #607282;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .house-card b {
-  color: #b23b3b;
+  color: var(--el-color-danger);
   font-size: 16px;
 }
 
 .house-card-driving {
-  color: #607282;
+  color: var(--el-text-color-secondary);
 }
 
 .house-card-fees {
@@ -527,12 +576,12 @@ body {
 }
 
 .fee-label {
-  color: #909399;
+  color: var(--el-text-color-placeholder);
   flex-shrink: 0;
 }
 
 .fee-value {
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-weight: 500;
   text-align: right;
   min-width: 0;
@@ -548,7 +597,7 @@ body {
   gap: 12px;
   min-height: 24px;
   padding-top: 8px;
-  border-top: 1px solid #eef2f5;
+  border-top: 1px solid var(--app-fill-light);
 }
 
 .house-card-actions .el-button {
@@ -560,16 +609,16 @@ body {
 }
 
 .muted {
-  color: #6c7a86;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
 
 .amap-container .map-route-label {
-  background: #ffffff;
+  background: var(--el-bg-color);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  color: #1d1d1f;
+  color: var(--el-text-color-primary);
   padding: 8px 18px;
   border-radius: 999px;
   font-size: 14px;
@@ -577,9 +626,9 @@ body {
   letter-spacing: 0.3px;
   white-space: nowrap;
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    0 1px 4px rgba(0, 0, 0, 0.04);
-  border: 0.5px solid rgba(0, 0, 0, 0.04);
+    0 4px 16px var(--app-shadow-color),
+    0 1px 4px rgb(48 49 51 / 8%);
+  border: 0.5px solid var(--app-border-lighter);
 }
 
 .amap-info-window {
@@ -628,17 +677,17 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 14px;
-  border-bottom: 1px solid #dce5eb;
-  background: #ffffff;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--el-bg-color);
   padding: 0 0 12px;
 }
 
 .house-form-nav button {
   height: 30px;
-  border: 1px solid #d4e1e8;
+  border: 1px solid var(--app-border-base);
   border-radius: 8px;
-  background: #f6fafc;
-  color: #486274;
+  background: var(--app-bg-soft);
+  color: var(--app-text-regular);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -647,9 +696,9 @@ body {
 }
 
 .house-form-nav button:hover {
-  border-color: #407899;
-  background: #eaf4f8;
-  color: #214459;
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary-dark-2);
 }
 
 .house-form-sections {
@@ -658,16 +707,16 @@ body {
 }
 
 .house-form-section {
-  border: 1px solid #dce5eb;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #fbfdfe;
+  background: var(--app-bg-soft);
   padding: 16px 16px 2px;
   scroll-margin-top: 54px;
 }
 
 .house-form-section h3 {
   margin: 0 0 14px;
-  color: #1f3445;
+  color: var(--app-text-primary);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
@@ -689,7 +738,7 @@ body {
 }
 
 .house-form-dialog .el-dialog__footer {
-  border-top: 1px solid #e2e9ee;
+  border-top: 1px solid var(--app-border-light);
   padding-top: 14px;
 }
 
@@ -734,9 +783,9 @@ body {
 
 .map-panel,
 .location-panel {
-  border: 1px solid #dce5eb;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
 }
 
 .map-panel {
@@ -755,12 +804,12 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  border: 1px solid #dce5eb;
-  background: rgba(255, 255, 255, 0.95);
-  color: #606266;
+  border: 1px solid var(--app-border-light);
+  background: rgb(255 255 255 / 95%);
+  color: var(--el-text-color-regular);
   cursor: pointer;
   font-size: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--app-shadow-color);
   transition: background 0.15s;
 }
 
@@ -777,9 +826,49 @@ body {
 }
 
 .map-panel-close-btn:hover {
-  background: #ffffff;
-  color: #303133;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  box-shadow: 0 2px 12px var(--app-shadow-color);
+}
+
+.map-context-menu {
+  position: absolute;
+  z-index: 1001;
+  display: grid;
+  min-width: 136px;
+  overflow: hidden;
+  border: 1px solid var(--app-border-light);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  padding: 4px;
+  box-shadow: 0 12px 28px var(--app-shadow-color-strong);
+  transform: translate(2px, 2px);
+}
+
+.map-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 9px 10px;
+  color: var(--app-text-regular);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
+}
+
+.map-context-menu button:hover {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary-dark-2);
+}
+
+.map-context-menu .el-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
 }
 
 .amap-container {
@@ -798,9 +887,9 @@ body {
   z-index: 0;
   min-height: 320px;
   overflow: hidden;
-  border: 1px solid #dce5eb;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #eef4f7;
+  background: var(--app-fill-light);
 }
 
 .coordinate-amap-container {
@@ -817,14 +906,14 @@ body {
   display: grid;
   place-content: center;
   gap: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 24px;
   text-align: center;
 }
 
 .map-empty .el-icon {
   justify-self: center;
-  color: #407899;
+  color: var(--el-color-primary);
   font-size: 28px;
 }
 
@@ -833,7 +922,7 @@ body {
 }
 
 .map-empty span {
-  color: #607282;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 
@@ -850,13 +939,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #dce5eb;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 5px 8px;
-  color: #324858;
+  color: var(--app-text-regular);
   font-size: 12px;
-  box-shadow: 0 8px 20px rgb(31 49 63 / 10%);
+  box-shadow: 0 8px 20px var(--app-shadow-color);
 }
 
 .map-marker-label {
@@ -865,17 +954,17 @@ body {
   gap: 5px;
   max-width: 160px;
   overflow: hidden;
-  border: 1px solid rgb(23 32 42 / 12%);
+  border: 1px solid var(--app-border-light);
   border-radius: 6px;
   background: rgb(255 255 255 / 94%);
   padding: 4px 7px;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgb(31 49 63 / 10%);
+  box-shadow: 0 4px 12px var(--app-shadow-color);
 }
 
 .amap-marker-label {
@@ -892,14 +981,14 @@ body {
   width: max-content;
   min-width: 210px;
   max-width: min(300px, calc(100vw - 48px));
-  border: 1px solid rgb(23 32 42 / 10%);
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 12px;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 13px;
   line-height: 1.45;
-  box-shadow: 0 12px 32px rgb(31 49 63 / 18%);
+  box-shadow: 0 12px 32px var(--app-shadow-color-strong);
 }
 
 .map-info-close-button {
@@ -914,7 +1003,7 @@ body {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #7a8995;
+  color: var(--el-text-color-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 18px;
@@ -922,15 +1011,15 @@ body {
 }
 
 .map-info-close-button:hover {
-  background: #eef3f6;
-  color: #243746;
+  background: var(--app-fill-light);
+  color: var(--app-text-primary);
 }
 
 .map-info strong {
   padding-right: 26px;
   min-width: 0;
   overflow: hidden;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 15px;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -940,7 +1029,7 @@ body {
 .map-info span {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: #607282;
+  color: var(--el-text-color-secondary);
 }
 
 .map-info-actions {
@@ -983,15 +1072,15 @@ body {
 .location-item {
   display: grid;
   gap: 12px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 14px 12px 12px;
 }
 
 .location-item:hover {
-  border-color: #407899;
-  box-shadow: 0 8px 22px rgb(31 49 63 / 10%);
+  border-color: var(--el-color-primary);
+  box-shadow: 0 8px 22px var(--app-shadow-color);
 }
 
 .location-item-header {
@@ -1041,7 +1130,7 @@ body {
   .map-data-panel {
     grid-template-columns: 58px minmax(0, 1fr);
     border-right: 0;
-    border-bottom: 1px solid #ccd8e0;
+    border-bottom: 1px solid var(--app-border-base);
   }
 
   .map-directory-rail {

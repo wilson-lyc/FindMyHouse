@@ -48,6 +48,12 @@ export interface AMapMouseEvent {
     getLng?: () => number;
     getLat?: () => number;
   };
+  pixel?: {
+    x?: number;
+    y?: number;
+    getX?: () => number;
+    getY?: () => number;
+  };
 }
 
 export interface AMapInfoWindow {

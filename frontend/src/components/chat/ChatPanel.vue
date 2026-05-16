@@ -4,8 +4,9 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Delete, Plus, Setting } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
 import {
-  sendChatMessage,
+  streamChatMessage,
   type AgentFrontendAction,
+  type ChatResponse,
   type ChatMessage as ApiChatMessage,
   type ConfirmCreateHouseResult,
   type ConfirmCreateLocationResult
@@ -28,6 +29,7 @@ import { formatCurrency } from '../../lib/format';
 interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
+  reasoning?: string;
   houses?: House[];
   housesTitle?: string;
   hidden?: boolean;
@@ -54,6 +56,8 @@ const markdown = new MarkdownIt({
   linkify: true,
   typographer: true,
 });
+markdown.renderer.rules.table_open = () => '<div class="chat-table-scroll"><table>';
+markdown.renderer.rules.table_close = () => '</table></div>';
 
 const emit = defineEmits<{
   housesFound: [houses: House[]];
@@ -77,10 +81,45 @@ async function handleSubmit() {
   loading.value = true;
   try {
     await persistCurrentSession(content);
-    const result = await sendChatMessage(toApiMessages());
-    appendAssistantResponse(result);
+    const apiMessages = toApiMessages();
+    const assistantMessage: ChatMessage = { content: '', role: 'assistant', reasoning: '' };
+    messages.value.push(assistantMessage);
+
+    let actions: ChatResponse['actions'] = [];
+    await streamChatMessage(apiMessages, (event) => {
+      if (event.type === 'reasoning_delta') {
+        assistantMessage.reasoning = `${assistantMessage.reasoning ?? ''}${event.delta}`;
+        return;
+      }
+
+      if (event.type === 'delta') {
+        assistantMessage.content += event.delta;
+        return;
+      }
+
+      if (event.type === 'status' && assistantMessage.content.trim().length === 0) {
+        assistantMessage.content = event.message;
+        return;
+      }
+
+      if (event.type === 'done') {
+        actions = event.actions;
+        assistantMessage.content = event.reply;
+        attachHousesToMessage(assistantMessage, event);
+        return;
+      }
+
+      if (event.type === 'error') {
+        throw new Error(event.message);
+      }
+    });
+
+    if (!assistantMessage.content) {
+      throw new Error('流式响应未正常结束');
+    }
+
     await persistCurrentSession();
-    await executeAgentActions(result.actions ?? []);
+    await executeAgentActions(actions ?? []);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '请求失败');
   } finally {
@@ -90,14 +129,16 @@ async function handleSubmit() {
 
 function appendAssistantResponse(result: { reply: string; houses?: House[]; housesTitle?: string }) {
   const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant' };
+  attachHousesToMessage(assistantMessage, result);
+  messages.value.push(assistantMessage);
+}
 
+function attachHousesToMessage(message: ChatMessage, result: { houses?: House[]; housesTitle?: string }) {
   if (result.houses && result.houses.length > 0) {
-    assistantMessage.houses = result.houses;
-    assistantMessage.housesTitle = result.housesTitle ?? `找到 ${result.houses.length} 套房源`;
+    message.houses = result.houses;
+    message.housesTitle = result.housesTitle ?? `找到 ${result.houses.length} 套房源`;
     emit('housesFound', result.houses);
   }
-
-  messages.value.push(assistantMessage);
 }
 
 async function loadSessions() {
@@ -421,11 +462,20 @@ watch(loading, () => {
           <div v-for="(msg, index) in visibleMessages" :key="index" class="chat-message-wrapper" :class="msg.role">
             <div class="chat-bubble">
               <div
-                v-if="msg.role === 'assistant'"
+                v-if="msg.role === 'assistant' && msg.content"
                 class="chat-bubble-markdown markdown-body"
                 v-html="renderAssistantContent(msg.content)"
               />
+              <div v-else-if="msg.role === 'assistant'" class="chat-inline-loading">
+                <span class="chat-loading-dot" />
+                <span class="chat-loading-dot" />
+                <span class="chat-loading-dot" />
+              </div>
               <div v-else class="chat-bubble-text">{{ msg.content }}</div>
+              <details v-if="msg.role === 'assistant' && msg.reasoning" class="chat-reasoning">
+                <summary>思考过程</summary>
+                <div class="chat-reasoning-content">{{ msg.reasoning }}</div>
+              </details>
               <div v-if="msg.houses && msg.houses.length > 0" class="chat-house-results">
                 <div class="chat-house-results-header">
                   {{ msg.housesTitle ?? `找到 ${msg.houses.length} 套房源` }}
@@ -447,7 +497,7 @@ watch(loading, () => {
               </div>
             </div>
           </div>
-          <div v-if="loading" class="chat-message-wrapper assistant">
+          <div v-if="loading && !visibleMessages.some((msg) => msg.role === 'assistant' && msg.content.length === 0)" class="chat-message-wrapper assistant">
             <div class="chat-bubble chat-loading">
               <span class="chat-loading-dot" />
               <span class="chat-loading-dot" />
@@ -488,9 +538,23 @@ watch(loading, () => {
 
     <el-dialog v-model="sessionDialogVisible" title="管理会话" width="860px" class="chat-session-dialog">
       <div class="chat-session-dialog-toolbar">
-        <el-button :icon="Delete" :disabled="!hasSelectedSessions" @click="removeSelectedSessions">
-          删除选中
-        </el-button>
+        <div class="chat-session-dialog-summary">
+          <span>{{ sessions.length }} 条会话</span>
+          <span v-if="hasSelectedSessions" class="chat-session-dialog-selected">
+            已选 {{ selectedSessionIds.length }} 条
+          </span>
+        </div>
+        <div class="chat-session-dialog-actions">
+          <el-button
+            type="danger"
+            plain
+            :icon="Delete"
+            :disabled="!hasSelectedSessions"
+            @click="removeSelectedSessions"
+          >
+            删除选中
+          </el-button>
+        </div>
       </div>
 
       <el-table
@@ -530,7 +594,7 @@ watch(loading, () => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #f7f9fb;
+  background: var(--app-bg-soft);
 }
 
 .chat-splitter {
@@ -569,17 +633,17 @@ watch(loading, () => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #526170;
+  color: var(--el-text-color-regular);
 }
 
 .chat-header-actions .el-button:hover,
 .chat-header-actions .el-button:focus {
-  background: #e7ebef;
-  color: #17202a;
+  background: var(--el-fill-color-light);
+  color: var(--app-text-primary);
 }
 
 .chat-header-actions .el-button:active {
-  background: #d9e0e6;
+  background: var(--el-color-info-light-8);
 }
 
 .chat-header-title span {
@@ -592,22 +656,60 @@ watch(loading, () => {
   flex: 0 0 auto;
   padding: 6px 16px;
   font-size: 12px;
-  color: #b45309;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
+  color: var(--el-color-warning-dark-2);
+  background: var(--el-color-warning-light-9);
+  border-bottom: 1px solid var(--el-color-warning-light-8);
   text-align: center;
   line-height: 1.4;
 }
 
 .chat-session-dialog-toolbar {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--app-bg-soft);
+}
+
+.chat-session-dialog-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.chat-session-dialog-selected {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary-dark-2);
+  font-weight: 600;
+}
+
+.chat-session-dialog-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-session-dialog-actions .el-button {
+  margin-left: 0;
 }
 
 .chat-session-table-title {
   overflow: hidden;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
@@ -655,6 +757,7 @@ watch(loading, () => {
 .chat-message-wrapper {
   display: flex;
   max-width: 85%;
+  min-width: 0;
 }
 
 .chat-message-wrapper.user {
@@ -668,13 +771,15 @@ watch(loading, () => {
 }
 
 .chat-bubble {
+  max-width: 100%;
+  min-width: 0;
   padding: 10px 13px;
   border-radius: 14px;
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+  box-shadow: 0 1px 2px var(--app-shadow-color);
 }
 
 .chat-bubble-text {
@@ -682,22 +787,70 @@ watch(loading, () => {
 }
 
 .chat-message-wrapper.user .chat-bubble {
-  background: #2563eb;
-  color: #fff;
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
   border-bottom-right-radius: 5px;
 }
 
 .chat-message-wrapper.assistant .chat-bubble {
-  background: #eef1f4;
-  color: #17202a;
+  background: var(--el-fill-color-light);
+  color: var(--app-text-primary);
   border-bottom-left-radius: 5px;
 }
 
 .chat-bubble-markdown {
+  max-width: 100%;
+  min-width: 0;
   background: transparent;
   font-size: 14px;
   line-height: 1.55;
   white-space: normal;
+}
+
+.chat-bubble-markdown :deep(.chat-table-scroll) {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 8px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-bubble-markdown :deep(table) {
+  width: max-content;
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.chat-inline-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 42px;
+  min-height: 22px;
+}
+
+.chat-reasoning {
+  margin-top: 8px;
+  border-top: 1px solid var(--app-border-light);
+  padding-top: 7px;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.chat-reasoning summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+
+.chat-reasoning-content {
+  margin-top: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
 }
 
 .chat-loading {
@@ -793,27 +946,27 @@ watch(loading, () => {
 
 .chat-house-status.watching {
   background: var(--el-color-info-light-3);
-  color: #fff;
+  color: var(--el-bg-color);
 }
 
 .chat-house-status.interested {
   background: var(--el-color-primary-light-3);
-  color: #fff;
+  color: var(--el-bg-color);
 }
 
 .chat-house-status.negotiating {
   background: var(--el-color-warning-light-3);
-  color: #fff;
+  color: var(--el-bg-color);
 }
 
 .chat-house-status.signed {
   background: var(--el-color-success-light-3);
-  color: #fff;
+  color: var(--el-bg-color);
 }
 
 .chat-house-status.abandoned {
   background: var(--el-color-danger-light-3);
-  color: #fff;
+  color: var(--el-bg-color);
 }
 
 .chat-house-address {
@@ -827,7 +980,7 @@ watch(loading, () => {
 .chat-input-area {
   height: 100%;
   padding: 12px 16px 14px;
-  background: #ffffff;
+  background: var(--el-bg-color);
 }
 
 .chat-composer {
@@ -849,7 +1002,7 @@ watch(loading, () => {
   border: 0;
   outline: 0;
   background: transparent;
-  color: #17202a;
+  color: var(--app-text-primary);
   font: inherit;
   font-size: 14px;
   line-height: 1.55;
@@ -858,7 +1011,7 @@ watch(loading, () => {
 }
 
 .chat-composer-input::placeholder {
-  color: #8a96a3;
+  color: var(--el-text-color-secondary);
 }
 
 .chat-composer-input:disabled {
@@ -877,7 +1030,7 @@ watch(loading, () => {
 .chat-composer-hint {
   min-width: 0;
   overflow: hidden;
-  color: #98a2ad;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -893,8 +1046,8 @@ watch(loading, () => {
   flex: 0 0 auto;
   border: 0;
   border-radius: 50%;
-  background: #111111;
-  color: #ffffff;
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
   cursor: pointer;
   transition:
     background 0.18s ease,
@@ -903,7 +1056,7 @@ watch(loading, () => {
 }
 
 .chat-composer-send:hover:not(:disabled) {
-  background: #2a2f35;
+  background: var(--el-color-primary-dark-2);
   transform: translateY(-1px);
 }
 
@@ -924,7 +1077,7 @@ watch(loading, () => {
   width: 15px;
   height: 15px;
   border: 2px solid rgb(255 255 255 / 34%);
-  border-top-color: #ffffff;
+  border-top-color: var(--el-bg-color);
   border-radius: 50%;
   animation: chat-spin 0.8s linear infinite;
 }
