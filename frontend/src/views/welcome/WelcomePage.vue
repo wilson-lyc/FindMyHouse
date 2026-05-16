@@ -329,8 +329,8 @@ onMounted(loadConfig);
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  background: #f3f6f8;
-  color: #17202a;
+  background: var(--app-bg-page);
+  color: var(--app-text-primary);
 }
 
 .welcome-header {
@@ -341,8 +341,8 @@ onMounted(loadConfig);
   align-items: center;
   height: auto;
   padding: 12px 24px;
-  border-bottom: 1px solid #e2e9ee;
-  background: #ffffff;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--el-bg-color);
 }
 
 .welcome-title-row {
@@ -380,9 +380,9 @@ onMounted(loadConfig);
 .welcome-step-shell {
   display: grid;
   gap: 18px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 20px;
   margin-bottom: 16px;
 }
@@ -395,14 +395,14 @@ onMounted(loadConfig);
 .welcome-section {
   display: grid;
   gap: 18px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 20px;
 }
 
 .welcome-section-heading {
-  border-bottom: 1px solid #edf1f4;
+  border-bottom: 1px solid var(--app-border-lighter);
   padding-bottom: 14px;
 }
 

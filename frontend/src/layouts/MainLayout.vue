@@ -12,7 +12,8 @@ import { getDrivingRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
-import { normalizeHouseForm } from '../lib/house/house-form';
+import { createEmptyHouseForm, normalizeHouseForm } from '../lib/house/house-form';
+import { createEmptyLocationForm } from '../lib/location/location-form';
 import type { House, HouseForm } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
 import type { DrivingRouteResult } from '../model/map/geocode';
@@ -61,6 +62,11 @@ const contentPanelWidth = ref(420);
 const minContentPanelWidth = 360;
 const maxContentPanelWidth = 760;
 
+interface MapCreatePosition {
+  longitude: number;
+  latitude: number;
+}
+
 const activeMenu = computed(() => {
   if (route.name === 'locations' || route.name === 'chat' || route.name === 'stats') return String(route.name);
   return 'houses';
@@ -78,6 +84,17 @@ function openCreateDialog() {
   resetHouseDialogOptions();
   editingHouse.value = null;
   houseDialogInitialForm.value = null;
+  dialogVisible.value = true;
+}
+
+function openCreateHouseDialogAt(position: MapCreatePosition) {
+  resetHouseDialogOptions();
+  editingHouse.value = null;
+  houseDialogInitialForm.value = {
+    ...createEmptyHouseForm(),
+    longitude: position.longitude,
+    latitude: position.latitude
+  };
   dialogVisible.value = true;
 }
 
@@ -228,7 +245,20 @@ async function loadRoutes() {
 }
 
 function openCreateLocationDialog() {
+  resetLocationDialogOptions();
   editingLocation.value = null;
+  locationDialogInitialForm.value = null;
+  locationDialogVisible.value = true;
+}
+
+function openCreateLocationDialogAt(position: MapCreatePosition) {
+  resetLocationDialogOptions();
+  editingLocation.value = null;
+  locationDialogInitialForm.value = {
+    ...createEmptyLocationForm(),
+    longitude: position.longitude,
+    latitude: position.latitude
+  };
   locationDialogVisible.value = true;
 }
 
@@ -458,6 +488,8 @@ onMounted(async () => {
           <MapPanel
             ref="mapPanelRef"
             @edit-house="openEditDialog"
+            @create-house="openCreateHouseDialogAt"
+            @create-location="openCreateLocationDialogAt"
           />
         </div>
       </el-splitter-panel>

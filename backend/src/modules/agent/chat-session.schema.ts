@@ -4,6 +4,7 @@ import { idParamsSchema } from '../houses/dto/house.schema.js';
 const chatSessionMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
+  reasoning: z.string().optional(),
   houses: z.array(z.unknown()).optional(),
   housesTitle: z.string().optional(),
   hidden: z.boolean().optional(),

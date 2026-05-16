@@ -184,8 +184,8 @@ onMounted(loadConfig);
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  background: #f3f6f8;
-  color: #17202a;
+  background: var(--app-bg-page);
+  color: var(--app-text-primary);
 }
 
 .settings-header {
@@ -196,8 +196,8 @@ onMounted(loadConfig);
   align-items: center;
   height: auto;
   padding: 12px 24px;
-  border-bottom: 1px solid #e2e9ee;
-  background: #ffffff;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--el-bg-color);
 }
 
 .settings-title-row {
@@ -212,14 +212,14 @@ onMounted(loadConfig);
   padding: 0;
   border: 0;
   background: transparent;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 16px;
 }
 
 .settings-back-button:hover,
 .settings-back-button:focus {
   background: transparent;
-  color: #111111;
+  color: var(--el-color-primary);
 }
 
 .settings-header h1,
@@ -235,7 +235,7 @@ onMounted(loadConfig);
 .settings-header p,
 .settings-section-heading p {
   margin: 6px 0 0;
-  color: #647383;
+  color: var(--el-text-color-secondary);
 }
 
 .settings-main {
@@ -262,14 +262,14 @@ onMounted(loadConfig);
 .settings-section {
   display: grid;
   gap: 18px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 20px;
 }
 
 .settings-section-heading {
-  border-bottom: 1px solid #edf1f4;
+  border-bottom: 1px solid var(--app-border-lighter);
   padding-bottom: 14px;
 }
 

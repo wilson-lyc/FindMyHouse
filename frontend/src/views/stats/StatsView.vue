@@ -154,17 +154,28 @@ function initChart(element: HTMLDivElement | null) {
   return echarts.init(element, undefined, { renderer: 'canvas' });
 }
 
+function getThemeColor(name: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 function renderCharts() {
   const [statusChart, rentChart, sourceChart, commuteChart] = charts.value;
-  const textColor = '#22313f';
-  const mutedColor = '#6d7b88';
+  const primaryColor = getThemeColor('--el-color-primary');
+  const successColor = getThemeColor('--el-color-success');
+  const warningColor = getThemeColor('--el-color-warning');
+  const dangerColor = getThemeColor('--el-color-danger');
+  const infoColor = getThemeColor('--el-color-info');
+  const textColor = getThemeColor('--el-text-color-primary');
+  const mutedColor = getThemeColor('--el-text-color-secondary');
+  const splitLineColor = getThemeColor('--el-border-color-lighter');
+  const emptyColor = getThemeColor('--el-color-info-light-8');
   const statusData = statusRows.value;
   const sourceData = sourceRows.value.filter((item) => item.value > 0);
   const hasStatusData = statusData.some((item) => item.value > 0);
   const hasSourceData = sourceData.length > 0;
 
   statusChart?.setOption({
-    color: hasStatusData ? ['#2f6f73', '#e0a536', '#c95f4b', '#7b8794', '#415a77'] : ['#d5dbe0'],
+    color: hasStatusData ? [infoColor, primaryColor, warningColor, dangerColor, successColor] : [emptyColor],
     tooltip: { trigger: 'item' },
     series: [
       {
@@ -179,11 +190,11 @@ function renderCharts() {
   } satisfies EChartsOption);
 
   rentChart?.setOption({
-    color: ['#2f6f73'],
+    color: [primaryColor],
     grid: { left: 34, right: 14, top: 18, bottom: 28 },
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: rentBuckets.value.map((item) => item.name), axisLabel: { color: mutedColor } },
-    yAxis: { type: 'value', minInterval: 1, axisLabel: { color: mutedColor }, splitLine: { lineStyle: { color: '#e8eef2' } } },
+    yAxis: { type: 'value', minInterval: 1, axisLabel: { color: mutedColor }, splitLine: { lineStyle: { color: splitLineColor } } },
     series: [
       {
         type: 'bar',
@@ -195,7 +206,7 @@ function renderCharts() {
   } satisfies EChartsOption);
 
   sourceChart?.setOption({
-    color: hasSourceData ? ['#415a77', '#2f6f73', '#e0a536', '#c95f4b', '#718096', '#9b7b45'] : ['#d5dbe0'],
+    color: hasSourceData ? [primaryColor, successColor, warningColor, dangerColor, infoColor] : [emptyColor],
     tooltip: { trigger: 'item' },
     series: [
       {
@@ -210,7 +221,7 @@ function renderCharts() {
   } satisfies EChartsOption);
 
   commuteChart?.setOption({
-    color: ['#c95f4b'],
+    color: [dangerColor],
     grid: { left: 46, right: 18, top: 20, bottom: 34 },
     tooltip: {
       formatter: (params: unknown) => {
@@ -218,12 +229,12 @@ function renderCharts() {
         return `${item.name}<br/>通勤 ${item.value[0]} 分钟<br/>租金 ${formatCurrency(item.value[1])}<br/>月成本 ${formatCurrency(item.value[2])}`;
       }
     },
-    xAxis: { type: 'value', name: '分钟', axisLabel: { color: mutedColor }, splitLine: { lineStyle: { color: '#e8eef2' } } },
+    xAxis: { type: 'value', name: '分钟', axisLabel: { color: mutedColor }, splitLine: { lineStyle: { color: splitLineColor } } },
     yAxis: {
       type: 'value',
       name: '租金',
       axisLabel: { color: mutedColor, formatter: (value: number) => `${Math.round(value / 1000)}k` },
-      splitLine: { lineStyle: { color: '#e8eef2' } }
+      splitLine: { lineStyle: { color: splitLineColor } }
     },
     series: [{ type: 'scatter', data: commuteScatterRows.value }]
   } satisfies EChartsOption);

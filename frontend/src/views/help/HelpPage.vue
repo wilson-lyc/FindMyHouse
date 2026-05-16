@@ -179,8 +179,8 @@ const screenshots = [
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  background: #f3f6f8;
-  color: #17202a;
+  background: var(--app-bg-page);
+  color: var(--app-text-primary);
 }
 
 .help-header {
@@ -191,8 +191,8 @@ const screenshots = [
   align-items: center;
   height: auto;
   padding: 12px 24px;
-  border-bottom: 1px solid #e2e9ee;
-  background: #ffffff;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--el-bg-color);
 }
 
 .help-title-row {
@@ -207,14 +207,14 @@ const screenshots = [
   padding: 0;
   border: 0;
   background: transparent;
-  color: #17202a;
+  color: var(--app-text-primary);
   font-size: 16px;
 }
 
 .help-back-button:hover,
 .help-back-button:focus {
   background: transparent;
-  color: #111111;
+  color: var(--el-color-primary);
 }
 
 .help-header h1 {
@@ -264,7 +264,7 @@ const screenshots = [
   margin: 0;
   max-width: 600px;
   margin-inline: auto;
-  color: #526270;
+  color: var(--el-text-color-regular);
   font-size: 15px;
   line-height: 1.7;
 }
@@ -277,7 +277,7 @@ const screenshots = [
 
 .help-section-desc {
   margin: 0 0 16px;
-  color: #647383;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
 }
 
@@ -289,9 +289,9 @@ const screenshots = [
 .help-capability-card {
   display: flex;
   gap: 16px;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 20px;
 }
 
@@ -304,7 +304,7 @@ const screenshots = [
   justify-content: center;
   font-size: 22px;
   border-radius: 8px;
-  background: #f3f6f8;
+  background: var(--app-bg-page);
 }
 
 .help-capability-body {
@@ -320,7 +320,7 @@ const screenshots = [
 
 .help-capability-body p {
   margin: 0 0 10px;
-  color: #526270;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -333,11 +333,11 @@ const screenshots = [
 
 .help-example-tag {
   display: inline-block;
-  border: 1px solid #dce5eb;
+  border: 1px solid var(--app-border-light);
   border-radius: 6px;
-  background: #f6fafc;
+  background: var(--app-bg-soft);
   padding: 4px 10px;
-  color: #407899;
+  color: var(--el-color-primary);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -348,9 +348,9 @@ const screenshots = [
 }
 
 .help-feature-card {
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 20px;
 }
 
@@ -362,7 +362,7 @@ const screenshots = [
 
 .help-feature-card p {
   margin: 0;
-  color: #526270;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -375,7 +375,7 @@ const screenshots = [
 }
 
 .help-notes li {
-  color: #526270;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -393,14 +393,14 @@ const screenshots = [
 
 .help-screenshot-img {
   width: 100%;
-  border: 1px solid #e2e9ee;
+  border: 1px solid var(--app-border-light);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--el-bg-color);
   display: block;
 }
 
 .help-screenshot-figure figcaption {
-  color: #526270;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   line-height: 1.5;
   text-align: center;

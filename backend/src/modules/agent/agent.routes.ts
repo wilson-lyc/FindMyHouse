@@ -68,6 +68,35 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     return { data: result };
   });
 
+  app.post('/api/chat/stream', async (request, reply) => {
+    const { messages } = agentMessageSchema.parse(request.body);
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    const sendEvent = (event: string, data: unknown) => {
+      reply.raw.write(`event: ${event}\n`);
+      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      for await (const event of agentService.streamChat(messages)) {
+        sendEvent(event.type, event);
+      }
+    } catch (error) {
+      sendEvent('error', {
+        type: 'error',
+        message: error instanceof Error ? error.message : '请求失败',
+      });
+    } finally {
+      reply.raw.end();
+    }
+  });
+
   app.post('/api/chat/debug', async (request) => {
     const { messages } = agentMessageSchema.parse(request.body);
     const llm = getLlm();

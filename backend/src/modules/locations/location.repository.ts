@@ -11,6 +11,11 @@ export class LocationRepository {
     const where: string[] = [];
     const params: Record<string, string> = {};
 
+    if (filters.q) {
+      where.push('(name LIKE @q OR address LIKE @q)');
+      params.q = `%${filters.q}%`;
+    }
+
     if (filters.category) {
       where.push('category = @category');
       params.category = filters.category;
