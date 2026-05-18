@@ -68,7 +68,7 @@ interface MapCreatePosition {
 }
 
 const activeMenu = computed(() => {
-  if (route.name === 'locations' || route.name === 'chat' || route.name === 'stats') return String(route.name);
+  if (route.name === 'locations' || route.name === 'chat') return String(route.name);
   return 'houses';
 });
 
@@ -458,12 +458,13 @@ onMounted(async () => {
           <el-icon><ChatDotSquare /></el-icon>
           <span>对话</span>
         </el-menu-item>
-        <el-menu-item index="stats">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>统计</span>
-        </el-menu-item>
       </el-menu>
       <div class="map-directory-bottom">
+        <el-tooltip content="统计" placement="right">
+          <router-link class="map-directory-icon-button" to="/stats" aria-label="统计">
+            <el-icon><DataAnalysis /></el-icon>
+          </router-link>
+        </el-tooltip>
         <el-tooltip content="帮助" placement="right">
           <router-link class="map-directory-icon-button" to="/help" aria-label="帮助">
             <el-icon><QuestionFilled /></el-icon>
