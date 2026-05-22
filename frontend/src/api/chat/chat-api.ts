@@ -13,13 +13,6 @@ export interface ChatResponse {
   actions: AgentFrontendAction[];
 }
 
-export type ChatStreamEvent =
-  | { type: 'reasoning_delta'; delta: string }
-  | { type: 'delta'; delta: string }
-  | { type: 'status'; message: string }
-  | ({ type: 'done' } & ChatResponse)
-  | { type: 'error'; message: string };
-
 export interface ConfirmCreateHouseAction {
   id: string;
   type: 'confirm_create_house';
@@ -48,7 +41,19 @@ export interface ShowLocationSearchResultsAction {
   locations: Location[];
 }
 
-export type AgentFrontendAction = ConfirmCreateHouseAction | ConfirmCreateLocationAction | ShowHouseSearchResultsAction | ShowLocationSearchResultsAction;
+export interface ConfirmCompareHousesAction {
+  id: string;
+  type: 'confirm_compare_houses';
+  title: string;
+  houses: House[];
+}
+
+export type AgentFrontendAction =
+  | ConfirmCreateHouseAction
+  | ConfirmCreateLocationAction
+  | ShowHouseSearchResultsAction
+  | ShowLocationSearchResultsAction
+  | ConfirmCompareHousesAction;
 
 export type ConfirmCreateHouseResult =
   | { status: 'created'; house: House }
@@ -58,46 +63,10 @@ export type ConfirmCreateLocationResult =
   | { status: 'created'; location: Location }
   | { status: 'cancelled' };
 
+export type ConfirmCompareHousesResult =
+  | { status: 'confirmed'; houses: House[] }
+  | { status: 'cancelled' };
+
 export function sendChatMessage(messages: ChatMessage[]) {
   return postData<ChatResponse, { messages: ChatMessage[] }>('/api/chat', { messages });
-}
-
-export async function streamChatMessage(messages: ChatMessage[], onEvent: (event: ChatStreamEvent) => void) {
-  const response = await fetch('/api/chat/stream', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ messages })
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
-  }
-
-  if (!response.body) {
-    throw new Error('浏览器不支持流式响应');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done });
-
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() ?? '';
-
-    for (const part of parts) {
-      const dataLine = part.split('\n').find((line) => line.startsWith('data: '));
-      if (!dataLine) continue;
-
-      onEvent(JSON.parse(dataLine.slice(6)) as ChatStreamEvent);
-    }
-
-    if (done) break;
-  }
 }

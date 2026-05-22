@@ -4,10 +4,10 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Delete, Plus, Setting } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
 import {
-  streamChatMessage,
+  sendChatMessage,
   type AgentFrontendAction,
-  type ChatResponse,
   type ChatMessage as ApiChatMessage,
+  type ConfirmCompareHousesResult,
   type ConfirmCreateHouseResult,
   type ConfirmCreateLocationResult
 } from '../../api/chat/chat-api';
@@ -29,9 +29,9 @@ import { formatCurrency } from '../../lib/format';
 interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
-  reasoning?: string;
   houses?: House[];
   housesTitle?: string;
+  compareHouses?: House[];
   hidden?: boolean;
 }
 
@@ -43,6 +43,9 @@ const sessionDialogVisible = ref(false);
 const currentSessionId = ref<string | null>(null);
 const sessions = ref<ChatSessionSummary[]>([]);
 const selectedSessionIds = ref<string[]>([]);
+const compareConfirmDialogVisible = ref(false);
+const pendingCompareAction = ref<Extract<AgentFrontendAction, { type: 'confirm_compare_houses' }> | null>(null);
+const pendingCompareResolve = ref<((result: ConfirmCompareHousesResult) => void) | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const messagesContainerRef = ref<HTMLDivElement | null>(null);
 const composerPanelSize = ref('152px');
@@ -62,6 +65,7 @@ markdown.renderer.rules.table_close = () => '</table></div>';
 const emit = defineEmits<{
   housesFound: [houses: House[]];
   selectHouse: [house: House];
+  openHouseCompare: [houses: House[]];
   confirmCreateHouse: [action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>, done: (result: ConfirmCreateHouseResult) => void];
   confirmCreateLocation: [action: Extract<AgentFrontendAction, { type: 'confirm_create_location' }>, done: (result: ConfirmCreateLocationResult) => void];
 }>();
@@ -82,44 +86,11 @@ async function handleSubmit() {
   try {
     await persistCurrentSession(content);
     const apiMessages = toApiMessages();
-    const assistantMessage: ChatMessage = { content: '', role: 'assistant', reasoning: '' };
-    messages.value.push(assistantMessage);
-
-    let actions: ChatResponse['actions'] = [];
-    await streamChatMessage(apiMessages, (event) => {
-      if (event.type === 'reasoning_delta') {
-        assistantMessage.reasoning = `${assistantMessage.reasoning ?? ''}${event.delta}`;
-        return;
-      }
-
-      if (event.type === 'delta') {
-        assistantMessage.content += event.delta;
-        return;
-      }
-
-      if (event.type === 'status' && assistantMessage.content.trim().length === 0) {
-        assistantMessage.content = event.message;
-        return;
-      }
-
-      if (event.type === 'done') {
-        actions = event.actions;
-        assistantMessage.content = event.reply;
-        attachHousesToMessage(assistantMessage, event);
-        return;
-      }
-
-      if (event.type === 'error') {
-        throw new Error(event.message);
-      }
-    });
-
-    if (!assistantMessage.content) {
-      throw new Error('流式响应未正常结束');
-    }
+    const result = await sendChatMessage(apiMessages);
+    appendAssistantResponse(result);
 
     await persistCurrentSession();
-    await executeAgentActions(actions ?? []);
+    await executeAgentActions(result.actions ?? []);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '请求失败');
   } finally {
@@ -293,6 +264,17 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
       }
     }
 
+    if (action.type === 'confirm_compare_houses') {
+      const result = await requestCompareConfirmation(action);
+
+      if (result.status === 'confirmed') {
+        await runConfirmedComparison(result.houses);
+      } else {
+        messages.value.push({ role: 'assistant', content: '已取消房源对比。' });
+        await persistCurrentSession();
+      }
+    }
+
     if (action.type === 'confirm_create_location') {
       const result = await requestCreateLocationConfirmation(action);
 
@@ -317,6 +299,89 @@ function requestCreateLocationConfirmation(action: Extract<AgentFrontendAction, 
   return new Promise<ConfirmCreateLocationResult>((resolve) => {
     emit('confirmCreateLocation', action, resolve);
   });
+}
+
+function requestCompareConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_compare_houses' }>) {
+  pendingCompareAction.value = action;
+  compareConfirmDialogVisible.value = true;
+
+  return new Promise<ConfirmCompareHousesResult>((resolve) => {
+    pendingCompareResolve.value = resolve;
+  });
+}
+
+function confirmCompareHouses() {
+  if (!pendingCompareAction.value || !pendingCompareResolve.value) return;
+
+  const houses = pendingCompareAction.value.houses;
+  pendingCompareResolve.value({ status: 'confirmed', houses });
+  closeCompareConfirmation();
+}
+
+function cancelCompareHouses() {
+  pendingCompareResolve.value?.({ status: 'cancelled' });
+  closeCompareConfirmation();
+}
+
+function handleCompareConfirmVisibleChange(visible: boolean) {
+  if (visible) {
+    compareConfirmDialogVisible.value = true;
+    return;
+  }
+
+  cancelCompareHouses();
+}
+
+function closeCompareConfirmation() {
+  compareConfirmDialogVisible.value = false;
+  pendingCompareAction.value = null;
+  pendingCompareResolve.value = null;
+}
+
+async function runConfirmedComparison(houses: House[]) {
+  messages.value.push({
+    role: 'user',
+    hidden: true,
+    content: createCompareCallbackMessage(houses)
+  });
+
+  const result = await sendChatMessage(toApiMessages());
+  const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant', compareHouses: houses };
+  attachHousesToMessage(assistantMessage, result);
+  messages.value.push(assistantMessage);
+  await persistCurrentSession();
+  await executeAgentActions(result.actions ?? []);
+}
+
+function createCompareCallbackMessage(houses: House[]) {
+  const payload = houses.map((house) => ({
+    name: house.name,
+    status: statusLabels[house.status],
+    layout: `${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`,
+    address: house.address,
+    rentPrice: house.rentPrice,
+    monthlyTotalCost: getMonthlyTotalCost(house),
+    propertyFee: house.propertyFee,
+    waterFeePerTon: house.waterFeePerTon,
+    electricityFeePerKwh: house.electricityFeePerKwh,
+    otherFee: house.otherFee,
+    rentPaymentPeriods: house.rentPaymentPeriods,
+    contactNotes: house.contactNotes
+  }));
+
+  return [
+    '前端执行器回调：用户已确认对比以下房源。',
+    '请基于这些房源做对比分析，输出清晰的取舍建议和推荐结论；不要展示内部 ID。',
+    JSON.stringify(payload, null, 2)
+  ].join('\n');
+}
+
+function getMonthlyTotalCost(house: House) {
+  return house.rentPrice + (house.propertyFee ?? 0) + (house.otherFee ?? 0);
+}
+
+function formatHouseStatus(house: House) {
+  return statusLabels[house.status];
 }
 
 function appendCreatedHouseResponse(house: House) {
@@ -392,6 +457,10 @@ function handleInputKeydown(event: KeyboardEvent) {
 
 function handleSelectHouse(house: House) {
   emit('selectHouse', house);
+}
+
+function handleOpenHouseCompare(houses: House[]) {
+  emit('openHouseCompare', houses);
 }
 
 function renderAssistantContent(content: string) {
@@ -472,10 +541,6 @@ watch(loading, () => {
                 <span class="chat-loading-dot" />
               </div>
               <div v-else class="chat-bubble-text">{{ msg.content }}</div>
-              <details v-if="msg.role === 'assistant' && msg.reasoning" class="chat-reasoning">
-                <summary>思考过程</summary>
-                <div class="chat-reasoning-content">{{ msg.reasoning }}</div>
-              </details>
               <div v-if="msg.houses && msg.houses.length > 0" class="chat-house-results">
                 <div class="chat-house-results-header">
                   {{ msg.housesTitle ?? `找到 ${msg.houses.length} 套房源` }}
@@ -494,6 +559,11 @@ watch(loading, () => {
                   </div>
                   <div class="chat-house-address">{{ house.address }}</div>
                 </div>
+              </div>
+              <div v-if="msg.compareHouses && msg.compareHouses.length > 1" class="chat-compare-actions">
+                <el-button type="primary" plain @click="handleOpenHouseCompare(msg.compareHouses)">
+                  打开对比表
+                </el-button>
               </div>
             </div>
           </div>
@@ -584,6 +654,36 @@ watch(loading, () => {
           </template>
         </el-table-column>
       </el-table>
+    </el-dialog>
+
+    <el-dialog
+      :model-value="compareConfirmDialogVisible"
+      :title="pendingCompareAction?.title ?? '确认对比房源'"
+      width="720px"
+      class="chat-compare-confirm-dialog"
+      @update:model-value="handleCompareConfirmVisibleChange"
+    >
+      <el-table :data="pendingCompareAction?.houses ?? []" max-height="360">
+        <el-table-column label="房源" min-width="180">
+          <template #default="{ row }">
+            <div class="chat-compare-confirm-name">{{ row.name }}</div>
+            <div class="chat-compare-confirm-address">{{ row.address }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="月租" width="100">
+          <template #default="{ row }">{{ formatCurrency(row.rentPrice) }}</template>
+        </el-table-column>
+        <el-table-column label="户型" width="110">
+          <template #default="{ row }">{{ row.bedroomCount }}室{{ row.livingRoomCount }}厅{{ row.bathroomCount }}卫</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">{{ formatHouseStatus(row) }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="cancelCompareHouses">取消</el-button>
+        <el-button type="primary" @click="confirmCompareHouses">确认并开始分析</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -830,29 +930,6 @@ watch(loading, () => {
   min-height: 22px;
 }
 
-.chat-reasoning {
-  margin-top: 8px;
-  border-top: 1px solid var(--app-border-light);
-  padding-top: 7px;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: normal;
-}
-
-.chat-reasoning summary {
-  cursor: pointer;
-  user-select: none;
-  font-weight: 600;
-}
-
-.chat-reasoning-content {
-  margin-top: 6px;
-  max-height: 180px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-}
-
 .chat-loading {
   display: flex;
   align-items: center;
@@ -891,6 +968,16 @@ watch(loading, () => {
   margin-top: 8px;
   border-top: 1px solid var(--el-border-color-light);
   padding-top: 8px;
+}
+
+.chat-compare-actions {
+  margin-top: 10px;
+  border-top: 1px solid var(--el-border-color-light);
+  padding-top: 10px;
+}
+
+.chat-compare-actions .el-button {
+  margin-left: 0;
 }
 
 .chat-house-results-header {
@@ -975,6 +1062,18 @@ watch(loading, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-compare-confirm-name {
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.chat-compare-confirm-address {
+  margin-top: 3px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .chat-input-area {

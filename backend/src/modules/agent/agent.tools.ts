@@ -13,6 +13,7 @@ export const agentToolNames = [
   'search_houses',
   'search_houses_near_location',
   'get_house',
+  'prepare_house_comparison',
   'create_house',
   'update_house',
   'delete_house',
@@ -59,7 +60,19 @@ export interface ShowLocationSearchResultsAction {
   locations: Location[];
 }
 
-export type AgentFrontendAction = ConfirmCreateHouseAction | ConfirmCreateLocationAction | ShowHouseSearchResultsAction | ShowLocationSearchResultsAction;
+export interface ConfirmCompareHousesAction {
+  id: string;
+  type: 'confirm_compare_houses';
+  title: string;
+  houses: House[];
+}
+
+export type AgentFrontendAction =
+  | ConfirmCreateHouseAction
+  | ConfirmCreateLocationAction
+  | ShowHouseSearchResultsAction
+  | ShowLocationSearchResultsAction
+  | ConfirmCompareHousesAction;
 
 export interface ToolResult {
   kind: 'houses' | 'house' | 'locations' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
@@ -151,6 +164,14 @@ const updateHouseToolSchema = z.object({
 
 const deleteHouseToolSchema = idParamsSchema;
 const getHouseToolSchema = idParamsSchema;
+const prepareHouseComparisonToolSchema = z
+  .object({
+    houseIds: z.array(idParamsSchema.shape.id).max(4).optional().describe('需要对比的房源 ID。如果已经知道 ID，优先提供 ID。'),
+    houseNames: z.array(z.string().trim().min(1)).max(4).optional().describe('用户自然语言里提到的房源名称或关键词，例如“人才公寓”“保利公寓”。当用户直接说要对比某些房源时使用。'),
+  })
+  .refine((value) => (value.houseIds?.length ?? 0) + (value.houseNames?.length ?? 0) >= 2, {
+    message: '至少需要提供两个房源 ID 或名称关键词。',
+  });
 
 const searchLocationsToolSchema = z.object({
   q: z.string().trim().min(1).optional().describe('地点名称或地址关键词'),
@@ -201,6 +222,14 @@ export function createAgentTools(context: AgentToolContext) {
         name: 'get_house',
         description: '根据明确的房源 ID 查询单套房源详情。',
         schema: getHouseToolSchema,
+      }
+    ),
+    tool(
+      async (params) => toolResultToJson(await runAgentTool({ tool: 'prepare_house_comparison', params }, context)),
+      {
+        name: 'prepare_house_comparison',
+        description: '当用户要求对比房源时优先使用。可以直接传入用户提到的房源名称/关键词（houseNames），例如“人才公寓”“保利公寓”；如果已经知道房源 ID，也可以传 houseIds。工具会整理 2-4 套候选房源并让前端弹窗请用户确认，确认后用户会把确认结果作为回调发回来，你再基于确认的房源做对比分析。',
+        schema: prepareHouseComparisonToolSchema,
       }
     ),
     tool(
@@ -310,6 +339,10 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
 
     if (toolCall.tool === 'get_house') {
       return getHouse(params, context);
+    }
+
+    if (toolCall.tool === 'prepare_house_comparison') {
+      return prepareHouseComparison(params, context);
     }
 
     if (toolCall.tool === 'create_house') {
@@ -472,6 +505,93 @@ function getHouse(params: Record<string, unknown>, { houseRepository }: AgentToo
     houses: [house],
     reply: `找到这套房源：\n${formatHouseDetails(house)}`,
   };
+}
+
+function prepareHouseComparison(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
+  const { houseIds, houseNames } = prepareHouseComparisonToolSchema.parse(params);
+  const allHouses = houseRepository.list({ limit: 100 });
+  const housesById = [...new Set(houseIds ?? [])]
+    .map((id) => houseRepository.findById(id))
+    .filter((house): house is House => Boolean(house));
+  const housesByName = (houseNames ?? [])
+    .map((name) => findBestHouseMatch(allHouses, name))
+    .filter((house): house is House => Boolean(house));
+  const houses = dedupeHouses([...housesById, ...housesByName]).slice(0, 4);
+
+  if (houses.length < 2) {
+    return {
+      kind: 'empty',
+      content: '可用于对比的房源不足两套。',
+      houses,
+      reply: '我还没有定位到至少两套可对比的房源。请告诉我要对比哪些房源，或换一种更接近房源名称的描述再试。',
+    };
+  }
+
+  const requestedCount = (houseIds?.length ?? 0) + (houseNames?.length ?? 0);
+  const missingCount = requestedCount - houses.length;
+  const title = `确认对比 ${houses.length} 套房源`;
+  const missingNotice = missingCount > 0 ? `\n\n有 ${missingCount} 套房源没有找到，已先列出可确认的房源。` : '';
+
+  return {
+    kind: 'frontend_action',
+    content: formatHouseSummary(houses),
+    houses,
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'confirm_compare_houses',
+        title,
+        houses,
+      },
+    ],
+    reply: `我整理了以下 ${houses.length} 套待对比房源，请在弹窗中确认后，我再开始分析：\n\n${formatHouseSummary(houses)}${missingNotice}`,
+  };
+}
+
+function dedupeHouses(houses: House[]): House[] {
+  const seen = new Set<string>();
+
+  return houses.filter((house) => {
+    if (seen.has(house.id)) return false;
+    seen.add(house.id);
+    return true;
+  });
+}
+
+function findBestHouseMatch(houses: House[], query: string): House | undefined {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return undefined;
+
+  const scoredMatches = houses
+    .map((house) => ({ house, score: scoreHouseMatch(house, normalizedQuery) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scoredMatches[0]?.house;
+}
+
+function scoreHouseMatch(house: House, normalizedQuery: string): number {
+  const normalizedName = normalizeSearchText(house.name);
+  const normalizedAddress = normalizeSearchText(house.address);
+
+  if (normalizedName === normalizedQuery) return 100;
+  if (normalizedName.includes(normalizedQuery)) return 80 + normalizedQuery.length;
+  if (normalizedQuery.includes(normalizedName)) return 70 + normalizedName.length;
+  if (normalizedAddress.includes(normalizedQuery)) return 50 + normalizedQuery.length;
+
+  const commonChars = new Set([...normalizedQuery].filter((char) => normalizedName.includes(char)));
+  if (commonChars.size >= Math.min(2, normalizedQuery.length)) {
+    return commonChars.size * 10;
+  }
+
+  return 0;
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 async function createHouse(params: Record<string, unknown>, { amapService }: AgentToolContext): Promise<ToolResult> {

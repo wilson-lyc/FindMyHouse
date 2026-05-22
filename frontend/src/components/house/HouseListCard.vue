@@ -9,6 +9,8 @@ defineProps<{
   house: House;
   drivingDistance?: DrivingDistanceResult;
   focusLocationName?: string;
+  compareSelected?: boolean;
+  compareDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +18,7 @@ const emit = defineEmits<{
   edit: [house: House];
   delete: [house: House];
   route: [house: House];
+  compareChange: [house: House, selected: boolean];
 }>();
 
 function formatFeeLabel(value: number | undefined, suffix: string) {
@@ -56,7 +59,16 @@ function formatDuration(seconds: number): string {
     @click="emit('select', house)"
   >
     <div class="house-card-header">
-      <strong>{{ house.name }}</strong>
+      <div class="house-card-title-row">
+        <el-checkbox
+          :model-value="compareSelected"
+          :disabled="compareDisabled"
+          aria-label="加入对比"
+          @click.stop
+          @change="(selected: string | number | boolean) => emit('compareChange', house, Boolean(selected))"
+        />
+        <strong>{{ house.name }}</strong>
+      </div>
       <el-tag :type="statusType(house.status)" size="small">{{ statusLabels[house.status] }}</el-tag>
     </div>
     <small>

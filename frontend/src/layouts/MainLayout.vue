@@ -4,19 +4,21 @@ import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { ChatDotSquare, DataAnalysis, House as HouseIcon, Location as LocationIcon, QuestionFilled, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
-import type { ConfirmCreateHouseAction, ConfirmCreateHouseResult, ConfirmCreateLocationAction, ConfirmCreateLocationResult } from '../api/chat/chat-api';
 import { getDrivingRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
-import { createEmptyHouseForm, normalizeHouseForm } from '../lib/house/house-form';
-import { createEmptyLocationForm } from '../lib/location/location-form';
+import { normalizeHouseForm } from '../lib/house/house-form';
 import type { House, HouseForm } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
 import type { DrivingRouteResult } from '../model/map/geocode';
+import { useHouseCompareStore } from '../stores/houseCompareStore';
+import { useHouseDialogStore } from '../stores/houseDialogStore';
+import { useLocationDialogStore } from '../stores/locationDialogStore';
 import { useMapStore } from '../stores/mapStore';
 
 const {
@@ -42,30 +44,31 @@ const {
   selectedHouseId,
   routeData
 } = storeToRefs(mapStore);
+const houseCompareStore = useHouseCompareStore();
+const { visible: houseCompareDialogVisible, houses: houseCompareDialogHouses } = storeToRefs(houseCompareStore);
+const houseDialogStore = useHouseDialogStore();
+const {
+  visible: houseDialogVisible,
+  editingHouse,
+  initialForm: houseDialogInitialForm,
+  title: houseDialogTitle,
+  cancelText: houseDialogCancelText,
+  submitText: houseDialogSubmitText
+} = storeToRefs(houseDialogStore);
+const locationDialogStore = useLocationDialogStore();
+const {
+  visible: locationDialogVisible,
+  editingLocation,
+  initialForm: locationDialogInitialForm,
+  title: locationDialogTitle,
+  cancelText: locationDialogCancelText,
+  submitText: locationDialogSubmitText
+} = storeToRefs(locationDialogStore);
 
-const dialogVisible = ref(false);
-const editingHouse = ref<House | null>(null);
-const houseDialogInitialForm = ref<HouseForm | null>(null);
-const houseDialogTitle = ref<string>();
-const houseDialogCancelText = ref<string>();
-const houseDialogSubmitText = ref<string>();
-const pendingAgentCreateDone = ref<((result: ConfirmCreateHouseResult) => void) | null>(null);
-const locationDialogVisible = ref(false);
-const editingLocation = ref<Location | null>(null);
-const locationDialogInitialForm = ref<LocationForm | null>(null);
-const locationDialogTitle = ref<string>();
-const locationDialogCancelText = ref<string>();
-const locationDialogSubmitText = ref<string>();
-const pendingAgentLocationCreateDone = ref<((result: ConfirmCreateLocationResult) => void) | null>(null);
 const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
 const contentPanelWidth = ref(420);
 const minContentPanelWidth = 360;
 const maxContentPanelWidth = 760;
-
-interface MapCreatePosition {
-  longitude: number;
-  latitude: number;
-}
 
 const activeMenu = computed(() => {
   if (route.name === 'locations' || route.name === 'chat') return String(route.name);
@@ -80,79 +83,19 @@ const mappedHouses = computed(() =>
   houses.value.filter((house) => house.latitude !== undefined && house.longitude !== undefined)
 );
 
-function openCreateDialog() {
-  resetHouseDialogOptions();
-  editingHouse.value = null;
-  houseDialogInitialForm.value = null;
-  dialogVisible.value = true;
-}
-
-function openCreateHouseDialogAt(position: MapCreatePosition) {
-  resetHouseDialogOptions();
-  editingHouse.value = null;
-  houseDialogInitialForm.value = {
-    ...createEmptyHouseForm(),
-    longitude: position.longitude,
-    latitude: position.latitude
-  };
-  dialogVisible.value = true;
-}
-
-function openEditDialog(house: House) {
-  resetHouseDialogOptions();
-  editingHouse.value = house;
-  houseDialogInitialForm.value = null;
-  dialogVisible.value = true;
-}
-
 async function submitHouse(form: HouseForm) {
   try {
     const savedHouse = await saveHouse(normalizeHouseForm(form), editingHouse.value);
 
-    if (pendingAgentCreateDone.value && savedHouse) {
-      pendingAgentCreateDone.value({ status: 'created', house: savedHouse });
-      pendingAgentCreateDone.value = null;
+    if (savedHouse) {
+      houseDialogStore.resolveCreated(savedHouse);
       onChatHousesFound([savedHouse]);
     }
 
-    closeHouseDialog(false);
+    houseDialogStore.close();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存失败');
   }
-}
-
-function resetHouseDialogOptions() {
-  if (pendingAgentCreateDone.value) {
-    pendingAgentCreateDone.value({ status: 'cancelled' });
-    pendingAgentCreateDone.value = null;
-  }
-
-  houseDialogTitle.value = undefined;
-  houseDialogCancelText.value = undefined;
-  houseDialogSubmitText.value = undefined;
-}
-
-function closeHouseDialog(cancelPending: boolean) {
-  if (cancelPending && pendingAgentCreateDone.value) {
-    pendingAgentCreateDone.value({ status: 'cancelled' });
-    pendingAgentCreateDone.value = null;
-  }
-
-  dialogVisible.value = false;
-  editingHouse.value = null;
-  houseDialogInitialForm.value = null;
-  houseDialogTitle.value = undefined;
-  houseDialogCancelText.value = undefined;
-  houseDialogSubmitText.value = undefined;
-}
-
-function handleHouseDialogVisibleChange(visible: boolean) {
-  if (!visible) {
-    closeHouseDialog(true);
-    return;
-  }
-
-  dialogVisible.value = true;
 }
 
 async function confirmDeleteHouse(house: House) {
@@ -244,76 +187,18 @@ async function loadRoutes() {
   }
 }
 
-function openCreateLocationDialog() {
-  resetLocationDialogOptions();
-  editingLocation.value = null;
-  locationDialogInitialForm.value = null;
-  locationDialogVisible.value = true;
-}
-
-function openCreateLocationDialogAt(position: MapCreatePosition) {
-  resetLocationDialogOptions();
-  editingLocation.value = null;
-  locationDialogInitialForm.value = {
-    ...createEmptyLocationForm(),
-    longitude: position.longitude,
-    latitude: position.latitude
-  };
-  locationDialogVisible.value = true;
-}
-
-function openEditLocationDialog(location: Location) {
-  editingLocation.value = location;
-  locationDialogVisible.value = true;
-}
-
 async function submitLocation(form: LocationForm) {
   try {
     const savedLocation = await saveLocation(form, editingLocation.value);
 
-    if (pendingAgentLocationCreateDone.value && savedLocation) {
-      pendingAgentLocationCreateDone.value({ status: 'created', location: savedLocation });
-      pendingAgentLocationCreateDone.value = null;
+    if (savedLocation) {
+      locationDialogStore.resolveCreated(savedLocation);
     }
 
-    closeLocationDialog(false);
+    locationDialogStore.close();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存地点失败');
   }
-}
-
-function resetLocationDialogOptions() {
-  if (pendingAgentLocationCreateDone.value) {
-    pendingAgentLocationCreateDone.value({ status: 'cancelled' });
-    pendingAgentLocationCreateDone.value = null;
-  }
-
-  locationDialogTitle.value = undefined;
-  locationDialogCancelText.value = undefined;
-  locationDialogSubmitText.value = undefined;
-}
-
-function closeLocationDialog(cancelPending: boolean) {
-  if (cancelPending && pendingAgentLocationCreateDone.value) {
-    pendingAgentLocationCreateDone.value({ status: 'cancelled' });
-    pendingAgentLocationCreateDone.value = null;
-  }
-
-  locationDialogVisible.value = false;
-  editingLocation.value = null;
-  locationDialogInitialForm.value = null;
-  locationDialogTitle.value = undefined;
-  locationDialogCancelText.value = undefined;
-  locationDialogSubmitText.value = undefined;
-}
-
-function handleLocationDialogVisibleChange(visible: boolean) {
-  if (!visible) {
-    closeLocationDialog(true);
-    return;
-  }
-
-  locationDialogVisible.value = true;
 }
 
 async function confirmDeleteLocation(location: Location) {
@@ -337,28 +222,6 @@ function onChatHousesFound(foundHouses: House[]) {
 
 function onChatSelectHouse(house: House) {
   selectHouse(house);
-}
-
-function onAgentConfirmCreateHouse(action: ConfirmCreateHouseAction, done: (result: ConfirmCreateHouseResult) => void) {
-  resetHouseDialogOptions();
-  editingHouse.value = null;
-  houseDialogInitialForm.value = action.payload;
-  houseDialogTitle.value = action.title;
-  houseDialogCancelText.value = '暂不新增';
-  houseDialogSubmitText.value = '确认新增';
-  pendingAgentCreateDone.value = done;
-  dialogVisible.value = true;
-}
-
-function onAgentConfirmCreateLocation(action: ConfirmCreateLocationAction, done: (result: ConfirmCreateLocationResult) => void) {
-  resetLocationDialogOptions();
-  editingLocation.value = null;
-  locationDialogInitialForm.value = action.payload;
-  locationDialogTitle.value = action.title;
-  locationDialogCancelText.value = '暂不新增';
-  locationDialogSubmitText.value = '确认新增';
-  pendingAgentLocationCreateDone.value = done;
-  locationDialogVisible.value = true;
 }
 
 function notifyMapResize() {
@@ -417,23 +280,17 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   locations,
   locationsLoading,
   locationSaving,
-  openCreateDialog,
-  openEditDialog,
   submitHouse,
   confirmDeleteHouse,
   applyHouseFilters,
   toggleViewportHouses,
   selectHouse,
   showRoute,
-  openCreateLocationDialog,
-  openEditLocationDialog,
   submitLocation,
   confirmDeleteLocation,
   setLocationFocus,
   onChatHousesFound,
-  onChatSelectHouse,
-  onAgentConfirmCreateHouse,
-  onAgentConfirmCreateLocation
+  onChatSelectHouse
 });
 
 onMounted(async () => {
@@ -488,23 +345,23 @@ onMounted(async () => {
         <div class="map-canvas-panel">
           <MapPanel
             ref="mapPanelRef"
-            @edit-house="openEditDialog"
-            @create-house="openCreateHouseDialogAt"
-            @create-location="openCreateLocationDialogAt"
+            @edit-house="houseDialogStore.openEdit"
+            @create-house="houseDialogStore.openCreateAt"
+            @create-location="locationDialogStore.openCreateAt"
           />
         </div>
       </el-splitter-panel>
     </el-splitter>
 
     <HouseFormDialog
-      :model-value="dialogVisible"
+      :model-value="houseDialogVisible"
       :house="editingHouse"
       :initial-form="houseDialogInitialForm"
       :saving="saving"
       :title="houseDialogTitle"
       :cancel-text="houseDialogCancelText"
       :submit-text="houseDialogSubmitText"
-      @update:model-value="handleHouseDialogVisibleChange"
+      @update:model-value="houseDialogStore.setVisible"
       @submit="submitHouse"
     />
     <LocationFormDialog
@@ -515,8 +372,14 @@ onMounted(async () => {
       :title="locationDialogTitle"
       :cancel-text="locationDialogCancelText"
       :submit-text="locationDialogSubmitText"
-      @update:model-value="handleLocationDialogVisibleChange"
+      @update:model-value="locationDialogStore.setVisible"
       @submit="submitLocation"
+    />
+    <HouseCompareDialog
+      v-model="houseCompareDialogVisible"
+      :houses="houseCompareDialogHouses"
+      :driving-routes="drivingRoutes"
+      :loading="loading"
     />
   </main>
 </template>
