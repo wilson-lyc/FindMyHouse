@@ -32,6 +32,11 @@ export const rentPaymentPeriodLabels: Record<RentPaymentPeriod, string> = {
   annually: '年付'
 };
 
+export interface CustomFeeItem {
+  name: string;
+  amount: number;
+}
+
 export interface House {
   id: string;
   name: string;
@@ -48,7 +53,7 @@ export interface House {
   propertyFee?: number;
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
-  otherFee?: number;
+  customFees?: CustomFeeItem[];
   phone?: string;
   wechat?: string;
   contactNotes?: string;

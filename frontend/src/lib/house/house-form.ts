@@ -1,4 +1,4 @@
-import type { House, HouseForm } from '../../model/house/house';
+import type { CustomFeeItem, House, HouseForm } from '../../model/house/house';
 
 export function createEmptyHouseForm(): HouseForm {
   return {
@@ -16,7 +16,7 @@ export function createEmptyHouseForm(): HouseForm {
     propertyFee: undefined,
     waterFeePerTon: undefined,
     electricityFeePerKwh: undefined,
-    otherFee: undefined,
+    customFees: [],
     phone: '',
     wechat: '',
     contactNotes: ''
@@ -39,7 +39,7 @@ export function houseToForm(house: House): HouseForm {
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
-    otherFee: house.otherFee,
+    customFees: house.customFees ?? [],
     phone: house.phone ?? '',
     wechat: house.wechat ?? '',
     contactNotes: house.contactNotes ?? ''
@@ -60,6 +60,6 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     propertyFee: payload.propertyFee ?? undefined,
     waterFeePerTon: payload.waterFeePerTon ?? undefined,
     electricityFeePerKwh: payload.electricityFeePerKwh ?? undefined,
-    otherFee: payload.otherFee ?? undefined
+    customFees: payload.customFees?.length ? payload.customFees : undefined
   };
 }
