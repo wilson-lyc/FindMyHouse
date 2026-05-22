@@ -1,4 +1,4 @@
-import { rentPaymentPeriods, type House, type HouseSourceChannel, type HouseStatus, type RentPaymentPeriod } from './domain/house.js';
+import { rentPaymentPeriods, type CustomFeeItem, type House, type HouseSourceChannel, type HouseStatus, type RentPaymentPeriod } from './domain/house.js';
 import type { CreateHouseInput, UpdateHouseInput } from './dto/house.schema.js';
 
 export interface HouseRow {
@@ -17,7 +17,7 @@ export interface HouseRow {
   property_fee: number | null;
   water_fee_per_ton: number | null;
   electricity_fee_per_kwh: number | null;
-  other_fee: number | null;
+  custom_fees: string | null;
   phone: string | null;
   wechat: string | null;
   contact_notes: string | null;
@@ -42,7 +42,7 @@ export function toHouse(row: HouseRow): House {
     propertyFee: row.property_fee ?? undefined,
     waterFeePerTon: row.water_fee_per_ton ?? undefined,
     electricityFeePerKwh: row.electricity_fee_per_kwh ?? undefined,
-    otherFee: row.other_fee ?? undefined,
+    customFees: parseCustomFees(row.custom_fees),
     phone: row.phone ?? undefined,
     wechat: row.wechat ?? undefined,
     contactNotes: row.contact_notes ?? undefined,
@@ -67,7 +67,7 @@ export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput) {
     property_fee: input.propertyFee ?? null,
     water_fee_per_ton: input.waterFeePerTon ?? null,
     electricity_fee_per_kwh: input.electricityFeePerKwh ?? null,
-    other_fee: input.otherFee ?? null,
+    custom_fees: input.customFees?.length ? JSON.stringify(input.customFees) : null,
     phone: input.phone ?? null,
     wechat: input.wechat ?? null,
     contact_notes: input.contactNotes ?? null
@@ -86,6 +86,27 @@ function parseRentPaymentPeriods(value: string | null): RentPaymentPeriod[] | un
     );
 
     return periods.length ? periods : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseCustomFees(value: string | null): CustomFeeItem[] | undefined {
+  if (!value) return undefined;
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return undefined;
+
+    const fees = parsed.filter(
+      (item): item is CustomFeeItem =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as Record<string, unknown>).name === 'string' &&
+        typeof (item as Record<string, unknown>).amount === 'number'
+    );
+
+    return fees.length ? fees : undefined;
   } catch {
     return undefined;
   }
