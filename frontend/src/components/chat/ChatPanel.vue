@@ -20,7 +20,7 @@ import {
   updateChatSession,
   type ChatSessionSummary
 } from '../../api/chat/chat-session-api';
-import type { House } from '../../model/house/house';
+import type { CustomFeeItem, House } from '../../model/house/house';
 import type { Location } from '../../model/location/location';
 import { locationCategoryLabels, type LocationCategory } from '../../model/location/location';
 import { statusLabels } from '../../model/house/house-status';
@@ -364,7 +364,7 @@ function createCompareCallbackMessage(houses: House[]) {
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
-    otherFee: house.otherFee,
+    customFees: house.customFees,
     rentPaymentPeriods: house.rentPaymentPeriods,
     contactNotes: house.contactNotes
   }));
@@ -377,7 +377,8 @@ function createCompareCallbackMessage(houses: House[]) {
 }
 
 function getMonthlyTotalCost(house: House) {
-  return house.rentPrice + (house.propertyFee ?? 0) + (house.otherFee ?? 0);
+  const customFeesTotal = (house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
+  return house.rentPrice + (house.propertyFee ?? 0) + customFeesTotal;
 }
 
 function formatHouseStatus(house: House) {
@@ -408,7 +409,7 @@ function createHouseCreatedReply(house: House) {
     ['水费', house.waterFeePerTon !== undefined ? `${house.waterFeePerTon} 元/吨` : undefined],
     ['电费', house.electricityFeePerKwh !== undefined ? `${house.electricityFeePerKwh} 元/度` : undefined],
     ['物业费', house.propertyFee !== undefined ? `${house.propertyFee} 元` : undefined],
-    ['其他费用', house.otherFee !== undefined ? `${house.otherFee} 元` : undefined],
+    ...(house.customFees?.map(fee => [`${fee.name}`, `${fee.amount} 元`] as [string, string]) ?? []),
     ['付款周期', house.rentPaymentPeriods?.length ? house.rentPaymentPeriods.join('、') : undefined],
     ['联系电话', house.phone || undefined],
     ['微信', house.wechat || undefined],
@@ -856,18 +857,19 @@ watch(loading, () => {
 
 .chat-message-wrapper {
   display: flex;
-  max-width: 85%;
   min-width: 0;
 }
 
 .chat-message-wrapper.user {
   align-self: flex-end;
   justify-content: flex-end;
+  max-width: 85%;
 }
 
 .chat-message-wrapper.assistant {
   align-self: flex-start;
   justify-content: flex-start;
+  max-width: 100%;
 }
 
 .chat-bubble {
@@ -879,7 +881,6 @@ watch(loading, () => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 1px 2px var(--app-shadow-color);
 }
 
 .chat-bubble-text {
@@ -893,9 +894,10 @@ watch(loading, () => {
 }
 
 .chat-message-wrapper.assistant .chat-bubble {
-  background: var(--el-fill-color-light);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
   color: var(--app-text-primary);
-  border-bottom-left-radius: 5px;
 }
 
 .chat-bubble-markdown {
@@ -905,6 +907,12 @@ watch(loading, () => {
   font-size: 14px;
   line-height: 1.55;
   white-space: normal;
+}
+
+.chat-bubble-markdown :deep(hr) {
+  height: 1px;
+  margin: 16px 0;
+  background-color: var(--el-border-color-light);
 }
 
 .chat-bubble-markdown :deep(.chat-table-scroll) {

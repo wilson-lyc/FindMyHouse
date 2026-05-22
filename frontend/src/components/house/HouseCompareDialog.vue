@@ -4,6 +4,7 @@ import { formatCurrency } from '../../lib/format';
 import {
   houseSourceChannelLabels,
   rentPaymentPeriodLabels,
+  type CustomFeeItem,
   type House
 } from '../../model/house/house';
 import type { DrivingRouteResult } from '../../model/map/geocode';
@@ -63,7 +64,7 @@ const comparisonRows = computed(() => [
   },
   {
     label: '其他费用',
-    values: props.houses.map((house) => formatCurrency(house.otherFee))
+    values: props.houses.map(formatCustomFees)
   },
   {
     label: '联系方式',
@@ -80,7 +81,13 @@ const comparisonRows = computed(() => [
 ]);
 
 function getMonthlyTotalCost(house: House) {
-  return house.rentPrice + (house.propertyFee ?? 0) + (house.otherFee ?? 0);
+  const customFeesTotal = (house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
+  return house.rentPrice + (house.propertyFee ?? 0) + customFeesTotal;
+}
+
+function formatCustomFees(house: House) {
+  if (!house.customFees?.length) return '-';
+  return house.customFees.map((fee) => `${fee.name} ${formatCurrency(fee.amount)}`).join('、');
 }
 
 function formatPaymentPeriods(house: House) {

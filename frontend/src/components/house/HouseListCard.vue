@@ -95,6 +95,10 @@ function formatDuration(seconds: number): string {
         <span class="fee-label">电费</span>
         <span class="fee-value">{{ formatFeeLabel(house.electricityFeePerKwh, '/度') }}</span>
       </div>
+      <div v-for="fee in house.customFees ?? []" :key="fee.name" class="fee-row">
+        <span class="fee-label" :title="fee.name">{{ fee.name }}</span>
+        <span class="fee-value">{{ formatCurrency(fee.amount) }}</span>
+      </div>
     </div>
     <div class="house-card-actions">
       <el-button

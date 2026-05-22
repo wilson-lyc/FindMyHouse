@@ -150,7 +150,8 @@ function average(values: Array<number | undefined>) {
 }
 
 function getMonthlyTotalCost(house: House) {
-  return house.rentPrice + (house.propertyFee ?? 0) + (house.otherFee ?? 0);
+  const customFeesTotal = (house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
+  return house.rentPrice + (house.propertyFee ?? 0) + customFeesTotal;
 }
 
 function formatMinutes(seconds?: number) {
