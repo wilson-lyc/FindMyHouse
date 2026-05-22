@@ -679,6 +679,31 @@ body {
   grid-column: span 2;
 }
 
+.custom-fees-form-item {
+  overflow: hidden;
+}
+
+.custom-fees-form-item .el-form-item__content {
+  overflow: hidden;
+}
+
+.custom-fees-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.custom-fees-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.custom-fees-count {
+  font-size: 13px;
+  color: var(--app-text-regular);
+}
+
 .address-row,
 .coordinate-row {
   display: grid;

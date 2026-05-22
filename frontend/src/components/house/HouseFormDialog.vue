@@ -2,7 +2,7 @@
 import { reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { Aim } from '@element-plus/icons-vue';
+import { Aim, Edit as EditIcon, Plus } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
@@ -11,11 +11,13 @@ import {
   houseStatuses,
   rentPaymentPeriodLabels,
   rentPaymentPeriods,
+  type CustomFeeItem,
   type House,
   type HouseForm
 } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import { createEmptyHouseForm, houseToForm } from '../../lib/house/house-form';
+import CustomFeeDialog from './CustomFeeDialog.vue';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -81,11 +83,35 @@ async function geocode() {
 
 
 
+const feeItemDialogVisible = ref(false);
+const feeItemDialogItem = ref<CustomFeeItem | null>(null);
+const feeEditingIndex = ref(-1);
+
 function scrollToSection(sectionKey: string) {
   document.getElementById(`house-form-${sectionKey}`)?.scrollIntoView({
     behavior: 'smooth',
     block: 'start'
   });
+}
+
+function openAddFeeDialog() {
+  feeItemDialogItem.value = null;
+  feeEditingIndex.value = -1;
+  feeItemDialogVisible.value = true;
+}
+
+function openEditFeeDialog(item: CustomFeeItem, index: number) {
+  feeItemDialogItem.value = { ...item };
+  feeEditingIndex.value = index;
+  feeItemDialogVisible.value = true;
+}
+
+function onFeeItemSave(item: CustomFeeItem) {
+  if (feeEditingIndex.value >= 0) {
+    form.customFees![feeEditingIndex.value] = item;
+  } else {
+    (form.customFees ??= []).push(item);
+  }
 }
 
 async function submitForm() {
@@ -136,16 +162,6 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="卫">
                 <el-input-number v-model="form.bathroomCount" :min="0" :step="1" controls-position="right" />
-              </el-form-item>
-              <el-form-item label="渠道">
-                <el-select v-model="form.sourceChannel" clearable placeholder="">
-                  <el-option
-                    v-for="channel in houseSourceChannels"
-                    :key="channel"
-                    :label="houseSourceChannelLabels[channel]"
-                    :value="channel"
-                  />
-                </el-select>
               </el-form-item>
             </div>
           </section>
@@ -202,9 +218,29 @@ async function submitForm() {
                   controls-position="right"
                 />
               </el-form-item>
-              <el-form-item label="其他费用">
-                <el-input-number v-model="form.otherFee" :min="0" :step="50" controls-position="right" />
+              <el-form-item label="自定义费用" class="span-2 custom-fees-form-item">
+                <div class="custom-fees-wrap">
+                  <div class="custom-fees-header">
+                    <span class="custom-fees-count">{{ form.customFees?.length ?? 0 }} 项</span>
+                    <el-button :icon="Plus" size="small" @click="openAddFeeDialog">添加</el-button>
+                  </div>
+                  <el-table v-if="form.customFees?.length" :data="form.customFees" size="small" max-height="240">
+                    <el-table-column label="费用项目" prop="name" min-width="140" />
+                    <el-table-column label="金额 (元/月)" width="160" align="right">
+                      <template #default="{ row }">
+                        {{ row.amount }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="80" align="center">
+                      <template #default="{ row, $index }">
+                        <el-button :icon="EditIcon" link type="primary" size="small" @click="openEditFeeDialog(row, $index)">编辑</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <el-empty v-else-if="form.customFees" description="暂无自定义费用" :image-size="60" />
+                </div>
               </el-form-item>
+              <CustomFeeDialog v-model="feeItemDialogVisible" :item="feeItemDialogItem" @save="onFeeItemSave" />
             </div>
           </section>
 
@@ -216,6 +252,16 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="微信">
                 <el-input v-model="form.wechat" placeholder="" />
+              </el-form-item>
+              <el-form-item label="渠道">
+                <el-select v-model="form.sourceChannel" clearable placeholder="">
+                  <el-option
+                    v-for="channel in houseSourceChannels"
+                    :key="channel"
+                    :label="houseSourceChannelLabels[channel]"
+                    :value="channel"
+                  />
+                </el-select>
               </el-form-item>
               <el-form-item label="备注" class="span-2">
                 <el-input v-model="form.contactNotes" type="textarea" :rows="3" placeholder="" />
