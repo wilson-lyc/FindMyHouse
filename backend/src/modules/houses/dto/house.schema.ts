@@ -32,10 +32,13 @@ export const createHouseSchema = z.object({
   longitude: optionalNumber,
   rentPrice: z.number().int().nonnegative(),
   rentPaymentPeriods: z.array(z.enum(rentPaymentPeriods)).optional(),
+  earnestMoney: optionalNumber,
+  deposit: optionalNumber,
   propertyFee: optionalNumber,
   waterFeePerTon: optionalNumber,
   electricityFeePerKwh: optionalNumber,
   customFees: z.array(z.object({ name: z.string().min(1, '费用名称不能为空'), amount: z.number().min(0, '金额不能为负数') })).optional(),
+  feeNotes: optionalText,
   phone: optionalText,
   wechat: optionalText,
   contactNotes: optionalText

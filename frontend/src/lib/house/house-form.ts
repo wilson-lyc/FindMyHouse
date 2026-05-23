@@ -13,10 +13,13 @@ export function createEmptyHouseForm(): HouseForm {
     longitude: undefined,
     rentPrice: undefined,
     rentPaymentPeriods: [],
+    earnestMoney: undefined,
+    deposit: undefined,
     propertyFee: undefined,
     waterFeePerTon: undefined,
     electricityFeePerKwh: undefined,
     customFees: [],
+    feeNotes: '',
     phone: '',
     wechat: '',
     contactNotes: ''
@@ -36,10 +39,13 @@ export function houseToForm(house: House): HouseForm {
     longitude: house.longitude,
     rentPrice: house.rentPrice,
     rentPaymentPeriods: house.rentPaymentPeriods ?? [],
+    earnestMoney: house.earnestMoney,
+    deposit: house.deposit,
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
     customFees: house.customFees ?? [],
+    feeNotes: house.feeNotes ?? '',
     phone: house.phone ?? '',
     wechat: house.wechat ?? '',
     contactNotes: house.contactNotes ?? ''
@@ -57,9 +63,12 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     latitude: payload.latitude ?? undefined,
     longitude: payload.longitude ?? undefined,
     rentPaymentPeriods: payload.rentPaymentPeriods?.length ? payload.rentPaymentPeriods : undefined,
+    earnestMoney: payload.earnestMoney ?? undefined,
+    deposit: payload.deposit ?? undefined,
     propertyFee: payload.propertyFee ?? undefined,
     waterFeePerTon: payload.waterFeePerTon ?? undefined,
     electricityFeePerKwh: payload.electricityFeePerKwh ?? undefined,
-    customFees: payload.customFees?.length ? payload.customFees : undefined
+    customFees: payload.customFees?.length ? payload.customFees : undefined,
+    feeNotes: payload.feeNotes?.trim() ?? ''
   };
 }

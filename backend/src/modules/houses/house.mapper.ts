@@ -14,10 +14,13 @@ export interface HouseRow {
   longitude: number | null;
   rent_price: number;
   rent_payment_periods: string | null;
+  earnest_money: number | null;
+  deposit: number | null;
   property_fee: number | null;
   water_fee_per_ton: number | null;
   electricity_fee_per_kwh: number | null;
   custom_fees: string | null;
+  fee_notes: string | null;
   phone: string | null;
   wechat: string | null;
   contact_notes: string | null;
@@ -39,10 +42,13 @@ export function toHouse(row: HouseRow): House {
     longitude: row.longitude ?? undefined,
     rentPrice: row.rent_price,
     rentPaymentPeriods: parseRentPaymentPeriods(row.rent_payment_periods),
+    earnestMoney: row.earnest_money ?? undefined,
+    deposit: row.deposit ?? undefined,
     propertyFee: row.property_fee ?? undefined,
     waterFeePerTon: row.water_fee_per_ton ?? undefined,
     electricityFeePerKwh: row.electricity_fee_per_kwh ?? undefined,
     customFees: parseCustomFees(row.custom_fees),
+    feeNotes: row.fee_notes ?? undefined,
     phone: row.phone ?? undefined,
     wechat: row.wechat ?? undefined,
     contactNotes: row.contact_notes ?? undefined,
@@ -64,10 +70,13 @@ export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput) {
     longitude: input.longitude ?? null,
     rent_price: input.rentPrice ?? null,
     rent_payment_periods: input.rentPaymentPeriods?.length ? JSON.stringify(input.rentPaymentPeriods) : null,
+    earnest_money: input.earnestMoney ?? null,
+    deposit: input.deposit ?? null,
     property_fee: input.propertyFee ?? null,
     water_fee_per_ton: input.waterFeePerTon ?? null,
     electricity_fee_per_kwh: input.electricityFeePerKwh ?? null,
     custom_fees: input.customFees?.length ? JSON.stringify(input.customFees) : null,
+    fee_notes: input.feeNotes ?? null,
     phone: input.phone ?? null,
     wechat: input.wechat ?? null,
     contact_notes: input.contactNotes ?? null

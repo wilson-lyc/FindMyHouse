@@ -23,6 +23,7 @@ data/
 .DS_Store
 .idea/
 .vscode/
+.sisyphus
 
 # Claude/Codex local state
 .claude/

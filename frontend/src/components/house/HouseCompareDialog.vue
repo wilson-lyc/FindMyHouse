@@ -43,6 +43,14 @@ const comparisonRows = computed(() => [
     values: props.houses.map(formatPaymentPeriods)
   },
   {
+    label: '定金',
+    values: props.houses.map((house) => formatCurrency(house.earnestMoney))
+  },
+  {
+    label: '押金',
+    values: props.houses.map((house) => formatCurrency(house.deposit))
+  },
+  {
     label: '通勤',
     values: props.houses.map(formatRoute)
   },
@@ -67,6 +75,10 @@ const comparisonRows = computed(() => [
     values: props.houses.map(formatCustomFees)
   },
   {
+    label: '费用备注',
+    values: props.houses.map((house) => house.feeNotes || '-')
+  },
+  {
     label: '联系方式',
     values: props.houses.map(formatContact)
   },
@@ -75,7 +87,7 @@ const comparisonRows = computed(() => [
     values: props.houses.map((house) => house.address || '-')
   },
   {
-    label: '备注',
+    label: '联系备注',
     values: props.houses.map((house) => house.contactNotes || '-')
   }
 ]);

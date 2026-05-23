@@ -13,10 +13,13 @@ const houseColumns = [
   ['longitude', 'REAL'],
   ['rent_price', 'INTEGER NOT NULL'],
   ['rent_payment_periods', 'TEXT'],
+  ['earnest_money', 'INTEGER'],
+  ['deposit', 'INTEGER'],
   ['property_fee', 'INTEGER'],
   ['water_fee_per_ton', 'REAL'],
   ['electricity_fee_per_kwh', 'REAL'],
   ['custom_fees', 'TEXT'],
+  ['fee_notes', 'TEXT'],
   ['phone', 'TEXT'],
   ['wechat', 'TEXT'],
   ['contact_notes', 'TEXT'],
@@ -98,11 +101,8 @@ export function migrate() {
 
   ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');
 
+  ensureColumn('houses', 'earnest_money', 'INTEGER');
+  ensureColumn('houses', 'deposit', 'INTEGER');
   ensureColumn('houses', 'custom_fees', 'TEXT');
-
-  const rows = db.prepare("SELECT id, other_fee FROM houses WHERE other_fee IS NOT NULL").all() as Array<{ id: string; other_fee: number }>;
-  for (const row of rows) {
-    const customFees = JSON.stringify([{ name: '其他费用', amount: row.other_fee }]);
-    db.prepare("UPDATE houses SET custom_fees = ? WHERE id = ?").run(customFees, row.id);
-  }
+  ensureColumn('houses', 'fee_notes', 'TEXT');
 }

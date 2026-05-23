@@ -361,10 +361,13 @@ function createCompareCallbackMessage(houses: House[]) {
     address: house.address,
     rentPrice: house.rentPrice,
     monthlyTotalCost: getMonthlyTotalCost(house),
+    earnestMoney: house.earnestMoney,
+    deposit: house.deposit,
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
     customFees: house.customFees,
+    feeNotes: house.feeNotes,
     rentPaymentPeriods: house.rentPaymentPeriods,
     contactNotes: house.contactNotes
   }));
@@ -406,11 +409,14 @@ function createHouseCreatedReply(house: House) {
     ['租金', `${formatCurrency(house.rentPrice)}/月`],
     ['户型', `${house.bedroomCount}室${house.livingRoomCount}厅${house.bathroomCount}卫`],
     ['状态', statusLabels[house.status]],
+    ['定金', house.earnestMoney !== undefined ? `${house.earnestMoney} 元` : undefined],
+    ['押金', house.deposit !== undefined ? `${house.deposit} 元` : undefined],
     ['水费', house.waterFeePerTon !== undefined ? `${house.waterFeePerTon} 元/吨` : undefined],
     ['电费', house.electricityFeePerKwh !== undefined ? `${house.electricityFeePerKwh} 元/度` : undefined],
     ['物业费', house.propertyFee !== undefined ? `${house.propertyFee} 元` : undefined],
     ...(house.customFees?.map(fee => [`${fee.name}`, `${fee.amount} 元`] as [string, string]) ?? []),
     ['付款周期', house.rentPaymentPeriods?.length ? house.rentPaymentPeriods.join('、') : undefined],
+    ['费用备注', house.feeNotes || undefined],
     ['联系电话', house.phone || undefined],
     ['微信', house.wechat || undefined],
     ['联系备注', house.contactNotes || undefined]
@@ -863,13 +869,13 @@ watch(loading, () => {
 .chat-message-wrapper.user {
   align-self: flex-end;
   justify-content: flex-end;
-  max-width: 85%;
+  max-width: min(520px, calc(100vw - 96px));
 }
 
 .chat-message-wrapper.assistant {
   align-self: flex-start;
   justify-content: flex-start;
-  max-width: 100%;
+  max-width: min(520px, calc(100vw - 96px));
 }
 
 .chat-bubble {
@@ -894,9 +900,8 @@ watch(loading, () => {
 }
 
 .chat-message-wrapper.assistant .chat-bubble {
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
+  background: #eeeef0;
+  border-bottom-left-radius: 5px;
   color: var(--app-text-primary);
 }
 

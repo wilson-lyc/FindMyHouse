@@ -54,13 +54,15 @@ function confirm() {
         <el-input v-model="name" placeholder="如：网费、保洁费" />
       </el-form-item>
       <el-form-item label="金额" required>
-        <el-input-number
-          v-model="amount"
-          :min="0"
-          :step="50"
-          controls-position="right"
-        />
-        <span style="margin-left: 8px;">元/月</span>
+        <div class="custom-fee-amount-row">
+          <el-input-number
+            v-model="amount"
+            :min="0"
+            :step="50"
+            controls-position="right"
+          />
+          <span class="custom-fee-amount-unit">元/月</span>
+        </div>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -69,3 +71,22 @@ function confirm() {
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.custom-fee-amount-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.custom-fee-amount-row :deep(.el-input-number) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.custom-fee-amount-unit {
+  flex: 0 0 auto;
+  color: var(--app-text-regular);
+}
+</style>

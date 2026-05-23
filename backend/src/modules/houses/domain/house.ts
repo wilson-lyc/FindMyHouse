@@ -34,10 +34,13 @@ export interface House {
   longitude?: number;
   rentPrice: number;
   rentPaymentPeriods?: RentPaymentPeriod[];
+  earnestMoney?: number;
+  deposit?: number;
   propertyFee?: number;
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
   customFees?: CustomFeeItem[];
+  feeNotes?: string;
   phone?: string;
   wechat?: string;
   contactNotes?: string;

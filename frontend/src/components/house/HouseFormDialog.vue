@@ -2,7 +2,7 @@
 import { reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { Aim, Edit as EditIcon, Plus } from '@element-plus/icons-vue';
+import { Aim, Delete as DeleteIcon, Edit as EditIcon, Plus } from '@element-plus/icons-vue';
 import { geocodeAddress } from '../../api/map/map-api';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import { createEmptyHouseForm, houseToForm } from '../../lib/house/house-form';
+import { formatCurrency } from '../../lib/format';
 import CustomFeeDialog from './CustomFeeDialog.vue';
 
 const props = defineProps<{
@@ -104,6 +105,10 @@ function openEditFeeDialog(item: CustomFeeItem, index: number) {
   feeItemDialogItem.value = { ...item };
   feeEditingIndex.value = index;
   feeItemDialogVisible.value = true;
+}
+
+function deleteFeeItem(index: number) {
+  form.customFees?.splice(index, 1);
 }
 
 function onFeeItemSave(item: CustomFeeItem) {
@@ -203,6 +208,12 @@ async function submitForm() {
                   />
                 </el-select>
               </el-form-item>
+              <el-form-item label="定金">
+                <el-input-number v-model="form.earnestMoney" :min="0" :step="500" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="押金">
+                <el-input-number v-model="form.deposit" :min="0" :step="500" controls-position="right" />
+              </el-form-item>
               <el-form-item label="物业费">
                 <el-input-number v-model="form.propertyFee" :min="0" :step="100" controls-position="right" />
               </el-form-item>
@@ -221,24 +232,37 @@ async function submitForm() {
               <el-form-item label="自定义费用" class="span-2 custom-fees-form-item">
                 <div class="custom-fees-wrap">
                   <div class="custom-fees-header">
-                    <span class="custom-fees-count">{{ form.customFees?.length ?? 0 }} 项</span>
-                    <el-button :icon="Plus" size="small" @click="openAddFeeDialog">添加</el-button>
+                    <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项</span>
+                    <el-button :icon="Plus" type="primary" plain size="small" @click="openAddFeeDialog">添加费用</el-button>
                   </div>
-                  <el-table v-if="form.customFees?.length" :data="form.customFees" size="small" max-height="240">
-                    <el-table-column label="费用项目" prop="name" min-width="140" />
-                    <el-table-column label="金额 (元/月)" width="160" align="right">
+                  <el-table
+                    :data="form.customFees ?? []"
+                    stripe
+                    size="small"
+                    max-height="240"
+                    class="custom-fees-table"
+                    empty-text="暂无自定义费用"
+                  >
+                    <el-table-column label="费用项目" prop="name" show-overflow-tooltip />
+                    <el-table-column label="金额" width="120">
                       <template #default="{ row }">
-                        {{ row.amount }}
+                        <span class="custom-fee-amount">{{ formatCurrency(row.amount) }}</span>
                       </template>
                     </el-table-column>
-                    <el-table-column label="操作" width="80" align="center">
+                    <el-table-column label="操作" width="132">
                       <template #default="{ row, $index }">
                         <el-button :icon="EditIcon" link type="primary" size="small" @click="openEditFeeDialog(row, $index)">编辑</el-button>
+                        <el-button :icon="DeleteIcon" link type="danger" size="small" @click="deleteFeeItem($index)">删除</el-button>
                       </template>
                     </el-table-column>
+                    <template #empty>
+                      <span class="custom-fees-empty-text">暂无自定义费用</span>
+                    </template>
                   </el-table>
-                  <el-empty v-else-if="form.customFees" description="暂无自定义费用" :image-size="60" />
                 </div>
+              </el-form-item>
+              <el-form-item label="费用备注" class="span-2">
+                <el-input v-model="form.feeNotes" type="textarea" :rows="3" placeholder="" />
               </el-form-item>
               <CustomFeeDialog v-model="feeItemDialogVisible" :item="feeItemDialogItem" @save="onFeeItemSave" />
             </div>
@@ -263,7 +287,7 @@ async function submitForm() {
                   />
                 </el-select>
               </el-form-item>
-              <el-form-item label="备注" class="span-2">
+              <el-form-item label="联系备注" class="span-2">
                 <el-input v-model="form.contactNotes" type="textarea" :rows="3" placeholder="" />
               </el-form-item>
             </div>

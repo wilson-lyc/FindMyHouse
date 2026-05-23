@@ -389,6 +389,10 @@ body {
   font-size: 13px;
 }
 
+.fee-row--full {
+  grid-column: 1 / -1;
+}
+
 .fee-label {
   color: var(--el-text-color-placeholder);
   flex-shrink: 0;
@@ -702,6 +706,23 @@ body {
 .custom-fees-count {
   font-size: 13px;
   color: var(--app-text-regular);
+}
+
+.custom-fees-table {
+  width: 100%;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.custom-fee-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-primary);
+}
+
+.custom-fees-empty-text {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .address-row,
