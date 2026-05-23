@@ -54,6 +54,7 @@ export const importHouseSchema = createHouseSchema.extend({
 });
 
 export const listHousesQuerySchema = z.object({
+  q: optionalText,
   status: z.enum(houseStatuses).optional(),
   sourceChannel: z.enum(houseSourceChannels).optional(),
   minRentPrice: z.coerce.number().int().nonnegative().optional(),

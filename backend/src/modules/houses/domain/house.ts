@@ -50,6 +50,7 @@ export interface House {
 }
 
 export interface HouseFilters {
+  q?: string;
   status?: HouseStatus;
   sourceChannel?: HouseSourceChannel;
   minRentPrice?: number;

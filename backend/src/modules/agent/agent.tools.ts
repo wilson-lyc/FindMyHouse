@@ -10,6 +10,7 @@ import type { LocationRepository } from '../locations/location.repository.js';
 import type { AmapService } from '../maps/amap.service.js';
 
 export const agentToolNames = [
+  'ask_user',
   'search_houses',
   'search_houses_near_location',
   'get_house',
@@ -24,6 +25,29 @@ export const agentToolNames = [
   'delete_location',
   'get_focus_location',
 ] as const;
+
+export const toolGroups = {
+  write: [
+    'ask_user',
+    'search_houses',
+    'get_house',
+    'create_house',
+    'update_house',
+    'search_locations',
+    'get_location',
+    'create_location',
+    'update_location',
+  ] as const satisfies readonly string[],
+  query: [
+    'ask_user',
+    'search_houses',
+    'search_houses_near_location',
+    'get_house',
+    'prepare_house_comparison',
+    'search_locations',
+    'get_focus_location',
+  ] as const satisfies readonly string[],
+};
 
 export type AgentToolName = (typeof agentToolNames)[number];
 
@@ -67,12 +91,26 @@ export interface ConfirmCompareHousesAction {
   houses: House[];
 }
 
+export interface AskSingleChoiceAction {
+  id: string;
+  type: 'ask_single_choice';
+  title: string;
+  question: string;
+  options: Array<{
+    id: string;
+    label: string;
+    value: string;
+  }>;
+  customOptionLabel: string;
+}
+
 export type AgentFrontendAction =
   | ConfirmCreateHouseAction
   | ConfirmCreateLocationAction
   | ShowHouseSearchResultsAction
   | ShowLocationSearchResultsAction
-  | ConfirmCompareHousesAction;
+  | ConfirmCompareHousesAction
+  | AskSingleChoiceAction;
 
 export interface ToolResult {
   kind: 'houses' | 'house' | 'locations' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
@@ -92,6 +130,17 @@ const toolResultToJson = (result: ToolResult) => JSON.stringify(result);
 
 const optionalNumberToolSchema = z.number().finite().optional();
 
+const askUserToolSchema = z.object({
+  title: z.string().trim().min(1).default('需要补充信息').describe('追问标题'),
+  question: z.string().trim().min(1).describe('要问用户的问题'),
+  options: z.array(z.object({
+    id: z.string().trim().min(1).optional().describe('选项 ID，不提供时自动生成'),
+    label: z.string().trim().min(1).describe('展示给用户的选项文案'),
+    value: z.string().trim().min(1).describe('用户选择后发送给助手的完整答案'),
+  })).min(2).max(5).describe('可供用户选择的选项，最少 2 个，最多 5 个'),
+  customOptionLabel: z.string().trim().min(1).default('自定义').describe('自定义输入框占位文案'),
+});
+
 const houseStatusLabels: Record<HouseStatus, string> = {
   watching: '观望中',
   interested: '感兴趣',
@@ -101,6 +150,7 @@ const houseStatusLabels: Record<HouseStatus, string> = {
 };
 
 const searchHousesToolSchema = z.object({
+  q: z.string().trim().min(1).optional().describe('LLM 从用户自然语言中构建出的房源关键词，用于匹配房源名称、地址、联系人、备注等文本字段'),
   status: z.enum(houseStatuses).optional().describe('房源状态'),
   sourceChannel: z.enum(houseSourceChannels).optional().describe('来源渠道'),
   minRentPrice: z.number().int().nonnegative().optional().describe('最低租金，单位元/月'),
@@ -202,113 +252,40 @@ const updateLocationToolSchema = z.object({
 const deleteLocationToolSchema = idParamsSchema;
 const getLocationToolSchema = idParamsSchema;
 
-export function createAgentTools(context: AgentToolContext) {
-  return [
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'search_houses', params }, context)),
-      {
-        name: 'search_houses',
-        description: '根据租金、户型、状态、来源渠道或坐标范围搜索房源。用户想找、筛选、列出或比较房源时使用。',
-        schema: searchHousesToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'search_houses_near_location', params }, context)),
-      {
-        name: 'search_houses_near_location',
-        description: '按某个已保存地点附近的距离搜索房源。用户说“某地点附近/周边/N公里内的房子”时使用；不要先把地点列表回复给用户。',
-        schema: searchHousesNearLocationToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'get_house', params }, context)),
-      {
-        name: 'get_house',
-        description: '根据明确的房源 ID 查询单套房源详情。',
-        schema: getHouseToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'prepare_house_comparison', params }, context)),
-      {
-        name: 'prepare_house_comparison',
-        description: '当用户要求对比房源时优先使用。可以直接传入用户提到的房源名称/关键词（houseNames），例如“人才公寓”“保利公寓”；如果已经知道房源 ID，也可以传 houseIds。工具会整理 2-4 套候选房源并让前端弹窗请用户确认，确认后用户会把确认结果作为回调发回来，你再基于确认的房源做对比分析。',
-        schema: prepareHouseComparisonToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'create_house', params }, context)),
-      {
-        name: 'create_house',
-        description: '准备新增一套房源并交给前端弹窗让用户确认。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。调用后不会直接入库。',
-        schema: createHouseToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'update_house', params }, context)),
-      {
-        name: 'update_house',
-        description: '更新一套已存在房源。必须有明确房源 ID 和要更新的字段；如果用户只描述房源名称或特征，先搜索候选房源。',
-        schema: updateHouseToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'delete_house', params }, context)),
-      {
-        name: 'delete_house',
-        description: '删除一套房源。删除不可逆，只有用户明确要求删除且提供明确房源 ID 时使用；否则先搜索或要求确认。',
-        schema: deleteHouseToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'search_locations', params }, context)),
-      {
-        name: 'search_locations',
-        description: '根据分类搜索地点。用户想找、列出或查看地点时使用。',
-        schema: searchLocationsToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'get_location', params }, context)),
-      {
-        name: 'get_location',
-        description: '根据明确的地点 ID 查询单条地点详情。',
-        schema: getLocationToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'create_location', params }, context)),
-      {
-        name: 'create_location',
-        description: '准备新增一个地点并交给前端弹窗让用户确认。必填项：名称、地址；工具会根据地址获取坐标，缺少名称/地址或无法定位时不能创建。调用后不会直接入库。',
-        schema: createLocationToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'update_location', params }, context)),
-      {
-        name: 'update_location',
-        description: '更新一个已存在地点。必须有明确地点 ID 和要更新的字段；如果用户只描述地点名称或特征，先搜索候选地点。',
-        schema: updateLocationToolSchema,
-      }
-    ),
-    tool(
-      async (params) => toolResultToJson(await runAgentTool({ tool: 'delete_location', params }, context)),
-      {
-        name: 'delete_location',
-        description: '删除一个地点。删除不可逆，只有用户明确要求删除且提供明确地点 ID 时使用；否则先搜索或要求确认。',
-        schema: deleteLocationToolSchema,
-      }
-    ),
-    tool(
-      async () => toolResultToJson(await runAgentTool({ tool: 'get_focus_location', params: {} }, context)),
-      {
-        name: 'get_focus_location',
-        description: '仅当用户明确询问焦点地点在哪里、是什么或要求查询焦点地点时使用。用户创建房源时提到“焦点地点是...”通常只是上下文，不要调用这个工具。',
-        schema: z.object({}),
-      }
-    ),
-  ];
+const toolDefinitions: Array<{
+  name: AgentToolName;
+  description: string;
+  schema: z.ZodSchema;
+}> = [
+  { name: 'ask_user', description: '当用户信息不足、目标记录不明确或需要用户从候选方案中选择时使用。每次追问必须提供 2-5 个选项，前端会额外提供一个自定义输入选项。', schema: askUserToolSchema },
+  { name: 'search_houses', description: '根据 LLM 构建的关键词、租金、户型、状态、来源渠道或坐标范围搜索房源。用户想找、筛选、列出或比较房源时使用；如果用户提到小区、地址、联系人、来源描述或其他文本线索，应先由 LLM 提炼成 q 关键词传入。', schema: searchHousesToolSchema },
+  { name: 'search_houses_near_location', description: '按某个已保存地点附近的距离搜索房源。用户说”某地点附近/周边/N公里内的房子”时使用。如果地点名称是泛称或不完整，例如“口岸”“学校”“公司附近”，工具会先把已保存地点作为选项追问用户，不能替用户直接选择某一个地点。', schema: searchHousesNearLocationToolSchema },
+  { name: 'get_house', description: '根据明确的房源 ID 查询单套房源详情。', schema: getHouseToolSchema },
+  { name: 'prepare_house_comparison', description: '当用户要求对比房源时优先使用。可以直接传入用户提到的房源名称/关键词（houseNames），例如”人才公寓””保利公寓”；如果已经知道房源 ID，也可以传 houseIds。工具会整理 2-4 套候选房源并让前端弹窗请用户确认，确认后用户会把确认结果作为回调发回来，你再基于确认的房源做对比分析。', schema: prepareHouseComparisonToolSchema },
+  { name: 'create_house', description: '准备新增一套房源并交给前端弹窗让用户确认。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。调用后不会直接入库。', schema: createHouseToolSchema },
+  { name: 'update_house', description: '更新一套已存在房源。必须有明确房源 ID 和要更新的字段；如果用户只描述房源名称或特征，先搜索候选房源。', schema: updateHouseToolSchema },
+  { name: 'delete_house', description: '删除一套房源。删除不可逆，只有用户明确要求删除且提供明确房源 ID 时使用；否则先搜索或要求确认。', schema: deleteHouseToolSchema },
+  { name: 'search_locations', description: '根据名称、地址关键词或分类搜索已保存地点。用户想找、列出、查看地点，或查询条件里提到不完整地点线索时使用。', schema: searchLocationsToolSchema },
+  { name: 'get_location', description: '根据明确的地点 ID 查询单条地点详情。', schema: getLocationToolSchema },
+  { name: 'create_location', description: '准备新增一个地点并交给前端弹窗让用户确认。必填项：名称、地址；工具会根据地址获取坐标，缺少名称/地址或无法定位时不能创建。调用后不会直接入库。', schema: createLocationToolSchema },
+  { name: 'update_location', description: '更新一个已存在地点。必须有明确地点 ID 和要更新的字段；如果用户只描述地点名称或特征，先搜索候选地点。', schema: updateLocationToolSchema },
+  { name: 'delete_location', description: '删除一个地点。删除不可逆，只有用户明确要求删除且提供明确地点 ID 时使用；否则先搜索或要求确认。', schema: deleteLocationToolSchema },
+  { name: 'get_focus_location', description: '仅当用户明确询问焦点地点在哪里、是什么或要求查询焦点地点时使用。用户创建房源时提到”焦点地点是...”通常只是上下文，不要调用这个工具。', schema: z.object({}) },
+];
+
+export function createAgentTools(
+  context: AgentToolContext,
+  toolNames?: readonly string[]
+) {
+  const nameSet = new Set<string>(toolNames ?? agentToolNames);
+  return toolDefinitions
+    .filter((def) => nameSet.has(def.name))
+    .map((def) =>
+      tool(
+        async (params: Record<string, unknown> | undefined) => toolResultToJson(await runAgentTool({ tool: def.name, params }, context)),
+        { name: def.name, description: def.description, schema: def.schema }
+      )
+    );
 }
 
 export function toolParamsAsSearchFilters(params: Record<string, unknown> = {}): HouseFilters {
@@ -333,6 +310,10 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
   const params = toolCall.params ?? {};
 
   try {
+    if (toolCall.tool === 'ask_user') {
+      return askUser(params);
+    }
+
     if (toolCall.tool === 'search_houses') {
       return searchHouses(params, context);
     }
@@ -405,6 +386,31 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
   };
 }
 
+function askUser(params: Record<string, unknown>): ToolResult {
+  const input = askUserToolSchema.parse(params);
+
+  return {
+    kind: 'frontend_action',
+    content: input.question,
+    houses: [],
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'ask_single_choice',
+        title: input.title,
+        question: input.question,
+        options: input.options.map((option, index) => ({
+          id: option.id ?? `option-${index + 1}`,
+          label: option.label,
+          value: option.value,
+        })),
+        customOptionLabel: input.customOptionLabel,
+      },
+    ],
+    reply: input.question,
+  };
+}
+
 function searchHousesNearLocation(params: Record<string, unknown>, { houseRepository, locationRepository }: AgentToolContext): ToolResult {
   const { locationName, radiusKm, ...houseFilterParams } = searchHousesNearLocationToolSchema.parse(params);
   const searchConditions = formatHouseSearchConditions(houseFilterParams, {
@@ -412,7 +418,13 @@ function searchHousesNearLocation(params: Record<string, unknown>, { houseReposi
     radiusKm,
   });
   const locations = locationRepository.list({ q: locationName });
-  const location = pickBestLocationMatch(locations, locationName);
+  const exactLocation = findExactLocationMatch(locations, locationName);
+
+  if (!exactLocation && locations.length > 0) {
+    return askUserToChooseNearbyLocation(locations, locationName, radiusKm, houseFilterParams);
+  }
+
+  const location = exactLocation;
 
   if (!location || location.latitude === undefined || location.longitude === undefined) {
     return {
@@ -458,6 +470,46 @@ function searchHousesNearLocation(params: Record<string, unknown>, { houseReposi
       },
     ],
   };
+}
+
+function askUserToChooseNearbyLocation(
+  locations: Location[],
+  locationName: string,
+  radiusKm: number,
+  houseFilterParams: Record<string, unknown>
+): ToolResult {
+  const candidateLocations = locations.slice(0, 4);
+  const options = candidateLocations.map((location) => ({
+    id: location.id,
+    label: location.name,
+    value: formatNearbyLocationChoiceValue(location, radiusKm, houseFilterParams),
+  }));
+
+  options.push({
+    id: 'other-location',
+    label: '不是这些地点',
+    value: '我想换一个地点附近找房。',
+  });
+
+  return askUser({
+    title: '确认地点',
+    question: `你说的「${locationName}」是指哪个已保存地点附近？`,
+    options,
+    customOptionLabel: '输入其他地点',
+  });
+}
+
+function formatNearbyLocationChoiceValue(location: Location, radiusKm: number, filters: Record<string, unknown>): string {
+  const constraints = [
+    typeof filters.maxRentPrice === 'number' ? `租金不高于 ${filters.maxRentPrice} 元/月` : undefined,
+    typeof filters.minRentPrice === 'number' ? `租金不低于 ${filters.minRentPrice} 元/月` : undefined,
+    typeof filters.minBedroomCount === 'number' ? `至少 ${filters.minBedroomCount} 个卧室` : undefined,
+    typeof filters.maxBedroomCount === 'number' ? `最多 ${filters.maxBedroomCount} 个卧室` : undefined,
+    typeof filters.q === 'string' && filters.q.trim() ? `关键词是「${filters.q.trim()}」` : undefined,
+  ].filter(Boolean);
+  const constraintText = constraints.length ? `，${constraints.join('，')}` : '';
+
+  return `我想看「${location.name}」附近 ${formatDistanceKm(radiusKm)} 内${constraintText}的房子。`;
 }
 
 function searchHouses(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
@@ -894,6 +946,7 @@ function formatHouseSearchConditions(
 ): string {
   const conditions = [
     locationScope ? `地点：「${locationScope.locationName}」附近 ${formatDistanceKm(locationScope.radiusKm)} 内` : undefined,
+    filters.q ? `关键词：「${filters.q}」` : undefined,
     filters.minRentPrice !== undefined && filters.maxRentPrice !== undefined
       ? `租金：${filters.minRentPrice}-${filters.maxRentPrice} 元/月`
       : undefined,
@@ -932,13 +985,11 @@ function hasCoordinateBounds(filters: HouseFilters): boolean {
   );
 }
 
-function pickBestLocationMatch(locations: Location[], query: string): Location | undefined {
-  const normalizedQuery = query.trim().toLowerCase();
-  return (
-    locations.find((location) => location.name.trim().toLowerCase() === normalizedQuery) ??
-    locations.find((location) => location.name.includes(query) || location.address.includes(query)) ??
-    locations[0]
-  );
+function findExactLocationMatch(locations: Location[], query: string): Location | undefined {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return undefined;
+
+  return locations.find((location) => normalizeSearchText(location.name) === normalizedQuery);
 }
 
 function createCoordinateBounds(latitude: number, longitude: number, radiusKm: number) {

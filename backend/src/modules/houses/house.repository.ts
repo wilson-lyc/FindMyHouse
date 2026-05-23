@@ -11,6 +11,20 @@ export class HouseRepository {
     const where: string[] = [];
     const params: Record<string, number | string> = {};
 
+    if (filters.q) {
+      where.push(`(
+        name LIKE @q ESCAPE '\\'
+        OR address LIKE @q ESCAPE '\\'
+        OR contact_name LIKE @q ESCAPE '\\'
+        OR phone LIKE @q ESCAPE '\\'
+        OR wechat LIKE @q ESCAPE '\\'
+        OR fee_notes LIKE @q ESCAPE '\\'
+        OR contact_notes LIKE @q ESCAPE '\\'
+        OR custom_fees LIKE @q ESCAPE '\\'
+      )`);
+      params.q = `%${escapeLikePattern(filters.q)}%`;
+    }
+
     if (filters.status) {
       where.push('status = @status');
       params.status = filters.status;
@@ -230,4 +244,8 @@ export class HouseRepository {
     transaction(houses);
     return houses.length;
   }
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
