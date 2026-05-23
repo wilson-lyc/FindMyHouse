@@ -1,27 +1,42 @@
 # FindMyHouse
 
-看房多了，记性不够用。FindMyHouse 帮你把各个渠道收集的房源汇总起来，在地图上直观比较位置、通勤与费用；并提供对话式 AI 助手，用自然语言完成查询、录入和管理。
+把散落在中介、小红书、豆瓣、贝壳、微信群里的房源，收进一个能看地图、算通勤、做对比、还能直接对话的找房工作台。
+
+FindMyHouse 不是一个房源平台，而是给「正在认真找房的人」用的个人决策工具：把候选房源统一记录下来，用地图看位置，用通勤路线判断生活半径，用费用和状态筛掉不合适的选择，最后让 AI 助手帮你用自然语言查、录、改、管。
 
 ![AI 对话](frontend/public/images/screenshots/chat.png)
 ![通勤路线](frontend/public/images/screenshots/route.png)
 
-## 功能概览
+## 它解决什么问题
 
-- 房源管理：统一录入/编辑来自不同渠道的房源信息，包含租金、户型、费用明细、联系方式与状态流转
-- 地点管理：维护公司/学校等关键地点，支持设置一个“焦点地点”作为通勤终点
-- 地图展示：房源与地点统一标注，支持地图拾取坐标
-- 通勤计算：房源到焦点地点的驾车距离/时间与路线展示，服务端缓存路线结果
-- AI 找房助手：自然语言搜索/查看/新增/更新/删除房源；支持会话历史管理
+找房最烦的不是「没有房源」，而是信息太散：
+
+- 今天在群里看到一套，明天在平台收藏一套，后天中介又发来三套
+- 租金、押金、物业、水电、联系方式、看房状态都混在聊天记录里
+- 地图上看着近，实际通勤可能很绕
+- 想比较几套房，只能反复翻截图和表格
+
+FindMyHouse 把这些信息变成一个可管理的本地数据库。你可以把它当作「找房版 CRM」：每套房都有状态、费用、联系人、地图坐标和路线数据，所有判断都围绕你自己的焦点地点展开，比如公司、学校或家人住所。
+
+## 核心能力
+
+- **房源收纳**：记录房源名称、地址、租金、户型、来源渠道、状态、联系人、押金、物业费、自定义费用等信息
+- **地图决策**：房源和关键地点统一显示在高德地图上，支持地图拾取坐标、视野内筛选和房源定位
+- **通勤计算**：自动计算房源到焦点地点的驾车距离、时间和路线，后端缓存结果，减少重复请求
+- **多房源对比**：选择 2-4 套房源横向比较，快速看出租金、总成本、户型、状态和通勤差异
+- **数据看板**：按租金、来源、状态、通勤等维度汇总候选房源，辅助做最终选择
+- **AI 找房助手**：用自然语言搜索、查看、新增、更新、删除房源，也能把搜索结果同步展示到地图
+- **本地优先**：数据默认存在本机 SQLite 文件里，适合个人长期维护和备份
 
 ## 技术栈
 
-- 前端：Vue 3 + Vite + Pinia + Element Plus
+- 前端：Vue 3 + Vite + Pinia + Element Plus + ECharts
 - 后端：Fastify + Zod + TypeScript
-- 数据：SQLite（better-sqlite3，本地文件）
-- AI：LangChain + LangGraph（OpenAI 协议兼容服务）
+- 数据：SQLite + better-sqlite3
+- AI：LangChain + LangGraph，支持 OpenAI 协议兼容服务
 - 地图：高德地图 JS API + Web Service API
 
-## 快速开始（本地开发）
+## 本地运行
 
 ### 环境要求
 
@@ -42,87 +57,85 @@ npm run dev
 
 启动后访问：
 
-- Web： http://localhost:5173
-- API： http://localhost:3001/api/health
+- Web：http://localhost:5173
+- API：http://localhost:3001/api/health
 
-### 首次使用必做
+## 首次配置
 
-1. 打开 Web 后进入欢迎页/设置页
-2. 配置并保存：
-   - 高德：Web Service Key、JS API Key（以及可选的 Security JS Code）
-   - OpenAI 兼容服务：Base URL、API Key、Model、Temperature
-3. 新增地点并设置一个焦点地点（通勤计算以它为终点）
+第一次打开 Web 页面后，先完成三件事：
 
-## 配置说明
+1. 进入设置页，保存高德地图配置：
+   - Web Service Key：给后端做地址解析、路线和距离计算
+   - JS API Key：给前端加载地图
+   - Security JS Code：如果高德控制台启用了安全密钥，则需要填写
+2. 保存 OpenAI 兼容服务配置：
+   - Base URL
+   - API Key
+   - Model
+   - Temperature
+3. 新增一个关键地点，并设置为焦点地点。通勤计算会以这个地点作为终点。
 
-### 业务配置（通过页面保存）
-
-系统的 OpenAI/高德 Key 并不是从 `.env` 读取，而是通过页面保存后写入本地 SQLite（`app_config` 表）。
-
-- 高德
-  - Web Service Key：用于服务端的地理编码、路线与距离计算
-  - JS API Key：用于前端加载地图
-  - Security JS Code：如你在高德控制台启用了安全密钥，需要填写
-- OpenAI 兼容服务
-  - Base URL：例如 DeepSeek、OpenAI、或自建兼容网关
-  - API Key / Model / Temperature
-
-### 运行参数（环境变量）
-
-后端不自动加载根目录 `.env`；如需修改后端监听端口或数据库路径，请通过环境变量传入。
-
-- `HOST`：默认 `0.0.0.0`
-- `PORT`：默认 `3001`
-- `DATABASE_URL`：SQLite 文件路径；不设置则默认为 `backend/data/find-my-house.sqlite`
-
-前端会读取根目录 `.env` 用于设置 Vite 端口与开发代理（例如 `VITE_PORT`、以及代理目标端口 `PORT`）。
-
-## 数据存储与备份
-
-- 默认数据库文件：`backend/data/find-my-house.sqlite`
-- 备份方式：停止服务后复制该 sqlite 文件即可（同时包含房源、地点、路线缓存、对话会话与配置）
+这些业务配置不会从 `.env` 读取，而是通过页面保存到本地 SQLite 的 `app_config` 表。
 
 ## 常用命令
 
 ```bash
-# 本地开发（前后端一起启动）
+# 前后端一起启动
 npm run dev
 
-# 构建（后端 tsc + 前端 vite build）
+# 构建后端和前端
 npm run build
 
 # 类型检查
 npm run typecheck
 
-# 生产启动（仅后端 API）
+# 生产启动后端 API
 npm run start
 ```
 
+## 数据与配置
+
+默认数据库文件：
+
+```text
+backend/data/find-my-house.sqlite
+```
+
+这个 SQLite 文件包含房源、地点、路线缓存、AI 会话和页面配置。需要备份时，停止服务后复制这个文件即可。
+
+后端运行参数通过环境变量传入：
+
+- `HOST`：默认 `0.0.0.0`
+- `PORT`：默认 `3001`
+- `DATABASE_URL`：SQLite 文件路径；不设置时使用 `backend/data/find-my-house.sqlite`
+
+前端开发环境会读取根目录 `.env`，主要用于设置 Vite 端口和开发代理，例如 `VITE_PORT` 以及代理目标端口 `PORT`。
+
 ## 生产部署
 
-当前仓库的生产运行形态是：后端单独提供 API；前端构建产物需要用任意静态资源服务器托管（推荐 Nginx），并反向代理 `/api` 到后端。
+当前生产形态是：后端单独提供 API，前端构建产物交给 Nginx 或其他静态资源服务托管，并把 `/api` 反向代理到后端。
 
-### 1) 构建
+### 1. 构建
 
 ```bash
 npm install
 npm run build
 ```
 
-构建后产物：
+构建产物：
 
 - 后端：`backend/dist/`
 - 前端：`frontend/dist/`
 
-### 2) 启动后端
+### 2. 启动后端
 
 ```bash
 HOST=0.0.0.0 PORT=3001 DATABASE_URL=/path/to/find-my-house.sqlite npm run start
 ```
 
-### 3) 托管前端并反代 /api（Nginx 示例）
+### 3. 托管前端并反代 API
 
-将 `frontend/dist` 复制到服务器目录（例如 `/var/www/find-my-house`），并使用如下配置：
+Nginx 示例：
 
 ```nginx
 server {
@@ -146,24 +159,34 @@ server {
 }
 ```
 
-### 4) 高德 Key 的域名白名单
+如果部署到公网域名，需要在高德控制台给 JS API Key 配好域名白名单，否则地图可能无法加载。
 
-如果在公网域名下使用前端地图，需要在高德控制台为 JS API Key 配置正确的域名白名单；否则地图可能加载失败。
-
-## 接口速览
+## API 速览
 
 - `GET /api/health`：健康检查
-- `GET/POST /api/config`：读取/保存业务配置（OpenAI/高德）
-- `GET/POST/PATCH/DELETE /api/houses`：房源 CRUD + 筛选
-- `GET/POST/PATCH/DELETE /api/locations`：地点 CRUD + 设置焦点地点
+- `GET /api/config`、`POST /api/config`：读取/保存高德和 AI 配置
+- `GET /api/houses`、`POST /api/houses`、`PATCH /api/houses/:id`、`DELETE /api/houses/:id`：房源管理
+- `GET /api/locations`、`POST /api/locations`、`PATCH /api/locations/:id`、`DELETE /api/locations/:id`：地点管理
 - `POST /api/maps/geocode`：地址解析
-- `POST /api/maps/driving-distance`：驾车距离/时间
-- `POST /api/maps/driving-route`：驾车路线（带服务端缓存）
+- `POST /api/maps/driving-distance`：驾车距离和时间
+- `POST /api/maps/driving-route`：驾车路线，带服务端缓存
 - `POST /api/chat`：AI 对话
-- `GET/POST/PATCH/DELETE /api/chat/sessions*`：会话管理
+- `GET /api/chat/sessions`、`POST /api/chat/sessions`、`PATCH /api/chat/sessions/:id`、`DELETE /api/chat/sessions/:id`：会话管理
 
 ## 常见问题
 
-- 地图加载失败：检查 JS API Key、Security JS Code 与域名白名单；同时确认后端已保存 Web Service Key
-- AI 助手不可用：检查是否在设置页保存了 OpenAI Base URL/API Key/Model
-- 修改端口不生效：后端不读取 `.env`，请使用环境变量传入 `PORT/HOST/DATABASE_URL`
+**地图加载失败**
+
+检查 JS API Key、Security JS Code、域名白名单，并确认后端已保存 Web Service Key。
+
+**AI 助手不可用**
+
+检查设置页里的 Base URL、API Key 和 Model 是否已保存，且服务支持 OpenAI 协议。
+
+**通勤路线没有结果**
+
+确认房源和焦点地点都有经纬度；如果是新录入的文本地址，先完成地址解析或手动在地图上取点。
+
+**修改端口不生效**
+
+后端不会自动读取根目录 `.env`。需要修改后端端口时，请通过 `PORT`、`HOST`、`DATABASE_URL` 环境变量传入。
