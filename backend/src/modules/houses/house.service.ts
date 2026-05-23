@@ -1,5 +1,5 @@
 import type { House, HouseFilters } from './domain/house.js';
-import type { CreateHouseInput, UpdateHouseInput } from './dto/house.schema.js';
+import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
 import type { HouseRepository } from './house.repository.js';
 
 export class HouseService {
@@ -23,5 +23,9 @@ export class HouseService {
 
   deleteHouse(id: string): boolean {
     return this.repository.delete(id);
+  }
+
+  importHouses(houses: ImportHouseInput[]): number {
+    return this.repository.upsertMany(houses);
   }
 }

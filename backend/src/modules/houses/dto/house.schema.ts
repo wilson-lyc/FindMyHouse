@@ -47,6 +47,12 @@ export const createHouseSchema = z.object({
 
 export const updateHouseSchema = createHouseSchema.partial();
 
+export const importHouseSchema = createHouseSchema.extend({
+  id: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
 export const listHousesQuerySchema = z.object({
   status: z.enum(houseStatuses).optional(),
   sourceChannel: z.enum(houseSourceChannels).optional(),
@@ -71,3 +77,4 @@ export const idParamsSchema = z.object({
 
 export type CreateHouseInput = z.infer<typeof createHouseSchema>;
 export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
+export type ImportHouseInput = z.infer<typeof importHouseSchema>;

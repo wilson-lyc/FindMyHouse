@@ -48,4 +48,12 @@ export class ConfigService {
   set(key: string, value: string): void {
     this.repo.set(key, value);
   }
+
+  setMany(config: Record<string, string>): number {
+    for (const [key, value] of Object.entries(config)) {
+      this.repo.set(key, value);
+    }
+
+    return Object.keys(config).length;
+  }
 }

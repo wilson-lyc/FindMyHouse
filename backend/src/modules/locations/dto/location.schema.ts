@@ -26,6 +26,12 @@ export const createLocationSchema = z.object({
 
 export const updateLocationSchema = createLocationSchema.partial();
 
+export const importLocationSchema = createLocationSchema.extend({
+  id: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
 export const listLocationsQuerySchema = z.object({
   category: z.enum(locationCategories).optional()
 });
@@ -36,3 +42,4 @@ export const idParamsSchema = z.object({
 
 export type CreateLocationInput = z.infer<typeof createLocationSchema>;
 export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;
+export type ImportLocationInput = z.infer<typeof importLocationSchema>;

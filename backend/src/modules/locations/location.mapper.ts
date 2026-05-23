@@ -1,5 +1,5 @@
 import type { Location, LocationCategory } from './domain/location.js';
-import type { CreateLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
 
 export interface LocationRow {
   id: string;
@@ -29,7 +29,7 @@ export function toLocation(row: LocationRow): Location {
   };
 }
 
-export function toLocationRowParams(input: CreateLocationInput | UpdateLocationInput) {
+export function toLocationRowParams(input: CreateLocationInput | UpdateLocationInput | ImportLocationInput) {
   return {
     name: input.name ?? null,
     category: input.category ?? null,

@@ -2,7 +2,15 @@
 import { computed, onMounted, provide, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
-import { ChatDotSquare, DataAnalysis, House as HouseIcon, Location as LocationIcon, QuestionFilled, Setting } from '@element-plus/icons-vue';
+import {
+  ChatDotSquare,
+  DataAnalysis,
+  House as HouseIcon,
+  Location as LocationIcon,
+  QuestionFilled,
+  Setting,
+  Upload
+} from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
@@ -327,6 +335,11 @@ onMounted(async () => {
         <el-tooltip content="统计" placement="right">
           <router-link class="map-directory-icon-button" to="/stats" aria-label="统计">
             <el-icon><DataAnalysis /></el-icon>
+          </router-link>
+        </el-tooltip>
+        <el-tooltip content="数据导入 / 导出" placement="right">
+          <router-link class="map-directory-icon-button" to="/data" aria-label="数据导入 / 导出">
+            <el-icon><Upload /></el-icon>
           </router-link>
         </el-tooltip>
         <el-tooltip content="帮助" placement="right">

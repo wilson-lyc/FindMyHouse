@@ -1,5 +1,5 @@
 import type { Location, LocationFilters } from './domain/location.js';
-import type { CreateLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
 import type { LocationRepository } from './location.repository.js';
 import type { RouteCacheRepository } from '../maps/route-cache.repository.js';
 
@@ -42,6 +42,13 @@ export class LocationService {
       this.clearRouteCacheIfFocusChanged(previousFocus);
     }
     return deleted;
+  }
+
+  importLocations(locations: ImportLocationInput[]): number {
+    const previousFocus = this.getFocusSignature();
+    const count = this.repository.upsertMany(locations);
+    this.clearRouteCacheIfFocusChanged(previousFocus);
+    return count;
   }
 
   private getFocusSignature(): string {
