@@ -8,14 +8,14 @@ import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
-import { getDrivingRoute } from '../api/map/map-api';
+import { getCommuteRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
 import { normalizeHouseForm } from '../lib/house/house-form';
 import type { House, HouseForm } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
-import type { DrivingRouteResult } from '../model/map/geocode';
+import type { CommuteRouteResult, CommuteMode } from '../model/map/geocode';
 import { useHouseCompareStore } from '../stores/houseCompareStore';
 import { useHouseDialogStore } from '../stores/houseDialogStore';
 import { useLocationDialogStore } from '../stores/locationDialogStore';
@@ -39,7 +39,8 @@ const mapStore = useMapStore();
 const {
   currentBounds,
   onlyViewportHouses,
-  drivingRoutes,
+  routes,
+  commuteMode,
   activeRouteHouseId,
   selectedHouseId,
   routeData
@@ -110,7 +111,7 @@ async function confirmDeleteHouse(house: House) {
     if (selectedHouseId.value === house.id) {
       mapStore.selectHouse(undefined);
     }
-    mapStore.removeDrivingRoute(house.id);
+    mapStore.removeRoute(house.id);
     if (activeRouteHouseId.value === house.id) {
       clearRoute();
     }
@@ -151,10 +152,11 @@ function clearRoute() {
   mapPanelRef.value?.clearRoute();
 }
 
-async function loadRoutes() {
+async function loadRoutes(mode?: CommuteMode) {
+  const currentMode = mode ?? commuteMode.value;
   const focus = focusLocation.value;
   if (!focus) {
-    mapStore.setDrivingRoutes(new Map());
+    mapStore.setRoutes(new Map());
     clearRoute();
     return;
   }
@@ -162,28 +164,28 @@ async function loadRoutes() {
   const targets = houses.value.filter((house) => house.latitude !== undefined && house.longitude !== undefined);
 
   if (targets.length === 0) {
-    mapStore.setDrivingRoutes(new Map());
+    mapStore.setRoutes(new Map());
     clearRoute();
     return;
   }
 
   const destination = `${focus.longitude},${focus.latitude}`;
-  const results = new Map<string, DrivingRouteResult>();
+  const results = new Map<string, CommuteRouteResult>();
 
   try {
     await Promise.all(
       targets.map(async (house) => {
         const origin = `${house.longitude},${house.latitude}`;
-        const result = await getDrivingRoute(origin, destination);
+        const result = await getCommuteRoute(origin, destination, currentMode);
         if (result) {
           results.set(house.id, result);
         }
       })
     );
 
-    mapStore.setDrivingRoutes(results);
+    mapStore.setRoutes(results);
   } catch (error) {
-    console.error('Failed to load driving routes:', error);
+    console.error(`Failed to load ${currentMode} routes:`, error);
   }
 }
 
@@ -235,6 +237,11 @@ async function navigateTo(name: string) {
   await router.push({ name });
 }
 
+watch(commuteMode, () => {
+  clearRoute();
+  void loadRoutes();
+});
+
 watch(focusLocation, () => {
   clearRoute();
   void loadRoutes();
@@ -274,7 +281,7 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   loading,
   saving,
   filters,
-  drivingRoutes,
+  routes,
   focusLocation,
   onlyViewportHouses,
   locations,
@@ -378,7 +385,7 @@ onMounted(async () => {
     <HouseCompareDialog
       v-model="houseCompareDialogVisible"
       :houses="houseCompareDialogHouses"
-      :driving-routes="drivingRoutes"
+      :routes="routes"
       :loading="loading"
     />
   </main>

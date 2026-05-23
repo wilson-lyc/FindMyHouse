@@ -105,6 +105,13 @@ export function migrate() {
   ensureColumn('houses', 'earnest_money', 'INTEGER');
   ensureColumn('houses', 'deposit', 'INTEGER');
   ensureColumn('houses', 'custom_fees', 'TEXT');
-  ensureColumn('houses', 'fee_notes', 'TEXT');
   ensureColumn('houses', 'contact_name', 'TEXT');
+  ensureColumn('houses', 'fee_notes', 'TEXT');
+
+  ensureColumn('map_route_cache', 'commute_mode', "TEXT NOT NULL DEFAULT 'driving'");
+
+  // Rebuild unique index to include commute_mode
+  db.exec('DROP INDEX IF EXISTS idx_map_route_cache_lookup');
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_map_route_cache_lookup
+    ON map_route_cache(focus_location_id, origin, destination, commute_mode, kind)`);
 }

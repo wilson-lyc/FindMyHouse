@@ -7,13 +7,13 @@ import {
   type CustomFeeItem,
   type House
 } from '../../model/house/house';
-import type { DrivingRouteResult } from '../../model/map/geocode';
+import type { CommuteRouteResult } from '../../model/map/geocode';
 import { statusLabels } from '../../model/house/house-status';
 
 const props = defineProps<{
   modelValue: boolean;
   houses: House[];
-  drivingRoutes: Map<string, DrivingRouteResult>;
+  routes: Map<string, CommuteRouteResult>;
   loading?: boolean;
 }>();
 
@@ -128,7 +128,7 @@ function formatDuration(seconds: number) {
 }
 
 function formatRoute(house: House) {
-  const route = props.drivingRoutes.get(house.id);
+  const route = props.routes.get(house.id);
   if (!route) return house.latitude !== undefined && house.longitude !== undefined ? '计算中' : '无坐标';
 
   return `${formatDuration(route.duration)} / ${formatDistance(route.distance)}`;

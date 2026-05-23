@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Delete, Edit, Van } from '@element-plus/icons-vue';
+import { Avatar, Delete, Edit, Promotion, Refresh, Van } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
 import type { House } from '../../model/house/house';
-import type { DrivingDistanceResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult, CommuteMode } from '../../model/map/geocode';
+import { commuteModeLabels } from '../../model/map/geocode';
 
 const props = defineProps<{
   house: House;
-  drivingDistance?: DrivingDistanceResult;
+  drivingDistance?: CommuteDistanceResult;
   focusLocationName?: string;
+  commuteMode?: CommuteMode;
   compareSelected?: boolean;
   compareDisabled?: boolean;
 }>();
@@ -35,6 +37,17 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
 const customFeesTotal = computed(() => {
   const total = (props.house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
   return total > 0 ? total : undefined;
+});
+
+const commuteModeIcon = computed(() => {
+  if (!props.commuteMode) return undefined;
+  const icons: Record<CommuteMode, object> = {
+    driving: Van,
+    transit: Promotion,
+    cycling: Refresh,
+    walking: Avatar
+  };
+  return icons[props.commuteMode];
 });
 
 function formatDistance(meters: number): string {
@@ -79,7 +92,12 @@ function formatDuration(seconds: number): string {
     </div>
     <small>
       <template v-if="drivingDistance && focusLocationName">
-        <span class="house-card-driving">距{{ focusLocationName }} {{ formatDistance(drivingDistance.distance) }} / {{ formatDuration(drivingDistance.duration) }}</span>
+        <span class="house-card-driving">
+          <template v-if="commuteModeIcon">
+            <el-icon :size="14"><component :is="commuteModeIcon" /></el-icon>
+          </template>
+          {{ commuteMode ? commuteModeLabels[commuteMode] : '' }}距{{ focusLocationName }} {{ formatDistance(drivingDistance.distance) }} / {{ formatDuration(drivingDistance.duration) }}
+        </span>
         ｜
       </template>
       {{ house.bedroomCount }}房{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫

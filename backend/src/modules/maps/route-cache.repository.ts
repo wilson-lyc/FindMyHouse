@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DrivingDistanceResult, DrivingRouteResult } from './amap.service.js';
+import type { CommuteDistanceResult, CommuteRouteResult, CommuteMode } from './amap.service.js';
 
 export type RouteCacheKind = 'distance' | 'route';
 
@@ -10,6 +10,7 @@ interface RouteCacheRow {
   origin: string;
   destination: string;
   kind: RouteCacheKind;
+  commute_mode: string;
   distance: number;
   duration: number;
   polyline?: string | null;
@@ -22,6 +23,7 @@ interface SaveRouteCacheInput {
   origin: string;
   destination: string;
   kind: RouteCacheKind;
+  commuteMode: CommuteMode;
   distance: number;
   duration: number;
   polyline?: Array<[number, number]>;
@@ -33,9 +35,10 @@ export class RouteCacheRepository {
   findDistance(
     focusLocationId: string,
     origin: string,
-    destination: string
-  ): DrivingDistanceResult | undefined {
-    const row = this.find(focusLocationId, origin, destination, 'distance');
+    destination: string,
+    commuteMode: CommuteMode
+  ): CommuteDistanceResult | undefined {
+    const row = this.find(focusLocationId, origin, destination, 'distance', commuteMode);
     if (!row) return undefined;
 
     return {
@@ -43,15 +46,17 @@ export class RouteCacheRepository {
       destination: row.destination,
       distance: row.distance,
       duration: row.duration,
+      mode: commuteMode,
     };
   }
 
   findRoute(
     focusLocationId: string,
     origin: string,
-    destination: string
-  ): DrivingRouteResult | undefined {
-    const row = this.find(focusLocationId, origin, destination, 'route');
+    destination: string,
+    commuteMode: CommuteMode
+  ): CommuteRouteResult | undefined {
+    const row = this.find(focusLocationId, origin, destination, 'route', commuteMode);
     if (!row) return undefined;
 
     return {
@@ -59,7 +64,8 @@ export class RouteCacheRepository {
       destination: row.destination,
       distance: row.distance,
       duration: row.duration,
-      polyline: row.polyline ? (JSON.parse(row.polyline) as Array<[number, number]>) : [],
+      polyline: row.polyline ? (JSON.parse(row.polyline) as Array<[number, number]>) : undefined,
+      mode: commuteMode,
     };
   }
 
@@ -71,11 +77,11 @@ export class RouteCacheRepository {
       .prepare(
         `
           INSERT INTO map_route_cache (
-            id, focus_location_id, origin, destination, kind, distance, duration, polyline, created_at, updated_at
+            id, focus_location_id, origin, destination, kind, commute_mode, distance, duration, polyline, created_at, updated_at
           ) VALUES (
-            @id, @focus_location_id, @origin, @destination, @kind, @distance, @duration, @polyline, @created_at, @updated_at
+            @id, @focus_location_id, @origin, @destination, @kind, @commute_mode, @distance, @duration, @polyline, @created_at, @updated_at
           )
-          ON CONFLICT(focus_location_id, origin, destination, kind) DO UPDATE SET
+          ON CONFLICT(focus_location_id, origin, destination, commute_mode, kind) DO UPDATE SET
             distance = excluded.distance,
             duration = excluded.duration,
             polyline = excluded.polyline,
@@ -88,6 +94,7 @@ export class RouteCacheRepository {
         origin: input.origin,
         destination: input.destination,
         kind: input.kind,
+        commute_mode: input.commuteMode,
         distance: input.distance,
         duration: input.duration,
         polyline: input.polyline ? JSON.stringify(input.polyline) : null,
@@ -104,7 +111,8 @@ export class RouteCacheRepository {
     focusLocationId: string,
     origin: string,
     destination: string,
-    kind: RouteCacheKind
+    kind: RouteCacheKind,
+    commuteMode: CommuteMode
   ): RouteCacheRow | undefined {
     return this.database
       .prepare(
@@ -114,6 +122,7 @@ export class RouteCacheRepository {
             AND origin = @origin
             AND destination = @destination
             AND kind = @kind
+            AND commute_mode = @commute_mode
         `
       )
       .get({
@@ -121,6 +130,7 @@ export class RouteCacheRepository {
         origin,
         destination,
         kind,
+        commute_mode: commuteMode,
       }) as RouteCacheRow | undefined;
   }
 }

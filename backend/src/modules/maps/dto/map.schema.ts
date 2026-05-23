@@ -10,7 +10,21 @@ export const reverseGeocodeSchema = z.object({
   latitude: z.coerce.number().finite().min(-90).max(90)
 });
 
+export const commuteModeSchema = z.enum(['driving', 'transit', 'cycling', 'walking']);
+
 export const drivingDistanceSchema = z.object({
   origin: z.string().trim().min(1, 'origin is required'),
   destination: z.string().trim().min(1, 'destination is required')
+});
+
+export const commuteDistanceSchema = z.object({
+  origin: z.string().trim().min(1, 'origin is required'),
+  destination: z.string().trim().min(1, 'destination is required'),
+  commuteMode: commuteModeSchema.default('driving')
+});
+
+export const commuteRouteSchema = z.object({
+  origin: z.string().trim().min(1, 'origin is required'),
+  destination: z.string().trim().min(1, 'destination is required'),
+  commuteMode: commuteModeSchema.default('driving')
 });

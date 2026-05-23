@@ -40,25 +40,77 @@ const capabilities = [
     title: '查询焦点地点',
     description: '查询当前设置的焦点地点信息。焦点地点是通勤路线计算的终点。',
     examples: ['我的焦点地点在哪里？', '当前焦点地点是什么？']
+  },
+  {
+    icon: '🏠',
+    title: '搜索附近房源',
+    description: '以某个已保存地点为中心，按指定半径搜索附近的房源。支持按名称或类型找地点。',
+    examples: ['在公司附近2公里内有哪些房子？', '找学校周边1公里内的房源']
+  },
+  {
+    icon: '📊',
+    title: '对比房源',
+    description: '选择 2-4 套房源进行全方位的对比分析，包括租金、费用、通勤、户型、联系方式等，助手会给出综合推荐。',
+    examples: ['对比一下这套和那套', '帮我分析哪套更划算']
+  },
+  {
+    icon: '📍',
+    title: '管理地点',
+    description: '通过对话创建、更新、删除已保存的地点。新地点会自动解析地址为坐标。',
+    examples: ['新增一个地点叫公司', '把学校地址改一下', '删除这个地点']
   }
 ];
 
 const features = [
   {
+    icon: '🗂️',
+    title: '房源列表管理',
+    description: '在「房源」页面集中管理所有房源，支持按状态、来源渠道筛选，开启「仅视野」只显示地图当前视野内的房源。支持勾选 2-4 套进行横向对比。'
+  },
+  {
+    icon: '📊',
+    title: '房源对比',
+    description: '选中 2-4 套房源后点击「对比」，即可在弹窗中查看状态、户型、月租、月成本、通勤时长、费用明细、联系方式等十余项指标的逐项对比。'
+  },
+  {
+    icon: '📍',
+    title: '地点管理',
+    description: '在「地点」页面管理常用地点（公司、学校、交通枢纽等）。支持设为焦点地点，焦点地点是通勤路线计算的终点，同一时间只有一个焦点地点。'
+  },
+  {
+    icon: '🚗',
     title: '通勤路线规划',
-    description: '系统自动为每个有坐标的房源计算到焦点地点的驾车通勤路线，并在房源卡片和地图上直观展示。'
+    description: '系统自动为每个有坐标的房源计算到焦点地点的通勤路线。支持驾车、公交/地铁、骑行、步行四种模式，路线在地图上以色块区分，房源卡片同步显示距离和时长。'
   },
   {
+    icon: '🗺️',
+    title: '地图交互',
+    description: '房源和地点均在地图上以标记点展示，房源标记显示租金标签。点击标记弹出详情浮窗；右键地图任意位置可快速新增房源或地点。对话搜索结果会高亮在地图上。'
+  },
+  {
+    icon: '💬',
     title: '对话式交互',
-    description: '在对话页面中与 AI 助手自然语言交互，助手可以边聊天边在地图上展示搜索结果。'
+    description: '在「对话」页面中与 AI 助手自然语言交互，助手可以边聊天边在地图上展示搜索结果，支持多轮对话和工具调用。'
   },
   {
+    icon: '🔗',
     title: '智能地址解析',
-    description: '新增房源时，自动调用高德地图 API 将文本地址解析为精确的经纬度坐标。'
+    description: '新增房源或地点时，自动调用高德地图 API 将文本地址解析为精确经纬度坐标。也支持坐标反向解析为地址，可在地图上手动选点定位。'
   },
   {
+    icon: '📜',
     title: '历史会话管理',
-    description: '所有对话自动保存，支持查看历史会话、继续之前的对话。'
+    description: '所有对话自动保存，支持查看历史会话列表、恢复继续之前对话，支持单选/批量删除会话。'
+  },
+  {
+    icon: '📈',
+    title: '统计看板',
+    description: '在「统计」页面查看数据分析看板：房源状态分布饼图、租金区间柱状图、来源渠道分布、通勤-租金散点图、综合评分候选排名、户型分布排行。'
+  },
+  {
+    icon: '⚙️',
+    title: '服务配置',
+    description: '在「设置」页面配置 LLM 服务（Base URL、模型、API Key、温度）和高德地图服务（Web Service Key、JS API Key、安全密钥）。也可在首次进入时通过欢迎向导完成配置。'
   }
 ];
 
@@ -94,8 +146,9 @@ const screenshots = [
             <img class="help-logo" src="/favicon.png" alt="FindMyHouse" />
             <h2>AI 找房助手</h2>
             <p class="help-intro-text">
-              FindMyHouse 内置了一个智能找房助手，您可以在「对话」页面中通过自然语言与其交流。
-              助手可以帮您搜索、查看、新增、更新和删除房源，也可以查询焦点地点信息。
+              FindMyHouse 是一个集房源管理、AI 对话、地图可视化和数据统计于一体的找房助手。
+              您可以在「对话」页面通过自然语言与 AI 助手交流，或在「房源」页面直接管理数据。
+              系统自动计算通勤路线，并提供多维度的统计分析，助您高效决策。
             </p>
           </section>
 
@@ -131,8 +184,11 @@ const screenshots = [
 
             <div class="help-features">
               <div v-for="feature in features" :key="feature.title" class="help-feature-card">
-                <h3>{{ feature.title }}</h3>
-                <p>{{ feature.description }}</p>
+                <div class="help-feature-icon">{{ feature.icon }}</div>
+                <div class="help-feature-body">
+                  <h3>{{ feature.title }}</h3>
+                  <p>{{ feature.description }}</p>
+                </div>
               </div>
             </div>
           </section>
@@ -166,6 +222,8 @@ const screenshots = [
               <li>新增房源需要经过地址解析和二次确认，不会直接入库。</li>
               <li>删除房源不可逆，请谨慎操作。</li>
               <li>焦点地点是通勤路线计算的终点，系统中同一时间只能有一个焦点地点。</li>
+              <li>通勤路线需要配置高德地图 Web Service Key 后方可使用。</li>
+              <li>在地图上右键任意位置可快速新增房源或地点，坐标自动填充。</li>
             </ul>
           </section>
         </div>
@@ -348,6 +406,8 @@ const screenshots = [
 }
 
 .help-feature-card {
+  display: flex;
+  gap: 16px;
   border: 1px solid var(--app-border-light);
   border-radius: 8px;
   background: var(--el-bg-color);
@@ -365,6 +425,23 @@ const screenshots = [
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
+}
+
+.help-feature-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border-radius: 8px;
+  background: var(--app-bg-page);
+}
+
+.help-feature-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .help-notes {

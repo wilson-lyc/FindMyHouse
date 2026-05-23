@@ -8,6 +8,8 @@ import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type Hous
 import { statusLabels } from '../../model/house/house-status';
 import { useHouseCompareStore } from '../../stores/houseCompareStore';
 import { useHouseDialogStore } from '../../stores/houseDialogStore';
+import { useMapStore } from '../../stores/mapStore';
+import { commuteModeLabels } from '../../model/map/geocode';
 
 const context = inject<MainLayoutContext>(mainLayoutContextKey);
 
@@ -18,6 +20,7 @@ if (!context) {
 const layoutContext = context;
 const houseCompareStore = useHouseCompareStore();
 const houseDialogStore = useHouseDialogStore();
+const mapStore = useMapStore();
 const maxCompareCount = 4;
 const compareSelectedIds = ref<string[]>([]);
 
@@ -101,6 +104,14 @@ watch(
             :value="channel"
           />
         </el-select>
+        <el-select v-model="mapStore.commuteMode" placeholder="通勤方式">
+          <el-option
+            v-for="[mode, label] in Object.entries(commuteModeLabels)"
+            :key="mode"
+            :label="label"
+            :value="mode"
+          />
+        </el-select>
       </div>
     </div>
 
@@ -127,8 +138,9 @@ watch(
           v-for="house in layoutContext.houses.value"
           :key="house.id"
           :house="house"
-          :driving-distance="layoutContext.drivingRoutes.value.get(house.id)"
+          :driving-distance="layoutContext.routes.value.get(house.id)"
           :focus-location-name="layoutContext.focusLocation.value?.name"
+          :commute-mode="mapStore.commuteMode"
           :compare-selected="isCompareSelected(house)"
           :compare-disabled="isCompareDisabled(house)"
           @select="layoutContext.selectHouse"
