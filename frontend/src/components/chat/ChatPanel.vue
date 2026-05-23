@@ -870,13 +870,13 @@ watch(loading, () => {
 .chat-message-wrapper.user {
   align-self: flex-end;
   justify-content: flex-end;
-  max-width: min(520px, calc(100vw - 96px));
+  max-width: min(520px, calc(100% - 40px));
 }
 
 .chat-message-wrapper.assistant {
   align-self: flex-start;
   justify-content: flex-start;
-  max-width: min(520px, calc(100vw - 96px));
+  max-width: min(520px, calc(100% - 40px));
 }
 
 .chat-bubble {

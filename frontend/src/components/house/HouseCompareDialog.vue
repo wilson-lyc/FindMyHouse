@@ -21,6 +21,16 @@ const emit = defineEmits<{
   'update:modelValue': [visible: boolean];
 }>();
 
+const tableData = computed(() =>
+  comparisonRows.value.map((row) => {
+    const obj: Record<string, string> = { label: row.label };
+    props.houses.forEach((house, index) => {
+      obj[house.id] = row.values[index];
+    });
+    return obj;
+  })
+);
+
 const comparisonRows = computed(() => [
   {
     label: '状态',
@@ -148,29 +158,27 @@ function formatContact(house: House) {
     width="min(1080px, calc(100vw - 32px))"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-scrollbar class="house-compare-scrollbar">
-      <section v-loading="loading" class="compare-table-wrap">
-        <table class="compare-table">
-          <thead>
-            <tr>
-              <th>项目</th>
-              <th v-for="house in houses" :key="house.id">
-                <div class="compare-house-heading">
-                  <strong>{{ house.name }}</strong>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in comparisonRows" :key="row.label">
-              <th>{{ row.label }}</th>
-              <td v-for="(value, index) in row.values" :key="`${row.label}-${houses[index]?.id}`">
-                {{ value }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-    </el-scrollbar>
+    <el-table
+      :data="tableData"
+      height="calc(70vh - 60px)"
+      border
+      v-loading="loading"
+      header-cell-class-name="compare-table-header"
+    >
+      <el-table-column prop="label" label="项目" width="100" />
+      <el-table-column
+        v-for="house in houses"
+        :key="house.id"
+        :prop="house.id"
+        :label="house.name"
+        min-width="140"
+      />
+    </el-table>
   </el-dialog>
 </template>
+
+<style scoped>
+.compare-table-header {
+  background: var(--el-fill-color-light, #f5f7fa) !important;
+}
+</style>

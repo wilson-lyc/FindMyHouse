@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Aim, Delete as DeleteIcon, Edit as EditIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
@@ -36,6 +36,7 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<FormInstance>();
+const scrollbarRef = ref();
 const addressGeocoding = ref(false);
 const coordinateGeocoding = ref(false);
 const form = reactive<HouseForm>(createEmptyHouseForm());
@@ -59,6 +60,9 @@ watch(
     if (!visible) return;
     Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
+    nextTick(() => {
+      scrollbarRef.value?.wrapRef?.scrollTo(0, 0);
+    });
   },
   { immediate: true }
 );
@@ -158,7 +162,7 @@ async function submitForm() {
     class="house-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-scrollbar class="house-form-scrollbar">
+    <el-scrollbar ref="scrollbarRef" class="house-form-scrollbar">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
         <nav class="house-form-nav" aria-label="房源详情分区导航">
           <button
