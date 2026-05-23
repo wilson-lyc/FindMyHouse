@@ -7,6 +7,19 @@ const chatSessionMessageSchema = z.object({
   reasoning: z.string().optional(),
   houses: z.array(z.unknown()).optional(),
   housesTitle: z.string().optional(),
+  choicePrompt: z.object({
+    id: z.string(),
+    type: z.literal('ask_single_choice'),
+    title: z.string(),
+    question: z.string(),
+    options: z.array(z.object({
+      id: z.string(),
+      label: z.string(),
+      value: z.string(),
+    })).min(2).max(5),
+    customOptionLabel: z.string(),
+    answeredValue: z.string().optional(),
+  }).optional(),
   hidden: z.boolean().optional(),
 });
 

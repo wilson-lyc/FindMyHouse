@@ -1,14 +1,14 @@
 import type { ComputedRef, Ref } from 'vue';
 import type { House, HouseFilters, HouseForm } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
-import type { DrivingRouteResult } from '../model/map/geocode';
+import type { CommuteRouteResult } from '../model/map/geocode';
 
 export interface MainLayoutContext {
   houses: Ref<House[]>;
   loading: Ref<boolean>;
   saving: Ref<boolean>;
   filters: HouseFilters;
-  drivingRoutes: Ref<Map<string, DrivingRouteResult>>;
+  routes: Ref<Map<string, CommuteRouteResult>>;
   focusLocation: ComputedRef<Location | null>;
   onlyViewportHouses: Ref<boolean>;
   locations: Ref<Location[]>;

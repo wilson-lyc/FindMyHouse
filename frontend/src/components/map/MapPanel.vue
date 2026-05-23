@@ -10,6 +10,7 @@ import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
+import { commuteModeColors, type CommuteMode } from '../../model/map/geocode';
 
 const emit = defineEmits<{
   editHouse: [house: House];
@@ -23,7 +24,7 @@ interface MapContextMenuPosition {
 }
 
 const mapStore = useMapStore();
-const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds } = storeToRefs(mapStore);
+const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds, commuteMode } = storeToRefs(mapStore);
 
 // ==================== 地图实例 ====================
 
@@ -386,33 +387,52 @@ function clearRoutePolyline() {
 function renderRoutePolyline() {
   if (!map.value || !amap.value || !routeData.value) return;
 
-  const path = routeData.value.polyline;
-  if (!path || path.length < 2) return;
+  const currentMode = commuteMode.value;
+  const modeColor = commuteModeColors[currentMode];
 
   clearRoutePolyline();
 
-  routePolyline = new amap.value.Polyline({
-    path,
-    strokeColor: getComputedStyle(document.documentElement).getPropertyValue('--el-color-primary').trim(),
-    strokeWeight: 5,
-    strokeOpacity: 0.8,
-    lineJoin: 'round',
-    lineCap: 'round'
-  });
+  const path = routeData.value.polyline;
+  if (path && path.length >= 2) {
+    routePolyline = new amap.value.Polyline({
+      path,
+      strokeColor: modeColor,
+      strokeWeight: 5,
+      strokeOpacity: 0.8,
+      lineJoin: 'round',
+      lineCap: 'round'
+    });
 
-  routePolyline.setMap(map.value);
+    routePolyline.setMap(map.value);
 
-  map.value?.setFitView([routePolyline]);
+    map.value?.setFitView([routePolyline]);
 
-  const midIndex = Math.floor(path.length / 2);
-  const midPoint = path[midIndex];
+    const midIndex = Math.floor(path.length / 2);
+    const midPoint = path[midIndex];
 
-  const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
-  routeInfoWindow = new amap.value.InfoWindow({
-    content: routeInfoContent,
-    offset: new amap.value.Pixel(0, 0)
-  });
-  routeInfoWindow.open(map.value, midPoint);
+    const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
+    routeInfoWindow = new amap.value.InfoWindow({
+      content: routeInfoContent,
+      offset: new amap.value.Pixel(0, 0)
+    });
+    routeInfoWindow.open(map.value, midPoint);
+  } else {
+    // 公交/无折线模式：在目的地显示信息窗
+    const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
+    routeInfoWindow = new amap.value.InfoWindow({
+      content: routeInfoContent,
+      offset: new amap.value.Pixel(0, 0)
+    });
+    // 尝试从 destination 解析坐标
+    const destParts = routeData.value.destination.split(',');
+    if (destParts.length === 2) {
+      const destLng = Number(destParts[0]);
+      const destLat = Number(destParts[1]);
+      if (!isNaN(destLng) && !isNaN(destLat)) {
+        routeInfoWindow.open(map.value, [destLng, destLat]);
+      }
+    }
+  }
 }
 
 // ==================== 地图生命周期 ====================

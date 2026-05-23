@@ -48,12 +48,26 @@ export interface ConfirmCompareHousesAction {
   houses: House[];
 }
 
+export interface AskSingleChoiceAction {
+  id: string;
+  type: 'ask_single_choice';
+  title: string;
+  question: string;
+  options: Array<{
+    id: string;
+    label: string;
+    value: string;
+  }>;
+  customOptionLabel: string;
+}
+
 export type AgentFrontendAction =
   | ConfirmCreateHouseAction
   | ConfirmCreateLocationAction
   | ShowHouseSearchResultsAction
   | ShowLocationSearchResultsAction
-  | ConfirmCompareHousesAction;
+  | ConfirmCompareHousesAction
+  | AskSingleChoiceAction;
 
 export type ConfirmCreateHouseResult =
   | { status: 'created'; house: House }

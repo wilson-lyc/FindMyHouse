@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { fetchLocations } from '../api/location/location-api';
 import MainLayout from '../layouts/MainLayout.vue';
 import ChatView from '../views/chat/ChatView.vue';
+import DataTransferView from '../views/data-transfer/DataTransferView.vue';
 import HousesView from '../views/houses/HousesView.vue';
 import LocationsView from '../views/locations/LocationsView.vue';
 import StatsView from '../views/stats/StatsView.vue';
@@ -49,6 +50,11 @@ const routes = [
     component: StatsView
   },
   {
+    path: '/data',
+    name: 'data',
+    component: DataTransferView
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: SettingsView
@@ -71,12 +77,24 @@ async function hasFocusLocation(): Promise<boolean> {
 
 router.beforeEach(async (to) => {
   const hasFocus = await hasFocusLocation();
+  const importedFromWelcome = sessionStorage.getItem('find-my-house-welcome-imported') === 'true';
 
   if (hasFocus && to.name === 'welcome') {
     return { name: 'home' };
   }
 
-  if (!hasFocus && to.name !== 'welcome' && to.name !== 'settings' && to.name !== 'help' && to.name !== 'stats') {
+  if (!hasFocus && importedFromWelcome && to.name !== 'welcome') {
+    return;
+  }
+
+  if (
+    !hasFocus &&
+    to.name !== 'welcome' &&
+    to.name !== 'settings' &&
+    to.name !== 'help' &&
+    to.name !== 'stats' &&
+    to.name !== 'data'
+  ) {
     return { name: 'welcome' };
   }
 });

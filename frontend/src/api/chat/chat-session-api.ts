@@ -1,4 +1,5 @@
 import { deleteData, getData, patchData, postData } from '../http';
+import type { AskSingleChoiceAction } from '../chat/chat-api';
 import type { House } from '../../model/house/house';
 
 export interface PersistedChatMessage {
@@ -6,6 +7,9 @@ export interface PersistedChatMessage {
   content: string;
   houses?: House[];
   housesTitle?: string;
+  choicePrompt?: AskSingleChoiceAction & {
+    answeredValue?: string;
+  };
   hidden?: boolean;
 }
 

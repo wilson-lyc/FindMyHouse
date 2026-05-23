@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Aim, Delete as DeleteIcon, Edit as EditIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
@@ -36,6 +36,7 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<FormInstance>();
+const scrollbarRef = ref();
 const addressGeocoding = ref(false);
 const coordinateGeocoding = ref(false);
 const form = reactive<HouseForm>(createEmptyHouseForm());
@@ -59,6 +60,9 @@ watch(
     if (!visible) return;
     Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
+    nextTick(() => {
+      scrollbarRef.value?.wrapRef?.scrollTo(0, 0);
+    });
   },
   { immediate: true }
 );
@@ -158,7 +162,7 @@ async function submitForm() {
     class="house-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-scrollbar class="house-form-scrollbar">
+    <el-scrollbar ref="scrollbarRef" class="house-form-scrollbar">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
         <nav class="house-form-nav" aria-label="房源详情分区导航">
           <button
@@ -256,9 +260,6 @@ async function submitForm() {
               <el-form-item label="押金">
                 <el-input-number v-model="form.deposit" :min="0" :step="500" controls-position="right" />
               </el-form-item>
-              <el-form-item label="物业费">
-                <el-input-number v-model="form.propertyFee" :min="0" :step="100" controls-position="right" />
-              </el-form-item>
               <el-form-item label="水费/吨">
                 <el-input-number v-model="form.waterFeePerTon" :min="0" :precision="2" :step="0.5" controls-position="right" />
               </el-form-item>
@@ -271,12 +272,14 @@ async function submitForm() {
                   controls-position="right"
                 />
               </el-form-item>
+              <el-form-item label="物业费">
+                <el-input-number v-model="form.propertyFee" :min="0" :step="100" controls-position="right" />
+              </el-form-item>
               <el-form-item label="自定义费用" class="span-2 custom-fees-form-item">
                 <div class="custom-fees-wrap">
                   <div class="custom-fees-header">
                     <div class="custom-fees-summary">
-                      <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项</span>
-                      <span class="custom-fees-total">合计 {{ formatCurrency(customFeesTotal) }}</span>
+                      <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项，合计 {{ formatCurrency(customFeesTotal) }}</span>
                     </div>
                     <el-button :icon="Plus" type="primary" plain size="small" @click="openAddFeeDialog">添加费用</el-button>
                   </div>
@@ -291,7 +294,7 @@ async function submitForm() {
                     <el-table-column label="费用项目" prop="name" show-overflow-tooltip />
                     <el-table-column label="金额" width="120">
                       <template #default="{ row }">
-                        <span class="custom-fee-amount">{{ formatCurrency(row.amount) }}</span>
+                        <span>{{ formatCurrency(row.amount) }}</span>
                       </template>
                     </el-table-column>
                     <el-table-column label="操作" width="132">
@@ -300,9 +303,6 @@ async function submitForm() {
                         <el-button :icon="DeleteIcon" link type="danger" size="small" @click="deleteFeeItem($index)">删除</el-button>
                       </template>
                     </el-table-column>
-                    <template #empty>
-                      <span class="custom-fees-empty-text">暂无自定义费用</span>
-                    </template>
                   </el-table>
                 </div>
               </el-form-item>

@@ -3,7 +3,10 @@ import type {
   GeocodeResult,
   ReverseGeocodeResult,
   DrivingDistanceResult,
-  DrivingRouteResult
+  DrivingRouteResult,
+  CommuteDistanceResult,
+  CommuteRouteResult,
+  CommuteMode
 } from '../../model/map/geocode';
 
 export function geocodeAddress(address: string, city?: string) {
@@ -28,5 +31,19 @@ export function getDrivingRoute(origin: string, destination: string) {
   return postData<DrivingRouteResult, { origin: string; destination: string }>(
     '/api/maps/driving-route',
     { origin, destination }
+  );
+}
+
+export function getCommuteDistance(origin: string, destination: string, commuteMode: CommuteMode) {
+  return postData<CommuteDistanceResult, { origin: string; destination: string; commuteMode: CommuteMode }>(
+    '/api/maps/commute-distance',
+    { origin, destination, commuteMode }
+  );
+}
+
+export function getCommuteRoute(origin: string, destination: string, commuteMode: CommuteMode) {
+  return postData<CommuteRouteResult, { origin: string; destination: string; commuteMode: CommuteMode }>(
+    '/api/maps/commute-route',
+    { origin, destination, commuteMode }
   );
 }

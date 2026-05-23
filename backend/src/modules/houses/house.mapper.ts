@@ -1,5 +1,5 @@
 import { rentPaymentPeriods, type CustomFeeItem, type House, type HouseSourceChannel, type HouseStatus, type RentPaymentPeriod } from './domain/house.js';
-import type { CreateHouseInput, UpdateHouseInput } from './dto/house.schema.js';
+import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
 
 export interface HouseRow {
   id: string;
@@ -59,7 +59,7 @@ export function toHouse(row: HouseRow): House {
   };
 }
 
-export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput) {
+export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput | ImportHouseInput) {
   return {
     name: input.name ?? null,
     status: input.status ?? null,

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { Location, LocationFilters } from './domain/location.js';
-import type { CreateLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
 import { toLocation, toLocationRowParams, type LocationRow } from './location.mapper.js';
 
 export class LocationRepository {
@@ -114,6 +114,46 @@ export class LocationRepository {
   delete(id: string): boolean {
     const result = this.database.prepare('DELETE FROM locations WHERE id = ?').run(id);
     return result.changes > 0;
+  }
+
+  upsertMany(locations: ImportLocationInput[]): number {
+    const upsert = this.database.prepare(
+      `
+        INSERT INTO locations (
+          id, name, category, address, latitude, longitude, is_focus, notes, created_at, updated_at
+        ) VALUES (
+          @id, @name, @category, @address, @latitude, @longitude, @is_focus, @notes, @created_at, @updated_at
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          name = @name,
+          category = @category,
+          address = @address,
+          latitude = @latitude,
+          longitude = @longitude,
+          is_focus = @is_focus,
+          notes = @notes,
+          created_at = @created_at,
+          updated_at = @updated_at
+      `
+    );
+
+    const transaction = this.database.transaction((items: ImportLocationInput[]) => {
+      for (const location of items) {
+        if (location.isFocus) {
+          this.clearFocus(location.id);
+        }
+
+        upsert.run({
+          id: location.id,
+          ...toLocationRowParams(location),
+          created_at: location.createdAt,
+          updated_at: location.updatedAt
+        });
+      }
+    });
+
+    transaction(locations);
+    return locations.length;
   }
 
   private clearFocus(exceptId?: string) {

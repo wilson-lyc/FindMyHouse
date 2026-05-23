@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import { geocodeSchema, reverseGeocodeSchema, drivingDistanceSchema } from './dto/map.schema.js';
-import { AmapService, type DrivingDistanceResult, type DrivingRouteResult } from './amap.service.js';
+import { geocodeSchema, reverseGeocodeSchema, drivingDistanceSchema, commuteDistanceSchema, commuteRouteSchema } from './dto/map.schema.js';
+import { AmapService, type CommuteDistanceResult, type CommuteRouteResult, type CommuteMode } from './amap.service.js';
 import { RouteCacheRepository } from './route-cache.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
 import type { Location } from '../locations/domain/location.js';
@@ -26,23 +26,25 @@ function getMatchingFocusLocation(destination: string): Location | undefined {
     );
 }
 
-async function getCachedDrivingDistance(
+async function getCachedCommuteDistance(
+  mode: CommuteMode,
   origin: string,
   destination: string
-): Promise<DrivingDistanceResult | undefined> {
+): Promise<CommuteDistanceResult | undefined> {
   const focusLocation = getMatchingFocusLocation(destination);
   const cached = focusLocation
-    ? routeCacheRepository.findDistance(focusLocation.id, origin, destination)
+    ? routeCacheRepository.findDistance(focusLocation.id, origin, destination, mode)
     : undefined;
   if (cached) return cached;
 
-  const result = await amapService.getDrivingDistance(origin, destination);
+  const result = await amapService.getCommuteDistance(mode, origin, destination);
   if (result && focusLocation) {
     routeCacheRepository.save({
       focusLocationId: focusLocation.id,
       origin,
       destination,
       kind: 'distance',
+      commuteMode: mode,
       distance: result.distance,
       duration: result.duration,
     });
@@ -51,23 +53,25 @@ async function getCachedDrivingDistance(
   return result;
 }
 
-async function getCachedDrivingRoute(
+async function getCachedCommuteRoute(
+  mode: CommuteMode,
   origin: string,
   destination: string
-): Promise<DrivingRouteResult | undefined> {
+): Promise<CommuteRouteResult | undefined> {
   const focusLocation = getMatchingFocusLocation(destination);
   const cached = focusLocation
-    ? routeCacheRepository.findRoute(focusLocation.id, origin, destination)
+    ? routeCacheRepository.findRoute(focusLocation.id, origin, destination, mode)
     : undefined;
   if (cached) return cached;
 
-  const result = await amapService.getDrivingRoute(origin, destination);
+  const result = await amapService.getCommuteRoute(mode, origin, destination);
   if (result && focusLocation) {
     routeCacheRepository.save({
       focusLocationId: focusLocation.id,
       origin,
       destination,
       kind: 'route',
+      commuteMode: mode,
       distance: result.distance,
       duration: result.duration,
       polyline: result.polyline,
@@ -75,6 +79,20 @@ async function getCachedDrivingRoute(
   }
 
   return result;
+}
+
+async function getCachedDrivingDistance(
+  origin: string,
+  destination: string
+): Promise<CommuteDistanceResult | undefined> {
+  return getCachedCommuteDistance('driving', origin, destination);
+}
+
+async function getCachedDrivingRoute(
+  origin: string,
+  destination: string
+): Promise<CommuteRouteResult | undefined> {
+  return getCachedCommuteRoute('driving', origin, destination);
 }
 
 export async function registerMapRoutes(app: FastifyInstance) {
@@ -114,6 +132,36 @@ export async function registerMapRoutes(app: FastifyInstance) {
   app.post('/api/maps/driving-route', async (request, reply) => {
     const input = drivingDistanceSchema.parse(request.body);
     const result = await getCachedDrivingRoute(input.origin, input.destination);
+
+    if (!result) {
+      return reply.code(404).send({ error: 'Route not found' });
+    }
+
+    return { data: result };
+  });
+
+  app.post('/api/maps/commute-distance', async (request, reply) => {
+    const input = commuteDistanceSchema.parse(request.body);
+    const result = await getCachedCommuteDistance(
+      input.commuteMode ?? 'driving',
+      input.origin,
+      input.destination
+    );
+
+    if (!result) {
+      return reply.code(404).send({ error: 'Route not found' });
+    }
+
+    return { data: result };
+  });
+
+  app.post('/api/maps/commute-route', async (request, reply) => {
+    const input = commuteRouteSchema.parse(request.body);
+    const result = await getCachedCommuteRoute(
+      input.commuteMode ?? 'driving',
+      input.origin,
+      input.destination
+    );
 
     if (!result) {
       return reply.code(404).send({ error: 'Route not found' });

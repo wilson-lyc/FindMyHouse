@@ -6,6 +6,7 @@ import { Aim } from '@element-plus/icons-vue';
 import { fetchConfig, saveConfig, type ConfigData } from '../../api/config/config-api';
 import { geocodeAddress } from '../../api/map/map-api';
 import { createLocation } from '../../api/location/location-api';
+import DataImportPanel from '../../components/data-transfer/DataImportPanel.vue';
 import { locationCategories, locationCategoryLabels, type LocationForm } from '../../model/location/location';
 import type { FormInstance, FormRules } from 'element-plus';
 import CoordinatePicker from '../../components/map/CoordinatePicker.vue';
@@ -82,6 +83,10 @@ const locationRules: FormRules<LocationForm> = {
   address: [{ required: true, message: '请输入地址', trigger: 'blur' }]
 };
 
+function continueWithoutImport() {
+  activeStep.value = hasCompleteConfig() ? 2 : 1;
+}
+
 async function loadConfig() {
   try {
     const data = await fetchConfig();
@@ -93,9 +98,6 @@ async function loadConfig() {
     if (data.viteAmapJsKey) configData.viteAmapJsKey = data.viteAmapJsKey;
     if (data.viteAmapSecurityJsCode) configData.viteAmapSecurityJsCode = data.viteAmapSecurityJsCode;
 
-    if (hasCompleteConfig()) {
-      activeStep.value = 1;
-    }
   } catch {
     // 初次使用，无配置，使用默认值
   } finally {
@@ -119,7 +121,7 @@ async function saveAndNext() {
       viteAmapSecurityJsCode: configData.viteAmapSecurityJsCode.trim(),
     });
     ElMessage.success('配置已保存');
-    activeStep.value = 1;
+    activeStep.value = 2;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存配置失败');
   } finally {
@@ -171,6 +173,11 @@ async function submitForm() {
   }
 }
 
+function onImported() {
+  sessionStorage.setItem('find-my-house-welcome-imported', 'true');
+  router.push('/');
+}
+
 onMounted(loadConfig);
 </script>
 
@@ -187,13 +194,26 @@ onMounted(loadConfig);
         <section v-loading="loading" class="welcome-content">
           <div class="welcome-step-shell">
             <el-steps :active="activeStep" align-center>
+              <el-step title="导入数据" />
               <el-step title="服务配置" />
               <el-step title="焦点地点" />
             </el-steps>
           </div>
 
+          <section v-if="activeStep === 0" class="welcome-form">
+            <DataImportPanel
+              title="导入已有数据"
+              description="选择之前导出的 JSON 文件，快速导入房源、地点或服务配置。导入成功后将直接进入主应用。"
+              @imported="onImported"
+            />
+
+            <footer class="welcome-actions">
+              <el-button type="primary" plain @click="continueWithoutImport">不导入，继续配置</el-button>
+            </footer>
+          </section>
+
           <el-form
-            v-if="activeStep === 0"
+            v-if="activeStep === 1"
             ref="configFormRef"
             :model="configData"
             :rules="configRules"
@@ -263,7 +283,7 @@ onMounted(loadConfig);
           </el-form>
 
           <el-form
-            v-if="activeStep === 1"
+            v-if="activeStep === 2"
             ref="locationFormRef"
             :model="locationForm"
             :rules="locationRules"
@@ -312,7 +332,7 @@ onMounted(loadConfig);
             </section>
 
             <footer class="welcome-actions">
-              <el-button :disabled="saving" @click="activeStep = 0">上一步</el-button>
+              <el-button :disabled="saving" @click="activeStep = 1">上一步</el-button>
               <el-button type="primary" :loading="saving" @click="submitForm">
                 创建并开始使用
               </el-button>

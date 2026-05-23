@@ -4,12 +4,14 @@ import { Delete, Edit, Van } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
 import type { House } from '../../model/house/house';
-import type { DrivingDistanceResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult, CommuteMode } from '../../model/map/geocode';
+import { commuteModeLabels } from '../../model/map/geocode';
 
 const props = defineProps<{
   house: House;
-  drivingDistance?: DrivingDistanceResult;
+  drivingDistance?: CommuteDistanceResult;
   focusLocationName?: string;
+  commuteMode?: CommuteMode;
   compareSelected?: boolean;
   compareDisabled?: boolean;
 }>();
@@ -79,7 +81,9 @@ function formatDuration(seconds: number): string {
     </div>
     <small>
       <template v-if="drivingDistance && focusLocationName">
-        <span class="house-card-driving">距{{ focusLocationName }} {{ formatDistance(drivingDistance.distance) }} / {{ formatDuration(drivingDistance.duration) }}</span>
+        <span class="house-card-driving">
+          {{ commuteMode ? commuteModeLabels[commuteMode] : '' }}距{{ focusLocationName }} {{ formatDistance(drivingDistance.distance) }} / {{ formatDuration(drivingDistance.duration) }}
+        </span>
         ｜
       </template>
       {{ house.bedroomCount }}房{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫

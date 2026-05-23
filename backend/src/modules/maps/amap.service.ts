@@ -1,5 +1,7 @@
 import { configService } from '../config/index.js';
 
+export type CommuteMode = 'driving' | 'transit' | 'cycling' | 'walking';
+
 interface AmapGeocodeResponse {
   status: string;
   info: string;
@@ -36,19 +38,35 @@ export interface GeocodeResult {
   district?: string;
 }
 
-export interface DrivingDistanceResult {
+export interface CommuteDistanceResult {
   origin: string;
   destination: string;
   distance: number;
   duration: number;
+  mode: CommuteMode;
 }
 
-export interface DrivingRouteResult {
+export interface CommuteRouteResult {
   origin: string;
   destination: string;
   distance: number;
   duration: number;
-  polyline: Array<[number, number]>;
+  polyline?: Array<[number, number]>;
+  mode: CommuteMode;
+}
+
+// 向后兼容别名
+export type DrivingDistanceResult = CommuteDistanceResult;
+export type DrivingRouteResult = CommuteRouteResult;
+
+function getApiUrl(mode: CommuteMode): string {
+  const base = 'https://restapi.amap.com/v3/direction';
+  switch (mode) {
+    case 'driving': return `${base}/driving`;
+    case 'transit': return `${base}/transit/integrated`;
+    case 'cycling': return `${base}/bicycling`;
+    case 'walking': return `${base}/walking`;
+  }
 }
 
 export class AmapService {
@@ -133,10 +151,11 @@ export class AmapService {
     };
   }
 
-  async getDrivingDistance(
+  async getCommuteDistance(
+    mode: CommuteMode,
     origin: string,
     destination: string
-  ): Promise<DrivingDistanceResult | undefined> {
+  ): Promise<CommuteDistanceResult | undefined> {
     const amapKey = configService.getAmapWebServiceKey();
     if (!amapKey) {
       throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
@@ -149,11 +168,10 @@ export class AmapService {
       extensions: 'base'
     });
 
-    const response = await fetch(
-      `https://restapi.amap.com/v3/direction/driving?${params.toString()}`
-    );
+    const url = getApiUrl(mode);
+    const response = await fetch(`${url}?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(`Amap driving direction failed with ${response.status}`);
+      throw new Error(`Amap ${mode} direction failed with ${response.status}`);
     }
 
     const payload = (await response.json()) as {
@@ -162,7 +180,7 @@ export class AmapService {
       route?: { paths?: Array<{ distance: string; duration: string }> };
     };
     if (payload.status !== '1') {
-      throw new Error(payload.info || 'Amap driving direction failed');
+      throw new Error(payload.info || `Amap ${mode} direction failed`);
     }
 
     const path = payload.route?.paths?.[0];
@@ -174,14 +192,16 @@ export class AmapService {
       origin,
       destination,
       distance: Number(path.distance),
-      duration: Number(path.duration)
+      duration: Number(path.duration),
+      mode
     };
   }
 
-  async getDrivingRoute(
+  async getCommuteRoute(
+    mode: CommuteMode,
     origin: string,
     destination: string
-  ): Promise<DrivingRouteResult | undefined> {
+  ): Promise<CommuteRouteResult | undefined> {
     const amapKey = configService.getAmapWebServiceKey();
     if (!amapKey) {
       throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
@@ -194,11 +214,10 @@ export class AmapService {
       extensions: 'all'
     });
 
-    const response = await fetch(
-      `https://restapi.amap.com/v3/direction/driving?${params.toString()}`
-    );
+    const url = getApiUrl(mode);
+    const response = await fetch(`${url}?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(`Amap driving direction failed with ${response.status}`);
+      throw new Error(`Amap ${mode} direction failed with ${response.status}`);
     }
 
     const payload = (await response.json()) as {
@@ -213,7 +232,7 @@ export class AmapService {
       };
     };
     if (payload.status !== '1') {
-      throw new Error(payload.info || 'Amap driving direction failed');
+      throw new Error(payload.info || `Amap ${mode} direction failed`);
     }
 
     const path = payload.route?.paths?.[0];
@@ -221,14 +240,18 @@ export class AmapService {
       return undefined;
     }
 
-    const polyline: Array<[number, number]> = [];
-    for (const step of path.steps ?? []) {
-      if (!step.polyline) continue;
-      const points = step.polyline.split(';');
-      for (const point of points) {
-        const [lng, lat] = point.split(',').map(Number);
-        if (!isNaN(lng) && !isNaN(lat)) {
-          polyline.push([lng, lat]);
+    // 公交模式下不提取 polyline（无连续路径）
+    let polyline: Array<[number, number]> | undefined;
+    if (mode !== 'transit') {
+      polyline = [];
+      for (const step of path.steps ?? []) {
+        if (!step.polyline) continue;
+        const points = step.polyline.split(';');
+        for (const point of points) {
+          const [lng, lat] = point.split(',').map(Number);
+          if (!isNaN(lng) && !isNaN(lat)) {
+            polyline.push([lng, lat]);
+          }
         }
       }
     }
@@ -238,7 +261,23 @@ export class AmapService {
       destination,
       distance: Number(path.distance),
       duration: Number(path.duration),
-      polyline
+      polyline,
+      mode
     };
+  }
+
+  // 向后兼容委托
+  async getDrivingDistance(
+    origin: string,
+    destination: string
+  ): Promise<CommuteDistanceResult | undefined> {
+    return this.getCommuteDistance('driving', origin, destination);
+  }
+
+  async getDrivingRoute(
+    origin: string,
+    destination: string
+  ): Promise<CommuteRouteResult | undefined> {
+    return this.getCommuteRoute('driving', origin, destination);
   }
 }

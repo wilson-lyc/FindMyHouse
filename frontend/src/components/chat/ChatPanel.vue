@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Delete, Plus, Setting } from '@element-plus/icons-vue';
+import { Delete, Plus, Setting, Top } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
 import {
   sendChatMessage,
@@ -32,6 +32,9 @@ interface ChatMessage {
   houses?: House[];
   housesTitle?: string;
   compareHouses?: House[];
+  choicePrompt?: Extract<AgentFrontendAction, { type: 'ask_single_choice' }> & {
+    answeredValue?: string;
+  };
   hidden?: boolean;
 }
 
@@ -49,6 +52,7 @@ const pendingCompareResolve = ref<((result: ConfirmCompareHousesResult) => void)
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const messagesContainerRef = ref<HTMLDivElement | null>(null);
 const composerPanelSize = ref('152px');
+const customChoiceInputs = ref<Record<string, string>>({});
 
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
 const visibleMessages = computed(() => messages.value.filter((message) => !message.hidden));
@@ -98,10 +102,32 @@ async function handleSubmit() {
   }
 }
 
-function appendAssistantResponse(result: { reply: string; houses?: House[]; housesTitle?: string }) {
+function appendAssistantResponse(result: { reply: string; houses?: House[]; housesTitle?: string; actions?: AgentFrontendAction[] }) {
   const assistantMessage: ChatMessage = { content: result.reply, role: 'assistant' };
+  const choicePrompt = result.actions?.find((action) => action.type === 'ask_single_choice');
+  if (choicePrompt) {
+    assistantMessage.choicePrompt = choicePrompt;
+  }
   attachHousesToMessage(assistantMessage, result);
   messages.value.push(assistantMessage);
+}
+
+function getVisibleAssistantContent(message: ChatMessage) {
+  if (!message.choicePrompt) return message.content;
+
+  const content = normalizeChoiceText(message.content);
+  const question = normalizeChoiceText(message.choicePrompt.question);
+  const title = normalizeChoiceText(message.choicePrompt.title);
+
+  if (content && (content === question || content === title)) {
+    return '';
+  }
+
+  return message.content;
+}
+
+function normalizeChoiceText(value: string) {
+  return value.trim().replace(/\s+/g, '');
 }
 
 function attachHousesToMessage(message: ChatMessage, result: { houses?: House[]; housesTitle?: string }) {
@@ -235,14 +261,20 @@ async function removeSelectedSessions() {
 }
 
 function toApiMessages(): ApiChatMessage[] {
-  return messages.value.map((message) => ({
-    role: message.role,
-    content: message.content
-  }));
+  return messages.value
+    .filter((message) => message.content.trim().length > 0)
+    .map((message) => ({
+      role: message.role,
+      content: message.content
+    }));
 }
 
 async function executeAgentActions(actions: AgentFrontendAction[]) {
   for (const action of actions) {
+    if (action.type === 'ask_single_choice') {
+      continue;
+    }
+
     if (action.type === 'show_house_search_results') {
       emit('housesFound', action.houses);
       continue;
@@ -287,6 +319,34 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
       }
     }
   }
+}
+
+async function submitChoiceAnswer(message: ChatMessage, value: string) {
+  const answer = value.trim();
+  if (!message.choicePrompt || message.choicePrompt.answeredValue || !answer || loading.value) return;
+
+  message.choicePrompt.answeredValue = answer;
+  customChoiceInputs.value[message.choicePrompt.id] = '';
+  messages.value.push({ role: 'user', content: answer });
+
+  loading.value = true;
+  try {
+    await persistCurrentSession(answer);
+    const result = await sendChatMessage(toApiMessages());
+    appendAssistantResponse(result);
+    await persistCurrentSession();
+    await executeAgentActions(result.actions ?? []);
+  } catch (error) {
+    message.choicePrompt.answeredValue = undefined;
+    ElMessage.error(error instanceof Error ? error.message : '请求失败');
+  } finally {
+    loading.value = false;
+  }
+}
+
+function submitCustomChoiceAnswer(message: ChatMessage) {
+  if (!message.choicePrompt) return;
+  void submitChoiceAnswer(message, customChoiceInputs.value[message.choicePrompt.id] ?? '');
 }
 
 function requestCreateHouseConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>) {
@@ -538,15 +598,53 @@ watch(loading, () => {
           </div>
           <div v-for="(msg, index) in visibleMessages" :key="index" class="chat-message-wrapper" :class="msg.role">
             <div class="chat-bubble">
-              <div
-                v-if="msg.role === 'assistant' && msg.content"
-                class="chat-bubble-markdown markdown-body"
-                v-html="renderAssistantContent(msg.content)"
-              />
-              <div v-else-if="msg.role === 'assistant'" class="chat-inline-loading">
-                <span class="chat-loading-dot" />
-                <span class="chat-loading-dot" />
-                <span class="chat-loading-dot" />
+              <div v-if="msg.role === 'assistant'">
+                <div
+                  v-if="getVisibleAssistantContent(msg)"
+                  class="chat-bubble-markdown markdown-body"
+                  v-html="renderAssistantContent(getVisibleAssistantContent(msg))"
+                />
+                <div v-if="msg.choicePrompt" class="chat-choice-prompt">
+                  <div class="chat-choice-question">{{ msg.choicePrompt.question }}</div>
+                  <div class="chat-choice-options" role="radiogroup" :aria-label="msg.choicePrompt.question">
+                    <button
+                      v-for="option in msg.choicePrompt.options"
+                      :key="option.id"
+                      class="chat-choice-option"
+                      type="button"
+                      role="radio"
+                      :aria-checked="msg.choicePrompt.answeredValue === option.value"
+                      :class="{ selected: msg.choicePrompt.answeredValue === option.value }"
+                      :disabled="loading || Boolean(msg.choicePrompt.answeredValue)"
+                      @click="submitChoiceAnswer(msg, option.value)"
+                    >
+                      <span class="chat-choice-radio" />
+                      <span class="chat-choice-label">{{ option.label }}</span>
+                    </button>
+                  </div>
+                  <form class="chat-choice-custom" @submit.prevent="submitCustomChoiceAnswer(msg)">
+                    <input
+                      v-model="customChoiceInputs[msg.choicePrompt.id]"
+                      class="chat-choice-custom-input"
+                      type="text"
+                      :placeholder="msg.choicePrompt.customOptionLabel"
+                      :disabled="loading || Boolean(msg.choicePrompt.answeredValue)"
+                    >
+                    <el-button
+                      class="chat-choice-custom-submit"
+                      type="primary"
+                      native-type="submit"
+                      :disabled="loading || Boolean(msg.choicePrompt.answeredValue) || !(customChoiceInputs[msg.choicePrompt.id] ?? '').trim()"
+                    >
+                      发送
+                    </el-button>
+                  </form>
+                </div>
+                <div v-if="!msg.content && !msg.choicePrompt" class="chat-inline-loading">
+                  <span class="chat-loading-dot" />
+                  <span class="chat-loading-dot" />
+                  <span class="chat-loading-dot" />
+                </div>
               </div>
               <div v-else class="chat-bubble-text">{{ msg.content }}</div>
               <div v-if="msg.houses && msg.houses.length > 0" class="chat-house-results">
@@ -598,16 +696,17 @@ watch(loading, () => {
             />
             <div class="chat-composer-footer">
               <span class="chat-composer-hint">Shift + Enter 换行</span>
-              <button
+              <el-button
                 class="chat-composer-send"
-                type="submit"
+                type="primary"
+                circle
+                native-type="submit"
                 :disabled="!canSubmit"
+                :loading="loading"
+                :icon="loading ? undefined : Top"
                 aria-label="发送消息"
                 title="发送"
-              >
-                <span v-if="loading" class="chat-composer-spinner" />
-                <span v-else class="chat-composer-send-icon">↑</span>
-              </button>
+              />
             </div>
           </form>
         </div>
@@ -870,13 +969,13 @@ watch(loading, () => {
 .chat-message-wrapper.user {
   align-self: flex-end;
   justify-content: flex-end;
-  max-width: min(520px, calc(100vw - 96px));
+  max-width: min(520px, calc(100% - 40px));
 }
 
 .chat-message-wrapper.assistant {
   align-self: flex-start;
   justify-content: flex-start;
-  max-width: min(520px, calc(100vw - 96px));
+  max-width: min(520px, calc(100% - 40px));
 }
 
 .chat-bubble {
@@ -933,6 +1032,114 @@ watch(loading, () => {
   width: max-content;
   min-width: 100%;
   white-space: nowrap;
+}
+
+.chat-choice-prompt {
+  display: grid;
+  gap: 10px;
+  min-width: min(360px, 100%);
+  white-space: normal;
+}
+
+.chat-choice-question {
+  color: var(--app-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.chat-choice-options {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-choice-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  color: var(--app-text-primary);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.chat-choice-option:hover:not(:disabled) {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.chat-choice-option:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.chat-choice-option.selected {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary-dark-2);
+}
+
+.chat-choice-radio {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--el-border-color-darker);
+  border-radius: 50%;
+  background: var(--el-bg-color);
+  box-shadow: inset 0 0 0 3px var(--el-bg-color);
+}
+
+.chat-choice-option.selected .chat-choice-radio {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary);
+}
+
+.chat-choice-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-choice-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.chat-choice-custom-input {
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--el-bg-color);
+  color: var(--app-text-primary);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.chat-choice-custom-input:focus {
+  border-color: var(--el-color-primary);
+}
+
+.chat-choice-custom-submit {
+  height: 34px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chat-choice-custom-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
 }
 
 .chat-inline-loading {
@@ -1151,54 +1358,20 @@ watch(loading, () => {
 }
 
 .chat-composer-send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border: 0;
-  border-radius: 50%;
-  background: var(--el-color-primary);
-  color: var(--el-bg-color);
-  cursor: pointer;
   transition:
-    background 0.18s ease,
     opacity 0.18s ease,
     transform 0.18s ease;
 }
 
-.chat-composer-send:hover:not(:disabled) {
-  background: var(--el-color-primary-dark-2);
+.chat-composer-send:hover:not(.is-disabled) {
   transform: translateY(-1px);
 }
 
-.chat-composer-send:disabled {
-  cursor: not-allowed;
+.chat-composer-send.is-disabled {
   opacity: 0.28;
-}
-
-.chat-composer-send-icon {
-  display: block;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-  transform: translateY(-1px);
-}
-
-.chat-composer-spinner {
-  width: 15px;
-  height: 15px;
-  border: 2px solid rgb(255 255 255 / 34%);
-  border-top-color: var(--el-bg-color);
-  border-radius: 50%;
-  animation: chat-spin 0.8s linear infinite;
-}
-
-@keyframes chat-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 520px) {
