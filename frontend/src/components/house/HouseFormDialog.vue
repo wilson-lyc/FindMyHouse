@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { Aim, Delete as DeleteIcon, Edit as EditIcon, Plus } from '@element-plus/icons-vue';
-import { geocodeAddress } from '../../api/map/map-api';
+import { Aim, Delete as DeleteIcon, Edit as EditIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
+import { geocodeAddress, reverseGeocodeCoordinates } from '../../api/map/map-api';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
   houseSourceChannelLabels,
@@ -36,7 +36,8 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<FormInstance>();
-const geocoding = ref(false);
+const addressGeocoding = ref(false);
+const coordinateGeocoding = ref(false);
 const form = reactive<HouseForm>(createEmptyHouseForm());
 
 const formSections = [
@@ -62,23 +63,43 @@ watch(
   { immediate: true }
 );
 
-async function geocode() {
+async function convertAddressToCoordinates() {
   if (!form.address.trim()) {
     ElMessage.warning('请先输入地址');
     return;
   }
 
-  geocoding.value = true;
+  addressGeocoding.value = true;
   try {
     const result = await geocodeAddress(form.address);
     form.address = result.formattedAddress || form.address;
     form.latitude = result.latitude;
     form.longitude = result.longitude;
-    ElMessage.success('已定位');
+    ElMessage.success('已将地址转为坐标');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '定位失败');
+    ElMessage.error(error instanceof Error ? error.message : '地址转坐标失败');
   } finally {
-    geocoding.value = false;
+    addressGeocoding.value = false;
+  }
+}
+
+async function convertCoordinatesToAddress() {
+  if (form.longitude === undefined || form.latitude === undefined) {
+    ElMessage.warning('请先选择或输入坐标');
+    return;
+  }
+
+  coordinateGeocoding.value = true;
+  try {
+    const result = await reverseGeocodeCoordinates(form.longitude, form.latitude);
+    form.address = result.formattedAddress || form.address;
+    form.latitude = result.latitude;
+    form.longitude = result.longitude;
+    ElMessage.success('已将坐标转为地址');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '坐标转地址失败');
+  } finally {
+    coordinateGeocoding.value = false;
   }
 }
 
@@ -87,6 +108,9 @@ async function geocode() {
 const feeItemDialogVisible = ref(false);
 const feeItemDialogItem = ref<CustomFeeItem | null>(null);
 const feeEditingIndex = ref(-1);
+const customFeesTotal = computed(() =>
+  (form.customFees ?? []).reduce((total, item) => total + (Number(item.amount) || 0), 0)
+);
 
 function scrollToSection(sectionKey: string) {
   document.getElementById(`house-form-${sectionKey}`)?.scrollIntoView({
@@ -154,19 +178,26 @@ async function submitForm() {
               <el-form-item label="名称" prop="name">
                 <el-input v-model="form.name" placeholder="" />
               </el-form-item>
-              <el-form-item label="状态" prop="status">
+              <el-form-item label="状态" prop="status" required>
                 <el-select v-model="form.status" placeholder="">
                   <el-option v-for="status in houseStatuses" :key="status" :label="statusLabels[status]" :value="status" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="房">
-                <el-input-number v-model="form.bedroomCount" :min="0" :step="1" controls-position="right" />
-              </el-form-item>
-              <el-form-item label="厅">
-                <el-input-number v-model="form.livingRoomCount" :min="0" :step="1" controls-position="right" />
-              </el-form-item>
-              <el-form-item label="卫">
-                <el-input-number v-model="form.bathroomCount" :min="0" :step="1" controls-position="right" />
+              <el-form-item label="房型" class="span-2" required>
+                <div class="room-count-row">
+                  <label class="room-count-control">
+                    <el-input-number v-model="form.bedroomCount" :min="0" :step="1" controls-position="right" />
+                    <span>房</span>
+                  </label>
+                  <label class="room-count-control">
+                    <el-input-number v-model="form.livingRoomCount" :min="0" :step="1" controls-position="right" />
+                    <span>厅</span>
+                  </label>
+                  <label class="room-count-control">
+                    <el-input-number v-model="form.bathroomCount" :min="0" :step="1" controls-position="right" />
+                    <span>卫</span>
+                  </label>
+                </div>
               </el-form-item>
             </div>
           </section>
@@ -175,12 +206,23 @@ async function submitForm() {
             <h3>地理位置</h3>
             <div class="form-grid">
               <el-form-item label="地址" prop="address" class="span-2">
-                <div class="address-row">
+                <div class="address-row geocode-address-row">
                   <el-input v-model="form.address" placeholder="" />
-                  <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
+                  <div class="geocode-button-group">
+                    <el-button :icon="Aim" :loading="addressGeocoding" @click="convertAddressToCoordinates">
+                      地址转坐标
+                    </el-button>
+                    <el-button
+                      :icon="LocationFilled"
+                      :loading="coordinateGeocoding"
+                      @click="convertCoordinatesToAddress"
+                    >
+                      坐标转地址
+                    </el-button>
+                  </div>
                 </div>
               </el-form-item>
-              <el-form-item label="定位" class="span-2">
+              <el-form-item label="定位" class="span-2" required>
                 <div class="coordinate-map-field">
                   <CoordinatePicker
                     v-if="modelValue"
@@ -232,7 +274,10 @@ async function submitForm() {
               <el-form-item label="自定义费用" class="span-2 custom-fees-form-item">
                 <div class="custom-fees-wrap">
                   <div class="custom-fees-header">
-                    <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项</span>
+                    <div class="custom-fees-summary">
+                      <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项</span>
+                      <span class="custom-fees-total">合计 {{ formatCurrency(customFeesTotal) }}</span>
+                    </div>
                     <el-button :icon="Plus" type="primary" plain size="small" @click="openAddFeeDialog">添加费用</el-button>
                   </div>
                   <el-table
@@ -271,6 +316,9 @@ async function submitForm() {
           <section id="house-form-contact" class="house-form-section">
             <h3>联系方式</h3>
             <div class="form-grid">
+              <el-form-item label="联系人">
+                <el-input v-model="form.contactName" placeholder="" />
+              </el-form-item>
               <el-form-item label="电话">
                 <el-input v-model="form.phone" placeholder="" />
               </el-form-item>

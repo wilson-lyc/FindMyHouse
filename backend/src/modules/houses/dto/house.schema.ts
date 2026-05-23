@@ -39,6 +39,7 @@ export const createHouseSchema = z.object({
   electricityFeePerKwh: optionalNumber,
   customFees: z.array(z.object({ name: z.string().min(1, '费用名称不能为空'), amount: z.number().min(0, '金额不能为负数') })).optional(),
   feeNotes: optionalText,
+  contactName: optionalText,
   phone: optionalText,
   wechat: optionalText,
   contactNotes: optionalText

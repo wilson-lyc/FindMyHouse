@@ -21,6 +21,7 @@ export interface HouseRow {
   electricity_fee_per_kwh: number | null;
   custom_fees: string | null;
   fee_notes: string | null;
+  contact_name: string | null;
   phone: string | null;
   wechat: string | null;
   contact_notes: string | null;
@@ -49,6 +50,7 @@ export function toHouse(row: HouseRow): House {
     electricityFeePerKwh: row.electricity_fee_per_kwh ?? undefined,
     customFees: parseCustomFees(row.custom_fees),
     feeNotes: row.fee_notes ?? undefined,
+    contactName: row.contact_name ?? undefined,
     phone: row.phone ?? undefined,
     wechat: row.wechat ?? undefined,
     contactNotes: row.contact_notes ?? undefined,
@@ -77,6 +79,7 @@ export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput) {
     electricity_fee_per_kwh: input.electricityFeePerKwh ?? null,
     custom_fees: input.customFees?.length ? JSON.stringify(input.customFees) : null,
     fee_notes: input.feeNotes ?? null,
+    contact_name: input.contactName ?? null,
     phone: input.phone ?? null,
     wechat: input.wechat ?? null,
     contact_notes: input.contactNotes ?? null

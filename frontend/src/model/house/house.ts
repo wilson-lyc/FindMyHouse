@@ -57,6 +57,7 @@ export interface House {
   electricityFeePerKwh?: number;
   customFees?: CustomFeeItem[];
   feeNotes?: string;
+  contactName?: string;
   phone?: string;
   wechat?: string;
   contactNotes?: string;

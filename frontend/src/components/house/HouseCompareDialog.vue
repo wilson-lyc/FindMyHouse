@@ -135,7 +135,7 @@ function formatRoute(house: House) {
 }
 
 function formatContact(house: House) {
-  const contacts = [house.phone, house.wechat].filter(Boolean);
+  const contacts = [house.contactName, house.phone, house.wechat].filter(Boolean);
   return contacts.length ? contacts.join(' / ') : '-';
 }
 </script>

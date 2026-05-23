@@ -417,6 +417,7 @@ function createHouseCreatedReply(house: House) {
     ...(house.customFees?.map(fee => [`${fee.name}`, `${fee.amount} 元`] as [string, string]) ?? []),
     ['付款周期', house.rentPaymentPeriods?.length ? house.rentPaymentPeriods.join('、') : undefined],
     ['费用备注', house.feeNotes || undefined],
+    ['联系人', house.contactName || undefined],
     ['联系电话', house.phone || undefined],
     ['微信', house.wechat || undefined],
     ['联系备注', house.contactNotes || undefined]

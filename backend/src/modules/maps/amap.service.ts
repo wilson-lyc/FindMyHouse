@@ -13,6 +13,19 @@ interface AmapGeocodeResponse {
   }>;
 }
 
+interface AmapReverseGeocodeResponse {
+  status: string;
+  info: string;
+  regeocode?: {
+    formatted_address?: string;
+    addressComponent?: {
+      province?: string;
+      city?: string | string[];
+      district?: string;
+    };
+  };
+}
+
 export interface GeocodeResult {
   provider: 'amap';
   formattedAddress: string;
@@ -78,6 +91,45 @@ export class AmapService {
       province: first.province,
       city: Array.isArray(first.city) ? undefined : first.city,
       district: first.district
+    };
+  }
+
+  async reverseGeocode(longitude: number, latitude: number): Promise<GeocodeResult | undefined> {
+    const amapKey = configService.getAmapWebServiceKey();
+    if (!amapKey) {
+      throw new Error('AMAP_WEB_SERVICE_KEY is not configured');
+    }
+
+    const params = new URLSearchParams({
+      key: amapKey,
+      location: `${longitude},${latitude}`,
+      extensions: 'base'
+    });
+
+    const response = await fetch(`https://restapi.amap.com/v3/geocode/regeo?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(`Amap reverse geocode failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as AmapReverseGeocodeResponse;
+    if (payload.status !== '1') {
+      throw new Error(payload.info || 'Amap reverse geocode failed');
+    }
+
+    const formattedAddress = payload.regeocode?.formatted_address;
+    if (!formattedAddress) {
+      return undefined;
+    }
+
+    const addressComponent = payload.regeocode?.addressComponent;
+    return {
+      provider: 'amap',
+      formattedAddress,
+      latitude,
+      longitude,
+      province: addressComponent?.province,
+      city: Array.isArray(addressComponent?.city) ? undefined : addressComponent?.city,
+      district: addressComponent?.district
     };
   }
 

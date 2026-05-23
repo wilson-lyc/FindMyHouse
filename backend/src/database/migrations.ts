@@ -20,6 +20,7 @@ const houseColumns = [
   ['electricity_fee_per_kwh', 'REAL'],
   ['custom_fees', 'TEXT'],
   ['fee_notes', 'TEXT'],
+  ['contact_name', 'TEXT'],
   ['phone', 'TEXT'],
   ['wechat', 'TEXT'],
   ['contact_notes', 'TEXT'],
@@ -105,4 +106,5 @@ export function migrate() {
   ensureColumn('houses', 'deposit', 'INTEGER');
   ensureColumn('houses', 'custom_fees', 'TEXT');
   ensureColumn('houses', 'fee_notes', 'TEXT');
+  ensureColumn('houses', 'contact_name', 'TEXT');
 }

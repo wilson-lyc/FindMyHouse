@@ -20,6 +20,7 @@ export function createEmptyHouseForm(): HouseForm {
     electricityFeePerKwh: undefined,
     customFees: [],
     feeNotes: '',
+    contactName: '',
     phone: '',
     wechat: '',
     contactNotes: ''
@@ -46,6 +47,7 @@ export function houseToForm(house: House): HouseForm {
     electricityFeePerKwh: house.electricityFeePerKwh,
     customFees: house.customFees ?? [],
     feeNotes: house.feeNotes ?? '',
+    contactName: house.contactName ?? '',
     phone: house.phone ?? '',
     wechat: house.wechat ?? '',
     contactNotes: house.contactNotes ?? ''
@@ -57,6 +59,7 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     ...payload,
     name: payload.name.trim(),
     sourceChannel: payload.sourceChannel || null,
+    contactName: payload.contactName?.trim() ?? '',
     phone: payload.phone?.trim() ?? '',
     wechat: payload.wechat?.trim() ?? '',
     contactNotes: payload.contactNotes?.trim() ?? '',

@@ -708,6 +708,18 @@ body {
   color: var(--app-text-regular);
 }
 
+.custom-fees-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.custom-fees-total {
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+
 .custom-fees-table {
   width: 100%;
   border: 1px solid var(--el-border-color-light);
@@ -734,6 +746,32 @@ body {
 
 .address-row {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.geocode-button-group {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 10px;
+}
+
+.geocode-button-group .el-button {
+  margin-left: 0;
+}
+
+.room-count-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.room-count-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-text-secondary);
+  font-size: 14px;
 }
 
 .coordinate-row {
@@ -1092,6 +1130,10 @@ body {
   .address-row,
   .coordinate-row {
     grid-template-columns: 1fr;
+  }
+
+  .geocode-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .span-2 {
