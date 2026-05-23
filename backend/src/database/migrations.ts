@@ -13,10 +13,14 @@ const houseColumns = [
   ['longitude', 'REAL'],
   ['rent_price', 'INTEGER NOT NULL'],
   ['rent_payment_periods', 'TEXT'],
+  ['earnest_money', 'INTEGER'],
+  ['deposit', 'INTEGER'],
   ['property_fee', 'INTEGER'],
   ['water_fee_per_ton', 'REAL'],
   ['electricity_fee_per_kwh', 'REAL'],
-  ['other_fee', 'INTEGER'],
+  ['custom_fees', 'TEXT'],
+  ['fee_notes', 'TEXT'],
+  ['contact_name', 'TEXT'],
   ['phone', 'TEXT'],
   ['wechat', 'TEXT'],
   ['contact_notes', 'TEXT'],
@@ -97,4 +101,10 @@ export function migrate() {
   `);
 
   ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');
+
+  ensureColumn('houses', 'earnest_money', 'INTEGER');
+  ensureColumn('houses', 'deposit', 'INTEGER');
+  ensureColumn('houses', 'custom_fees', 'TEXT');
+  ensureColumn('houses', 'fee_notes', 'TEXT');
+  ensureColumn('houses', 'contact_name', 'TEXT');
 }

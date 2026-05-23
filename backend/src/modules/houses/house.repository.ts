@@ -101,12 +101,12 @@ export class HouseRepository {
         `
           INSERT INTO houses (
             id, name, status, bedroom_count, living_room_count, bathroom_count, source_channel,
-            address, latitude, longitude, rent_price, rent_payment_periods, property_fee, water_fee_per_ton,
-            electricity_fee_per_kwh, other_fee, phone, wechat, contact_notes, created_at, updated_at
+            address, latitude, longitude, rent_price, rent_payment_periods, earnest_money, deposit, property_fee, water_fee_per_ton,
+            electricity_fee_per_kwh, custom_fees, fee_notes, contact_name, phone, wechat, contact_notes, created_at, updated_at
           ) VALUES (
             @id, @name, @status, @bedroom_count, @living_room_count, @bathroom_count, @source_channel,
-            @address, @latitude, @longitude, @rent_price, @rent_payment_periods, @property_fee, @water_fee_per_ton,
-            @electricity_fee_per_kwh, @other_fee, @phone, @wechat, @contact_notes, @created_at, @updated_at
+            @address, @latitude, @longitude, @rent_price, @rent_payment_periods, @earnest_money, @deposit, @property_fee, @water_fee_per_ton,
+            @electricity_fee_per_kwh, @custom_fees, @fee_notes, @contact_name, @phone, @wechat, @contact_notes, @created_at, @updated_at
           )
         `
       )
@@ -147,10 +147,14 @@ export class HouseRepository {
             longitude = @longitude,
             rent_price = @rent_price,
             rent_payment_periods = @rent_payment_periods,
+            earnest_money = @earnest_money,
+            deposit = @deposit,
             property_fee = @property_fee,
             water_fee_per_ton = @water_fee_per_ton,
             electricity_fee_per_kwh = @electricity_fee_per_kwh,
-            other_fee = @other_fee,
+            custom_fees = @custom_fees,
+            fee_notes = @fee_notes,
+            contact_name = @contact_name,
             phone = @phone,
             wechat = @wechat,
             contact_notes = @contact_notes,

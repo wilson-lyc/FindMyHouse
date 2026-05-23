@@ -8,6 +8,8 @@ export interface GeocodeResult {
   district?: string;
 }
 
+export type ReverseGeocodeResult = GeocodeResult;
+
 export interface DrivingDistanceResult {
   origin: string;
   destination: string;

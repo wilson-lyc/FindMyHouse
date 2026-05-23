@@ -1,8 +1,20 @@
 import { postData } from '../http';
-import type { GeocodeResult, DrivingDistanceResult, DrivingRouteResult } from '../../model/map/geocode';
+import type {
+  GeocodeResult,
+  ReverseGeocodeResult,
+  DrivingDistanceResult,
+  DrivingRouteResult
+} from '../../model/map/geocode';
 
 export function geocodeAddress(address: string, city?: string) {
   return postData<GeocodeResult, { address: string; city?: string }>('/api/maps/geocode', { address, city });
+}
+
+export function reverseGeocodeCoordinates(longitude: number, latitude: number) {
+  return postData<ReverseGeocodeResult, { longitude: number; latitude: number }>(
+    '/api/maps/reverse-geocode',
+    { longitude, latitude }
+  );
 }
 
 export function getDrivingDistance(origin: string, destination: string) {

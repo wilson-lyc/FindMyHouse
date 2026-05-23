@@ -1,4 +1,4 @@
-import type { House, HouseForm } from '../../model/house/house';
+import type { CustomFeeItem, House, HouseForm } from '../../model/house/house';
 
 export function createEmptyHouseForm(): HouseForm {
   return {
@@ -13,10 +13,14 @@ export function createEmptyHouseForm(): HouseForm {
     longitude: undefined,
     rentPrice: undefined,
     rentPaymentPeriods: [],
+    earnestMoney: undefined,
+    deposit: undefined,
     propertyFee: undefined,
     waterFeePerTon: undefined,
     electricityFeePerKwh: undefined,
-    otherFee: undefined,
+    customFees: [],
+    feeNotes: '',
+    contactName: '',
     phone: '',
     wechat: '',
     contactNotes: ''
@@ -36,10 +40,14 @@ export function houseToForm(house: House): HouseForm {
     longitude: house.longitude,
     rentPrice: house.rentPrice,
     rentPaymentPeriods: house.rentPaymentPeriods ?? [],
+    earnestMoney: house.earnestMoney,
+    deposit: house.deposit,
     propertyFee: house.propertyFee,
     waterFeePerTon: house.waterFeePerTon,
     electricityFeePerKwh: house.electricityFeePerKwh,
-    otherFee: house.otherFee,
+    customFees: house.customFees ?? [],
+    feeNotes: house.feeNotes ?? '',
+    contactName: house.contactName ?? '',
     phone: house.phone ?? '',
     wechat: house.wechat ?? '',
     contactNotes: house.contactNotes ?? ''
@@ -51,15 +59,19 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     ...payload,
     name: payload.name.trim(),
     sourceChannel: payload.sourceChannel || null,
+    contactName: payload.contactName?.trim() ?? '',
     phone: payload.phone?.trim() ?? '',
     wechat: payload.wechat?.trim() ?? '',
     contactNotes: payload.contactNotes?.trim() ?? '',
     latitude: payload.latitude ?? undefined,
     longitude: payload.longitude ?? undefined,
     rentPaymentPeriods: payload.rentPaymentPeriods?.length ? payload.rentPaymentPeriods : undefined,
+    earnestMoney: payload.earnestMoney ?? undefined,
+    deposit: payload.deposit ?? undefined,
     propertyFee: payload.propertyFee ?? undefined,
     waterFeePerTon: payload.waterFeePerTon ?? undefined,
     electricityFeePerKwh: payload.electricityFeePerKwh ?? undefined,
-    otherFee: payload.otherFee ?? undefined
+    customFees: payload.customFees?.length ? payload.customFees : undefined,
+    feeNotes: payload.feeNotes?.trim() ?? ''
   };
 }

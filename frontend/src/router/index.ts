@@ -30,11 +30,6 @@ const routes = [
         path: 'chat',
         name: 'chat',
         component: ChatView
-      },
-      {
-        path: 'stats',
-        name: 'stats',
-        component: StatsView
       }
     ]
   },
@@ -47,6 +42,11 @@ const routes = [
     path: '/help',
     name: 'help',
     component: HelpPage
+  },
+  {
+    path: '/stats',
+    name: 'stats',
+    component: StatsView
   },
   {
     path: '/settings',

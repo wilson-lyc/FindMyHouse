@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Delete, Edit, Van } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
 import type { House } from '../../model/house/house';
 import type { DrivingDistanceResult } from '../../model/map/geocode';
 
-defineProps<{
+const props = defineProps<{
   house: House;
   drivingDistance?: DrivingDistanceResult;
   focusLocationName?: string;
+  compareSelected?: boolean;
+  compareDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +19,7 @@ const emit = defineEmits<{
   edit: [house: House];
   delete: [house: House];
   route: [house: House];
+  compareChange: [house: House, selected: boolean];
 }>();
 
 function formatFeeLabel(value: number | undefined, suffix: string) {
@@ -27,6 +31,11 @@ function formatFeeLabel(value: number | undefined, suffix: string) {
     maximumFractionDigits: 2
   }).format(value) + suffix;
 }
+
+const customFeesTotal = computed(() => {
+  const total = (props.house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
+  return total > 0 ? total : undefined;
+});
 
 function formatDistance(meters: number): string {
   if (meters >= 1000) {
@@ -56,7 +65,16 @@ function formatDuration(seconds: number): string {
     @click="emit('select', house)"
   >
     <div class="house-card-header">
-      <strong>{{ house.name }}</strong>
+      <div class="house-card-title-row">
+        <el-checkbox
+          :model-value="compareSelected"
+          :disabled="compareDisabled"
+          aria-label="加入对比"
+          @click.stop
+          @change="(selected: string | number | boolean) => emit('compareChange', house, Boolean(selected))"
+        />
+        <strong>{{ house.name }}</strong>
+      </div>
       <el-tag :type="statusType(house.status)" size="small">{{ statusLabels[house.status] }}</el-tag>
     </div>
     <small>
@@ -67,13 +85,9 @@ function formatDuration(seconds: number): string {
       {{ house.bedroomCount }}房{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫
     </small>
     <div class="house-card-fees">
-      <div class="fee-row">
+      <div class="fee-row fee-row--full">
         <span class="fee-label">租金</span>
         <span class="fee-value">{{ formatCurrency(house.rentPrice) }}</span>
-      </div>
-      <div class="fee-row">
-        <span class="fee-label">物业</span>
-        <span class="fee-value">{{ formatFeeLabel(house.propertyFee, '/月') }}</span>
       </div>
       <div class="fee-row">
         <span class="fee-label">水费</span>
@@ -82,6 +96,14 @@ function formatDuration(seconds: number): string {
       <div class="fee-row">
         <span class="fee-label">电费</span>
         <span class="fee-value">{{ formatFeeLabel(house.electricityFeePerKwh, '/度') }}</span>
+      </div>
+      <div class="fee-row">
+        <span class="fee-label">物业费</span>
+        <span class="fee-value">{{ formatFeeLabel(house.propertyFee, '/月') }}</span>
+      </div>
+      <div class="fee-row">
+        <span class="fee-label">其他费用</span>
+        <span class="fee-value">{{ formatCurrency(customFeesTotal) }}</span>
       </div>
     </div>
     <div class="house-card-actions">

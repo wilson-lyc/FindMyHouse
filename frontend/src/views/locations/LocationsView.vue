@@ -2,8 +2,10 @@
 import { inject } from 'vue';
 import LocationPanel from '../../components/location/LocationPanel.vue';
 import { mainLayoutContextKey, type MainLayoutContext } from '../../context/main-layout-context';
+import { useLocationDialogStore } from '../../stores/locationDialogStore';
 
 const context = inject<MainLayoutContext>(mainLayoutContextKey);
+const locationDialogStore = useLocationDialogStore();
 
 if (!context) {
   throw new Error('LocationsView must be used inside MainLayout.');
@@ -14,8 +16,8 @@ if (!context) {
   <LocationPanel
     :locations="context.locations.value"
     :loading="context.locationsLoading.value"
-    @create="context.openCreateLocationDialog"
-    @edit="context.openEditLocationDialog"
+    @create="locationDialogStore.openCreate"
+    @edit="locationDialogStore.openEdit"
     @delete="context.confirmDeleteLocation"
     @set-focus="context.setLocationFocus"
   />

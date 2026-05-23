@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import { geocodeSchema, drivingDistanceSchema } from './dto/map.schema.js';
+import { geocodeSchema, reverseGeocodeSchema, drivingDistanceSchema } from './dto/map.schema.js';
 import { AmapService, type DrivingDistanceResult, type DrivingRouteResult } from './amap.service.js';
 import { RouteCacheRepository } from './route-cache.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
@@ -38,14 +38,6 @@ async function getCachedDrivingDistance(
 
   const result = await amapService.getDrivingDistance(origin, destination);
   if (result && focusLocation) {
-    routeCacheRepository.save({
-      focusLocationId: focusLocation.id,
-      origin,
-      destination,
-      kind: 'distance',
-      distance: result.distance,
-      duration: result.duration,
-    });
     routeCacheRepository.save({
       focusLocationId: focusLocation.id,
       origin,
@@ -92,6 +84,17 @@ export async function registerMapRoutes(app: FastifyInstance) {
 
     if (!result) {
       return reply.code(404).send({ error: 'Address not found' });
+    }
+
+    return { data: result };
+  });
+
+  app.post('/api/maps/reverse-geocode', async (request, reply) => {
+    const input = reverseGeocodeSchema.parse(request.body);
+    const result = await amapService.reverseGeocode(input.longitude, input.latitude);
+
+    if (!result) {
+      return reply.code(404).send({ error: 'Coordinates not found' });
     }
 
     return { data: result };
