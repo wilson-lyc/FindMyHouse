@@ -1,38 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { ArrowLeft } from '@element-plus/icons-vue';
-import { fetchHouses } from '../../api/house/house-api';
 import ScheduleListPanel from '../../components/schedule/ScheduleListPanel.vue';
-import type { House, ViewingSchedule } from '../../model/house/house';
+import { useScheduleStore } from '../../stores/scheduleStore';
+import { useHouses } from '../../composables/house/useHouses';
+import type { Schedule } from '../../model/schedule/schedule';
 
 interface CalendarScheduleItem {
-  house: House;
-  schedule: ViewingSchedule;
+  schedule: Schedule;
   date: Date;
 }
 
 const router = useRouter();
+const scheduleStore = useScheduleStore();
+const { houses, loadHouses } = useHouses();
 const selectedDate = ref(new Date());
 const scheduleDialogVisible = ref(false);
 const selectedDialogDateKey = ref(formatDateKey(new Date()));
-const houses = ref<House[]>([]);
 const loading = ref(true);
 
 const schedulesByDay = computed(() => {
   const groups = new Map<string, CalendarScheduleItem[]>();
+  for (const schedule of scheduleStore.schedules) {
+    const date = new Date(schedule.viewingAt);
+    if (Number.isNaN(date.getTime())) continue;
 
-  for (const house of houses.value) {
-    for (const schedule of house.viewingSchedules ?? []) {
-      const date = new Date(schedule.viewingAt);
-      if (Number.isNaN(date.getTime())) continue;
-
-      const key = formatDateKey(date);
-      const items = groups.get(key) ?? [];
-      items.push({ house, schedule, date });
-      groups.set(key, items);
-    }
+    const key = formatDateKey(date);
+    const items = groups.get(key) ?? [];
+    items.push({ schedule, date });
+    groups.set(key, items);
   }
 
   for (const items of groups.values()) {
@@ -44,12 +41,10 @@ const schedulesByDay = computed(() => {
 
 const selectedDialogTitle = computed(() => `${formatDateLabel(parseDateKey(selectedDialogDateKey.value))} 日程`);
 
-async function loadHouses() {
+async function loadData() {
   loading.value = true;
   try {
-    houses.value = await fetchHouses({ status: '', sourceChannel: '' });
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '加载日程失败');
+    await Promise.all([scheduleStore.loadSchedules(), loadHouses()]);
   } finally {
     loading.value = false;
   }
@@ -68,19 +63,11 @@ function parseDateKey(dateKey: string) {
 }
 
 function formatDateLabel(date: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short'
-  }).format(date);
+  return new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(date);
 }
 
 function formatTime(date: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(date);
+  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
 }
 
 function openScheduleDialog(day: string) {
@@ -89,7 +76,7 @@ function openScheduleDialog(day: string) {
   scheduleDialogVisible.value = true;
 }
 
-onMounted(loadHouses);
+onMounted(loadData);
 </script>
 
 <template>
@@ -97,18 +84,11 @@ onMounted(loadHouses);
     <el-header class="schedule-calendar-header">
       <div class="schedule-calendar-title-row">
         <el-tooltip content="返回地图" placement="bottom">
-          <el-button
-            class="schedule-calendar-back-button"
-            :icon="ArrowLeft"
-            text
-            aria-label="返回地图"
-            @click="router.push('/')"
-          />
+          <el-button class="schedule-calendar-back-button" :icon="ArrowLeft" text aria-label="返回地图" @click="router.push('/')" />
         </el-tooltip>
         <h1>日程</h1>
       </div>
     </el-header>
-
     <el-main v-loading="loading" class="schedule-calendar-main">
       <section class="schedule-calendar-content">
         <el-calendar v-model="selectedDate" class="viewing-calendar">
@@ -116,13 +96,9 @@ onMounted(loadHouses);
             <div class="viewing-calendar-cell" :class="{ 'is-selected': data.isSelected }" @click="openScheduleDialog(data.day)">
               <div class="viewing-calendar-day">{{ Number(data.day.slice(-2)) }}</div>
               <div class="viewing-calendar-events">
-                <div
-                  v-for="item in schedulesByDay.get(data.day) ?? []"
-                  :key="`${item.house.id}-${item.schedule.id}`"
-                  class="viewing-calendar-event"
-                >
+                <div v-for="item in schedulesByDay.get(data.day) ?? []" :key="item.schedule.id" class="viewing-calendar-event">
                   <time>{{ formatTime(item.date) }}</time>
-                  <span>{{ item.house.name }}</span>
+                  <span>{{ item.schedule.houseName || '' }}</span>
                 </div>
               </div>
             </div>
@@ -130,17 +106,11 @@ onMounted(loadHouses);
         </el-calendar>
       </section>
     </el-main>
-
     <el-dialog v-model="scheduleDialogVisible" :title="selectedDialogTitle" width="520px" class="schedule-day-dialog">
       <ScheduleListPanel
         :houses="houses"
-        :loading="loading"
-        :title="selectedDialogTitle"
-        :date-key="selectedDialogDateKey"
-        empty-description="当天暂无看房安排"
-        compact
-        hide-header
-        hide-group-labels
+        :schedules="scheduleStore.schedules" :loading="loading" :title="selectedDialogTitle" :date-key="selectedDialogDateKey"
+        empty-description="当天暂无看房安排" compact hide-header hide-group-labels
       />
     </el-dialog>
   </el-container>

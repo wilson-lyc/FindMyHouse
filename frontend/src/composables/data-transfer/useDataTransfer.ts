@@ -8,13 +8,18 @@ import {
   type DataImportSummary
 } from '../../api/data-transfer/data-transfer-api';
 
-export type DataExportOption = 'data' | 'serviceConfig';
+export type DataExportOption = 'data' | 'schedules' | 'serviceConfig';
 
 export const dataExportScopes: Array<{ label: string; value: DataExportOption; description: string }> = [
   {
     label: '房源 + 地点数据',
     value: 'data',
     description: '导出房源、地点、坐标、备注等业务数据'
+  },
+  {
+    label: '日程数据',
+    value: 'schedules',
+    description: '导出看房日程数据'
   },
   {
     label: '服务配置数据',
@@ -57,7 +62,7 @@ function downloadJsonFile(data: unknown) {
 }
 
 export function useDataTransfer() {
-  const selectedScopes = ref<DataExportOption[]>(['data', 'serviceConfig']);
+  const selectedScopes = ref<DataExportOption[]>(['data', 'schedules', 'serviceConfig']);
   const exporting = ref(false);
   const importing = ref(false);
   const importSummary = ref<DataImportSummary | null>(null);
@@ -75,10 +80,16 @@ export function useDataTransfer() {
 
   function getExportScope(): DataExportScope {
     const hasData = selectedScopes.value.includes('data');
+    const hasSchedules = selectedScopes.value.includes('schedules');
     const hasServiceConfig = selectedScopes.value.includes('serviceConfig');
 
-    if (hasData && hasServiceConfig) return 'all';
-    if (hasServiceConfig) return 'serviceConfig';
+    if (hasData && hasSchedules && hasServiceConfig) return 'all';
+    if (hasServiceConfig) {
+      if (hasData || hasSchedules) return 'all';
+      return 'serviceConfig';
+    }
+    if (hasData && hasSchedules) return 'data';
+    if (hasSchedules) return 'schedules';
     return 'data';
   }
 

@@ -18,6 +18,7 @@ export interface MainLayoutContext {
   locationsLoading: Ref<boolean>;
   locationSaving: Ref<boolean>;
   submitHouse: (form: HouseForm) => Promise<void>;
+  deleteSchedule: (scheduleId: string) => Promise<void>;
   confirmDeleteHouse: (house: House) => Promise<void>;
   applyHouseFilters: () => Promise<void>;
   toggleViewportHouses: (enabled: boolean) => Promise<void>;

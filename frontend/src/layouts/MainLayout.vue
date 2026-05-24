@@ -17,13 +17,14 @@ import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
-import HouseScheduleDialog from '../components/schedule/HouseScheduleDialog.vue';
+import ScheduleFormDialog from '../components/schedule/ScheduleFormDialog.vue';
 import { getCommuteRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
-import { houseToForm, normalizeHouseForm } from '../lib/house/house-form';
-import type { House, HouseForm, ViewingSchedule } from '../model/house/house';
+import { normalizeHouseForm } from '../lib/house/house-form';
+import type { House, HouseForm } from '../model/house/house';
+import type { ScheduleForm } from '../model/schedule/schedule';
 import type { Location, LocationForm } from '../model/location/location';
 import type { CommuteRouteResult, CommuteMode } from '../model/map/geocode';
 import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
@@ -31,7 +32,8 @@ import { useHouseCompareStore } from '../stores/houseCompareStore';
 import { useHouseDialogStore } from '../stores/houseDialogStore';
 import { useLocationDialogStore } from '../stores/locationDialogStore';
 import { useMapStore } from '../stores/mapStore';
-import { useScheduleDialogStore } from '../stores/scheduleDialogStore';
+import { useScheduleStore } from '../stores/scheduleStore';
+import { useScheduleFormDialogStore } from '../stores/scheduleFormDialogStore';
 
 const {
   houses,
@@ -44,6 +46,7 @@ const {
 } = useHouses();
 const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation, setLocationFocus } =
   useLocations();
+const scheduleStore = useScheduleStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -55,8 +58,7 @@ const {
   scheduleRoutePlan,
   commuteMode,
   activeRouteHouseId,
-  selectedHouseId,
-  routeData
+  selectedHouseId
 } = storeToRefs(mapStore);
 const houseCompareStore = useHouseCompareStore();
 const { visible: houseCompareDialogVisible, houses: houseCompareDialogHouses } = storeToRefs(houseCompareStore);
@@ -70,12 +72,11 @@ const {
   submitText: houseDialogSubmitText,
   initialSection: houseDialogInitialSection
 } = storeToRefs(houseDialogStore);
-const scheduleDialogStore = useScheduleDialogStore();
+const scheduleFormDialogStore = useScheduleFormDialogStore();
 const {
-  visible: scheduleDialogVisible,
-  house: scheduleDialogHouse,
-  addScheduleOnOpen: scheduleDialogAddScheduleOnOpen
-} = storeToRefs(scheduleDialogStore);
+  visible: scheduleFormDialogVisible,
+  editingSchedule: scheduleFormEditingSchedule
+} = storeToRefs(scheduleFormDialogStore);
 const locationDialogStore = useLocationDialogStore();
 const {
   visible: locationDialogVisible,
@@ -85,6 +86,8 @@ const {
   cancelText: locationDialogCancelText,
   submitText: locationDialogSubmitText
 } = storeToRefs(locationDialogStore);
+
+const scheduleSaving = ref(false);
 
 const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
 const contentPanelWidth = ref(420);
@@ -119,24 +122,6 @@ async function submitHouse(form: HouseForm) {
   }
 }
 
-async function submitHouseSchedules(schedules: ViewingSchedule[]) {
-  const house = scheduleDialogHouse.value;
-  if (!house) return;
-
-  try {
-    await saveHouse(
-      normalizeHouseForm({
-        ...houseToForm(house),
-        viewingSchedules: schedules
-      }),
-      house
-    );
-    scheduleDialogStore.close();
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '保存日程失败');
-  }
-}
-
 async function confirmDeleteHouse(house: House) {
   try {
     await ElMessageBox.confirm(`确认删除「${house.name}」吗？`, '删除房源', {
@@ -156,6 +141,40 @@ async function confirmDeleteHouse(house: House) {
   } catch {
     // User cancelled the confirmation dialog.
   }
+}
+
+async function deleteSchedule(scheduleId: string) {
+  try {
+    await scheduleStore.removeSchedule(scheduleId);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '删除日程失败');
+  }
+}
+
+async function submitScheduleForm(form: ScheduleForm) {
+  const editing = scheduleFormEditingSchedule.value;
+  scheduleSaving.value = true;
+
+  try {
+    if (editing) {
+      await scheduleStore.editSchedule(editing.id, {
+        viewingAt: form.viewingAt,
+        note: form.note
+      });
+    } else {
+      await scheduleStore.addSchedule(form);
+    }
+
+    scheduleFormDialogStore.close();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存日程失败');
+  } finally {
+    scheduleSaving.value = false;
+  }
+}
+
+function editSchedule(schedule: import('../model/schedule/schedule').Schedule) {
+  scheduleFormDialogStore.open(schedule);
 }
 
 async function applyHouseFilters() {
@@ -332,6 +351,7 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   locationsLoading,
   locationSaving,
   submitHouse,
+  deleteSchedule,
   confirmDeleteHouse,
   applyHouseFilters,
   toggleViewportHouses,
@@ -346,7 +366,7 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
 });
 
 onMounted(async () => {
-  await Promise.all([loadHouses(), loadLocations()]);
+  await Promise.all([loadHouses(), loadLocations(), scheduleStore.loadSchedules()]);
   await loadRoutes();
 });
 </script>
@@ -426,13 +446,13 @@ onMounted(async () => {
       @update:model-value="houseDialogStore.setVisible"
       @submit="submitHouse"
     />
-    <HouseScheduleDialog
-      :model-value="scheduleDialogVisible"
-      :house="scheduleDialogHouse"
-      :saving="saving"
-      :add-schedule-on-open="scheduleDialogAddScheduleOnOpen"
-      @update:model-value="scheduleDialogStore.setVisible"
-      @submit="submitHouseSchedules"
+    <ScheduleFormDialog
+      :model-value="scheduleFormDialogVisible"
+      :editing-schedule="scheduleFormEditingSchedule"
+      :houses="houses"
+      :saving="scheduleSaving"
+      @update:model-value="scheduleFormDialogStore.setVisible"
+      @submit="submitScheduleForm"
     />
     <LocationFormDialog
       :model-value="locationDialogVisible"

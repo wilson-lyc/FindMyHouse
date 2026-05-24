@@ -49,13 +49,12 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_houses_updated_at ON houses(updated_at);
 
     CREATE TABLE IF NOT EXISTS viewing_schedules (
+      id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
-      id TEXT NOT NULL,
       viewing_at TEXT NOT NULL,
       note TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      PRIMARY KEY (house_id, id),
       FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
     );
 
@@ -130,6 +129,39 @@ export function migrate() {
     ON map_route_cache(focus_location_id, origin, destination, commute_mode, kind)`);
 
   migrateViewingSchedulesFromHouseColumn();
+  migrateViewingSchedulesToIndependentPK();
+}
+
+function migrateViewingSchedulesToIndependentPK() {
+  const tableInfo = db.prepare('PRAGMA table_info(viewing_schedules)').all() as Array<{ name: string; pk: number }>;
+  const hasTable = tableInfo.length > 0;
+  if (!hasTable) return;
+
+  const pkColumns = tableInfo.filter((col) => col.pk > 0);
+  const hasCompositePK = pkColumns.length === 2 && pkColumns.some((col) => col.name === 'house_id') && pkColumns.some((col) => col.name === 'id');
+  if (!hasCompositePK) return;
+
+  db.exec(`
+    CREATE TABLE viewing_schedules_v2 (
+      id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      viewing_at TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
+    );
+
+    INSERT INTO viewing_schedules_v2 (id, house_id, viewing_at, note, created_at, updated_at)
+    SELECT id, house_id, viewing_at, note, created_at, updated_at FROM viewing_schedules;
+
+    DROP TABLE viewing_schedules;
+
+    ALTER TABLE viewing_schedules_v2 RENAME TO viewing_schedules;
+  `);
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_viewing_schedules_house_id ON viewing_schedules(house_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_viewing_schedules_viewing_at ON viewing_schedules(viewing_at)');
 }
 
 function migrateViewingSchedulesFromHouseColumn() {

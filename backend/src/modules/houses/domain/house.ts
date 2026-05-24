@@ -23,8 +23,12 @@ export interface CustomFeeItem {
 
 export interface ViewingScheduleItem {
   id: string;
+  houseId: string;
   viewingAt: string;
   note?: string;
+  houseName?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface House {

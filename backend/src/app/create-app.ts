@@ -8,6 +8,7 @@ import { registerLocationRoutes } from '../modules/locations/location.routes.js'
 import { registerMapRoutes } from '../modules/maps/map.routes.js';
 import { registerAgentRoutes } from '../modules/agent/agent.routes.js';
 import { registerDataTransferRoutes } from '../modules/data-transfer/data-transfer.routes.js';
+import { registerScheduleRoutes } from '../modules/schedules/schedule.routes.js';
 
 export async function createApp() {
   const app = Fastify({
@@ -27,6 +28,7 @@ export async function createApp() {
   await registerMapRoutes(app);
   await registerAgentRoutes(app);
   await registerDataTransferRoutes(app);
+  await registerScheduleRoutes(app);
 
   return app;
 }

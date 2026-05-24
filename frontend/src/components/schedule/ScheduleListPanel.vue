@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Edit, Guide, House as HouseIcon, Van } from '@element-plus/icons-vue';
+import { Calendar, Delete as DeleteIcon, Edit, EditPen, Guide, House as HouseIcon, Van } from '@element-plus/icons-vue';
 import { getCommuteDistance, getCommuteRoute } from '../../api/map/map-api';
 import {
   createScheduleRoutePlan,
@@ -11,12 +11,14 @@ import {
   type ScheduleRoutePlan
 } from '../../lib/schedule/route-planner';
 import type { House, ViewingSchedule } from '../../model/house/house';
+import type { Schedule } from '../../model/schedule/schedule';
 import type { Location } from '../../model/location/location';
 import type { CommuteMode, CommuteRouteResult } from '../../model/map/geocode';
 
 const props = withDefaults(
   defineProps<{
     houses: House[];
+    schedules: Schedule[];
     loading?: boolean;
     title?: string;
     emptyDescription?: string;
@@ -32,6 +34,8 @@ const props = withDefaults(
     onSelectHouse?: (house: House) => void;
     onShowRoute?: (house: House) => void;
     onEditHouse?: (house: House) => void;
+    onEditSchedule?: (schedule: Schedule) => void;
+    onDeleteSchedule?: (scheduleId: string) => void;
     onShowRoutePlan?: (plan: ScheduleRoutePlan) => void;
   }>(),
   {
@@ -50,6 +54,8 @@ const props = withDefaults(
     onSelectHouse: undefined,
     onShowRoute: undefined,
     onEditHouse: undefined,
+    onEditSchedule: undefined,
+    onDeleteSchedule: undefined,
     onShowRoutePlan: undefined
   }
 );
@@ -60,6 +66,8 @@ const emit = defineEmits<{
 
 const planningDateKey = ref<string | null>(null);
 const activeRoutePlan = ref<ScheduleRoutePlan | null>(null);
+
+const houseMap = computed(() => new Map(props.houses.map((h) => [h.id, h])));
 
 watch(
   () => props.scheduleRoutePlan,
@@ -72,18 +80,21 @@ watch(
 );
 
 const scheduleItems = computed<ScheduleRouteItem[]>(() =>
-  props.houses
-    .flatMap((house) =>
-      (house.viewingSchedules ?? []).map((schedule) => {
-        const date = new Date(schedule.viewingAt);
-        return {
-          house,
-          schedule,
-          date,
-          dateKey: formatDateKey(date)
-        };
-      })
-    )
+  props.schedules
+    .map((schedule) => {
+      const date = new Date(schedule.viewingAt);
+      const house = houseMap.value.get(schedule.houseId);
+      return {
+        house: house ?? ({} as House),
+        schedule: {
+          id: schedule.id,
+          viewingAt: schedule.viewingAt,
+          note: schedule.note
+        } as ViewingSchedule,
+        date,
+        dateKey: formatDateKey(date)
+      };
+    })
     .filter((item) => !Number.isNaN(item.date.getTime()) && (!props.dateKey || item.dateKey === props.dateKey))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
 );
@@ -108,7 +119,9 @@ const groupedSchedules = computed(() => {
   return groups;
 });
 
-const hasActions = computed(() => Boolean(props.onSelectHouse || props.onShowRoute || props.onEditHouse));
+const hasActions = computed(
+  () => Boolean(props.onSelectHouse || props.onShowRoute || props.onEditHouse || props.onEditSchedule || props.onDeleteSchedule)
+);
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
@@ -262,6 +275,11 @@ async function planGroupRoute(group: { key: string; items: ScheduleRouteItem[] }
   }
 }
 
+function findHouseBySchedule(scheduleId: string): House | undefined {
+  const item = scheduleItems.value.find((si) => si.schedule.id === scheduleId);
+  return item?.house;
+}
+
 function selectHouse(house: House) {
   props.onSelectHouse?.(house);
 }
@@ -272,6 +290,14 @@ function showRoute(house: House) {
 
 function editHouse(house: House) {
   props.onEditHouse?.(house);
+}
+
+function editSchedule(schedule: Schedule) {
+  props.onEditSchedule?.(schedule);
+}
+
+function deleteSchedule(scheduleId: string) {
+  props.onDeleteSchedule?.(scheduleId);
 }
 
 function isTimeRisk(plan: ScheduleRoutePlan, index: number) {
@@ -343,7 +369,7 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
               有 {{ activeRoutePlan.estimatedLegCount }} 段接口未返回距离，已用直线距离兜底。
             </p>
           </div>
-          <article v-for="item in group.items" :key="`${item.house.id}-${item.schedule.id}`" class="schedule-card">
+          <article v-for="item in group.items" :key="item.schedule.id" class="schedule-card">
             <div class="schedule-card-main" :class="{ 'is-clickable': onSelectHouse }" @click="selectHouse(item.house)">
               <time>{{ formatTime(item.date) }}</time>
               <div>
@@ -366,6 +392,20 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
                 路线
               </el-button>
               <el-button v-if="onEditHouse" :icon="Edit" link type="primary" @click="editHouse(item.house)">详情</el-button>
+              <el-button v-if="onEditSchedule" :icon="EditPen" link type="primary" @click="editSchedule(props.schedules.find(s => s.id === item.schedule.id)!)">
+                编辑
+              </el-button>
+              <el-popconfirm
+                v-if="onDeleteSchedule"
+                title="确定要删除此日程吗？"
+                confirm-button-text="删除"
+                width="200"
+                @confirm="deleteSchedule(item.schedule.id)"
+              >
+                <template #reference>
+                  <el-button :icon="DeleteIcon" link type="danger">删除</el-button>
+                </template>
+              </el-popconfirm>
             </div>
           </article>
         </section>
