@@ -76,7 +76,8 @@ const {
 const scheduleFormDialogStore = useScheduleFormDialogStore();
 const {
   visible: scheduleFormDialogVisible,
-  editingSchedule: scheduleFormEditingSchedule
+  editingSchedule: scheduleFormEditingSchedule,
+  prefillHouseId: scheduleFormPrefillHouseId
 } = storeToRefs(scheduleFormDialogStore);
 const locationDialogStore = useLocationDialogStore();
 const {
@@ -455,6 +456,7 @@ onMounted(async () => {
     <ScheduleFormDialog
       :model-value="scheduleFormDialogVisible"
       :editing-schedule="scheduleFormEditingSchedule"
+      :prefill-house-id="scheduleFormPrefillHouseId"
       :houses="houses"
       :saving="scheduleSaving"
       @update:model-value="scheduleFormDialogStore.setVisible"

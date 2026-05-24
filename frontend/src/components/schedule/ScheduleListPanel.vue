@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Delete as DeleteIcon, Edit, EditPen, Guide, House as HouseIcon, Van } from '@element-plus/icons-vue';
+import { Calendar, Delete as DeleteIcon, EditPen, Guide, House as HouseIcon, Plus } from '@element-plus/icons-vue';
 import { getCommuteDistance, getCommuteRoute } from '../../api/map/map-api';
 import {
   createScheduleRoutePlan,
@@ -35,6 +35,7 @@ const props = withDefaults(
     onShowRoute?: (house: House) => void;
     onEditHouse?: (house: House) => void;
     onEditSchedule?: (schedule: Schedule) => void;
+    onAddSchedule?: () => void;
     onDeleteSchedule?: (scheduleId: string) => void;
     onShowRoutePlan?: (plan: ScheduleRoutePlan) => void;
   }>(),
@@ -55,6 +56,7 @@ const props = withDefaults(
     onShowRoute: undefined,
     onEditHouse: undefined,
     onEditSchedule: undefined,
+    onAddSchedule: undefined,
     onDeleteSchedule: undefined,
     onShowRoutePlan: undefined
   }
@@ -66,6 +68,7 @@ const emit = defineEmits<{
 
 const planningDateKey = ref<string | null>(null);
 const activeRoutePlan = ref<ScheduleRoutePlan | null>(null);
+const showAllSchedules = ref(false);
 
 const houseMap = computed(() => new Map(props.houses.map((h) => [h.id, h])));
 
@@ -79,8 +82,10 @@ watch(
   { immediate: true }
 );
 
-const scheduleItems = computed<ScheduleRouteItem[]>(() =>
-  props.schedules
+const scheduleItems = computed<ScheduleRouteItem[]>(() => {
+  const todayKey = formatDateKey(new Date());
+
+  return props.schedules
     .map((schedule) => {
       const date = new Date(schedule.viewingAt);
       const house = houseMap.value.get(schedule.houseId);
@@ -96,8 +101,9 @@ const scheduleItems = computed<ScheduleRouteItem[]>(() =>
       };
     })
     .filter((item) => !Number.isNaN(item.date.getTime()) && (!props.dateKey || item.dateKey === props.dateKey))
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-);
+    .filter((item) => showAllSchedules.value || item.dateKey >= todayKey)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+});
 
 const groupedSchedules = computed(() => {
   const groups: Array<{ key: string; label: string; items: ScheduleRouteItem[] }> = [];
@@ -120,7 +126,7 @@ const groupedSchedules = computed(() => {
 });
 
 const hasActions = computed(
-  () => Boolean(props.onSelectHouse || props.onShowRoute || props.onEditHouse || props.onEditSchedule || props.onDeleteSchedule)
+  () => Boolean(props.onSelectHouse || props.onEditSchedule || props.onDeleteSchedule)
 );
 
 function formatDateKey(date: Date) {
@@ -284,14 +290,6 @@ function selectHouse(house: House) {
   props.onSelectHouse?.(house);
 }
 
-function showRoute(house: House) {
-  props.onShowRoute?.(house);
-}
-
-function editHouse(house: House) {
-  props.onEditHouse?.(house);
-}
-
 function editSchedule(schedule: Schedule) {
   props.onEditSchedule?.(schedule);
 }
@@ -312,12 +310,16 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
 
 <template>
   <div class="schedule-pane" :class="{ 'schedule-pane-compact': compact, 'schedule-pane-no-header': hideHeader }">
-    <header v-if="!hideHeader" class="schedule-pane-header">
-      <div>
-        <h2>{{ title }}</h2>
-        <p>共 {{ scheduleItems.length }} 条安排</p>
+    <header v-if="!hideHeader" class="panel-header">
+      <h2>{{ title }}</h2>
+      <div class="panel-header-actions">
+        <div class="schedule-toggle-all">
+          <el-switch v-model="showAllSchedules" size="small" />
+          <span>全部</span>
+        </div>
+        <el-button v-if="onAddSchedule" text :icon="Plus" aria-label="添加日程" title="添加日程" @click="onAddSchedule" />
+        <el-button v-if="showCalendarButton" text :icon="Calendar" aria-label="日历" title="日历" @click="emit('calendar')" />
       </div>
-      <el-button v-if="showCalendarButton" :icon="Calendar" @click="emit('calendar')">日历</el-button>
     </header>
 
     <el-scrollbar v-loading="loading" class="schedule-list-scrollbar">
@@ -381,17 +383,6 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
               <el-button v-if="onSelectHouse" :icon="HouseIcon" link type="primary" @click="selectHouse(item.house)">
                 房源
               </el-button>
-              <el-button
-                v-if="onShowRoute"
-                :icon="Van"
-                link
-                type="primary"
-                :disabled="item.house.latitude === undefined || item.house.longitude === undefined"
-                @click="showRoute(item.house)"
-              >
-                路线
-              </el-button>
-              <el-button v-if="onEditHouse" :icon="Edit" link type="primary" @click="editHouse(item.house)">详情</el-button>
               <el-button v-if="onEditSchedule" :icon="EditPen" link type="primary" @click="editSchedule(props.schedules.find(s => s.id === item.schedule.id)!)">
                 编辑
               </el-button>
@@ -413,3 +404,14 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
     </el-scrollbar>
   </div>
 </template>
+
+<style scoped>
+.schedule-toggle-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+</style>

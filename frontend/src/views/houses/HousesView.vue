@@ -148,7 +148,7 @@ watch(
           @select="layoutContext.selectHouse"
           @edit="houseDialogStore.openEdit"
           @delete="layoutContext.confirmDeleteHouse"
-          @schedule="scheduleFormDialogStore.open()"
+          @schedule="(house: House) => scheduleFormDialogStore.openWithHouse(house.id)"
           @route="layoutContext.showRoute"
           @compare-change="toggleCompareHouse"
         />

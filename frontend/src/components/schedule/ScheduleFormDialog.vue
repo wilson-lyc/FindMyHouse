@@ -7,6 +7,7 @@ import type { Schedule, ScheduleForm } from '../../model/schedule/schedule';
 const props = defineProps<{
   modelValue: boolean;
   editingSchedule?: Schedule | null;
+  prefillHouseId?: string | null;
   houses: House[];
   saving: boolean;
 }>();
@@ -23,8 +24,8 @@ const form = reactive<ScheduleForm>({
 });
 
 watch(
-  () => [props.modelValue, props.editingSchedule] as const,
-  ([visible, editingSchedule]) => {
+  () => [props.modelValue, props.editingSchedule, props.prefillHouseId] as const,
+  ([visible, editingSchedule, prefillHouseId]) => {
     if (!visible) return;
 
     if (editingSchedule) {
@@ -32,7 +33,7 @@ watch(
       form.viewingAt = normalizeViewingAtForPicker(editingSchedule.viewingAt);
       form.note = editingSchedule.note ?? '';
     } else {
-      form.houseId = '';
+      form.houseId = prefillHouseId ?? '';
       form.viewingAt = '';
       form.note = '';
     }
@@ -58,13 +59,6 @@ function normalizeViewingAtForApi(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
-function setDefaultViewingAt() {
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
-  form.viewingAt = normalizeViewingAtForPicker(now.toISOString());
-}
-
 function submitForm() {
   if (!form.houseId || !form.viewingAt) return;
 
@@ -83,11 +77,10 @@ function submitForm() {
     width="520px"
     class="schedule-form-dialog"
     @update:model-value="emit('update:modelValue', $event)"
-    @open="setDefaultViewingAt"
   >
     <el-form label-width="80px" class="schedule-form">
       <el-form-item label="房源" required>
-        <el-select v-model="form.houseId" filterable placeholder="选择房源" style="width: 100%">
+        <el-select v-model="form.houseId" filterable style="width: 100%">
           <el-option
             v-for="house in houses"
             :key="house.id"
@@ -102,7 +95,6 @@ function submitForm() {
           type="datetime"
           value-format="YYYY-MM-DDTHH:mm:ss"
           format="YYYY-MM-DD HH:mm"
-          placeholder="选择看房时间"
           style="width: 100%"
         />
       </el-form-item>
@@ -111,7 +103,6 @@ function submitForm() {
           v-model="form.note"
           type="textarea"
           :rows="2"
-          placeholder="中介、门牌、同行人等"
         />
       </el-form-item>
     </el-form>

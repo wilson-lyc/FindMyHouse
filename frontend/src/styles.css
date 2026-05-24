@@ -327,6 +327,11 @@ body {
   text-align: left;
 }
 
+.house-card:hover {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 8px 22px var(--app-shadow-color);
+}
+
 .house-card .el-card__body {
   display: grid;
   gap: 8px;
@@ -747,25 +752,51 @@ body {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.schedule-pane-header {
+.panel-header {
   display: flex;
-  align-items: flex-start;
+  flex: 0 0 auto;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
-.schedule-pane-header h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
+.panel-header h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.schedule-pane-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.panel-header-actions .el-button {
+  width: 32px;
+  height: 32px;
+  margin-left: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-regular);
+}
+
+.panel-header-actions .el-button:hover,
+.panel-header-actions .el-button:focus {
+  background: var(--el-fill-color-light);
+  color: var(--app-text-primary);
+}
+
+.panel-header-actions .el-button:active {
+  background: var(--el-color-info-light-8);
 }
 
 .schedule-list-scrollbar {
@@ -899,6 +930,11 @@ body {
   border-radius: 8px;
   background: var(--el-bg-color);
   padding: 12px;
+}
+
+.schedule-card:hover {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 8px 22px var(--app-shadow-color);
 }
 
 .schedule-card-main {

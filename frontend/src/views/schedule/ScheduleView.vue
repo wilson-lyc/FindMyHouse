@@ -31,6 +31,7 @@ const houseDialogStore = useHouseDialogStore();
     :on-edit-house="houseDialogStore.openEdit"
     :on-edit-schedule="scheduleFormDialogStore.open"
     :on-delete-schedule="(scheduleId: string) => layoutContext.deleteSchedule(scheduleId)"
+    :on-add-schedule="() => scheduleFormDialogStore.open()"
     :focus-location="layoutContext.focusLocation.value"
     :routes="layoutContext.routes.value"
     :schedule-route-plan="layoutContext.scheduleRoutePlan.value"
