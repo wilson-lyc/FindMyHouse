@@ -2,8 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { fetchLocations } from '../api/location/location-api';
 import MainLayout from '../layouts/MainLayout.vue';
 import ChatView from '../views/chat/ChatView.vue';
-import DataTransferView from '../views/data-transfer/DataTransferView.vue';
+import ExportView from '../views/data-transfer/ExportView.vue';
 import HousesView from '../views/houses/HousesView.vue';
+import ImportView from '../views/data-transfer/ImportView.vue';
 import LocationsView from '../views/locations/LocationsView.vue';
 import ScheduleView from '../views/schedule/ScheduleView.vue';
 import ScheduleCalendarView from '../views/schedule/ScheduleCalendarView.vue';
@@ -57,9 +58,14 @@ const routes = [
     component: StatsView
   },
   {
-    path: '/data',
-    name: 'data',
-    component: DataTransferView
+    path: '/export',
+    name: 'export',
+    component: ExportView
+  },
+  {
+    path: '/import',
+    name: 'import',
+    component: ImportView
   },
   {
     path: '/settings',
@@ -105,7 +111,8 @@ router.beforeEach(async (to) => {
     to.name !== 'settings' &&
     to.name !== 'help' &&
     to.name !== 'stats' &&
-    to.name !== 'data' &&
+    to.name !== 'export' &&
+    to.name !== 'import' &&
     to.name !== 'schedule-calendar'
   ) {
     return { name: 'welcome' };

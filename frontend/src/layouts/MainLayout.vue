@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   ChatDotSquare,
   DataAnalysis,
+  Download,
   House as HouseIcon,
   Location as LocationIcon,
   QuestionFilled,
@@ -398,8 +399,13 @@ onMounted(async () => {
             <el-icon><DataAnalysis /></el-icon>
           </router-link>
         </el-tooltip>
-        <el-tooltip content="数据导入 / 导出" placement="right">
-          <router-link class="map-directory-icon-button" to="/data" aria-label="数据导入 / 导出">
+        <el-tooltip content="导出" placement="right">
+          <router-link class="map-directory-icon-button" to="/export" aria-label="导出">
+            <el-icon><Download /></el-icon>
+          </router-link>
+        </el-tooltip>
+        <el-tooltip content="导入" placement="right">
+          <router-link class="map-directory-icon-button" to="/import" aria-label="导入">
             <el-icon><Upload /></el-icon>
           </router-link>
         </el-tooltip>
