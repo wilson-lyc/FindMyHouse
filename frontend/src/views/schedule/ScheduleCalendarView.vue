@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { ArrowLeft } from '@element-plus/icons-vue';
 import { fetchHouses } from '../../api/house/house-api';
+import ScheduleListPanel from '../../components/schedule/ScheduleListPanel.vue';
 import type { House, ViewingSchedule } from '../../model/house/house';
 
 interface CalendarScheduleItem {
@@ -14,6 +15,8 @@ interface CalendarScheduleItem {
 
 const router = useRouter();
 const selectedDate = ref(new Date());
+const scheduleDialogVisible = ref(false);
+const selectedDialogDateKey = ref(formatDateKey(new Date()));
 const houses = ref<House[]>([]);
 const loading = ref(true);
 
@@ -39,6 +42,8 @@ const schedulesByDay = computed(() => {
   return groups;
 });
 
+const selectedDialogTitle = computed(() => `${formatDateLabel(parseDateKey(selectedDialogDateKey.value))} 日程`);
+
 async function loadHouses() {
   loading.value = true;
   try {
@@ -57,12 +62,31 @@ function formatDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function parseDateKey(dateKey: string) {
+  const [year = '0', month = '1', day = '1'] = dateKey.split('-');
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short'
+  }).format(date);
+}
+
 function formatTime(date: Date) {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   }).format(date);
+}
+
+function openScheduleDialog(day: string) {
+  selectedDate.value = parseDateKey(day);
+  selectedDialogDateKey.value = day;
+  scheduleDialogVisible.value = true;
 }
 
 onMounted(loadHouses);
@@ -89,7 +113,7 @@ onMounted(loadHouses);
       <section class="schedule-calendar-content">
         <el-calendar v-model="selectedDate" class="viewing-calendar">
           <template #date-cell="{ data }">
-            <div class="viewing-calendar-cell" :class="{ 'is-selected': data.isSelected }">
+            <div class="viewing-calendar-cell" :class="{ 'is-selected': data.isSelected }" @click="openScheduleDialog(data.day)">
               <div class="viewing-calendar-day">{{ Number(data.day.slice(-2)) }}</div>
               <div class="viewing-calendar-events">
                 <div
@@ -106,5 +130,18 @@ onMounted(loadHouses);
         </el-calendar>
       </section>
     </el-main>
+
+    <el-dialog v-model="scheduleDialogVisible" :title="selectedDialogTitle" width="520px" class="schedule-day-dialog">
+      <ScheduleListPanel
+        :houses="houses"
+        :loading="loading"
+        :title="selectedDialogTitle"
+        :date-key="selectedDialogDateKey"
+        empty-description="当天暂无看房安排"
+        compact
+        hide-header
+        hide-group-labels
+      />
+    </el-dialog>
   </el-container>
 </template>

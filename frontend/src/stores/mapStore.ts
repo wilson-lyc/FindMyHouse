@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import type { House } from '../model/house/house';
 import type { Location } from '../model/location/location';
 import type { CommuteRouteResult, MapBoundsFilter, CommuteMode } from '../model/map/geocode';
+import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 
 export const useMapStore = defineStore('map', () => {
   const houses = ref<House[]>([]);
@@ -14,6 +15,7 @@ export const useMapStore = defineStore('map', () => {
   const commuteMode = ref<CommuteMode>('driving');
   const routes = ref<Map<string, CommuteRouteResult>>(new Map());
   const routeData = ref<CommuteRouteResult | null>(null);
+  const scheduleRoutePlan = ref<ScheduleRoutePlan | null>(null);
   const activeRouteHouseId = ref<string | null>(null);
   const highlightedHouseIds = ref<string[]>([]);
 
@@ -64,13 +66,21 @@ export const useMapStore = defineStore('map', () => {
     if (!route) return false;
 
     routeData.value = route;
+    scheduleRoutePlan.value = null;
     activeRouteHouseId.value = houseId;
     return true;
   }
 
   function clearRoute() {
     routeData.value = null;
+    scheduleRoutePlan.value = null;
     activeRouteHouseId.value = null;
+  }
+
+  function showScheduleRoute(plan: ScheduleRoutePlan) {
+    routeData.value = null;
+    activeRouteHouseId.value = null;
+    scheduleRoutePlan.value = plan;
   }
 
   function setHighlightedHouseIds(ids: string[]) {
@@ -91,6 +101,7 @@ export const useMapStore = defineStore('map', () => {
     commuteMode,
     routes,
     routeData,
+    scheduleRoutePlan,
     activeRouteHouseId,
     highlightedHouseIds,
     setHouses,
@@ -103,6 +114,7 @@ export const useMapStore = defineStore('map', () => {
     removeRoute,
     showRoute,
     clearRoute,
+    showScheduleRoute,
     setHighlightedHouseIds,
     clearHighlightedHouseIds
   };

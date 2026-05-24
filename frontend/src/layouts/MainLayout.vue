@@ -17,18 +17,21 @@ import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
+import HouseScheduleDialog from '../components/schedule/HouseScheduleDialog.vue';
 import { getCommuteRoute } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
-import { normalizeHouseForm } from '../lib/house/house-form';
-import type { House, HouseForm } from '../model/house/house';
+import { houseToForm, normalizeHouseForm } from '../lib/house/house-form';
+import type { House, HouseForm, ViewingSchedule } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
 import type { CommuteRouteResult, CommuteMode } from '../model/map/geocode';
+import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 import { useHouseCompareStore } from '../stores/houseCompareStore';
 import { useHouseDialogStore } from '../stores/houseDialogStore';
 import { useLocationDialogStore } from '../stores/locationDialogStore';
 import { useMapStore } from '../stores/mapStore';
+import { useScheduleDialogStore } from '../stores/scheduleDialogStore';
 
 const {
   houses,
@@ -49,6 +52,7 @@ const {
   currentBounds,
   onlyViewportHouses,
   routes,
+  scheduleRoutePlan,
   commuteMode,
   activeRouteHouseId,
   selectedHouseId,
@@ -64,9 +68,14 @@ const {
   title: houseDialogTitle,
   cancelText: houseDialogCancelText,
   submitText: houseDialogSubmitText,
-  initialSection: houseDialogInitialSection,
-  addViewingScheduleOnOpen: houseDialogAddViewingScheduleOnOpen
+  initialSection: houseDialogInitialSection
 } = storeToRefs(houseDialogStore);
+const scheduleDialogStore = useScheduleDialogStore();
+const {
+  visible: scheduleDialogVisible,
+  house: scheduleDialogHouse,
+  addScheduleOnOpen: scheduleDialogAddScheduleOnOpen
+} = storeToRefs(scheduleDialogStore);
 const locationDialogStore = useLocationDialogStore();
 const {
   visible: locationDialogVisible,
@@ -107,6 +116,24 @@ async function submitHouse(form: HouseForm) {
     houseDialogStore.close();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存失败');
+  }
+}
+
+async function submitHouseSchedules(schedules: ViewingSchedule[]) {
+  const house = scheduleDialogHouse.value;
+  if (!house) return;
+
+  try {
+    await saveHouse(
+      normalizeHouseForm({
+        ...houseToForm(house),
+        viewingSchedules: schedules
+      }),
+      house
+    );
+    scheduleDialogStore.close();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存日程失败');
   }
 }
 
@@ -157,6 +184,10 @@ function showRoute(house: House) {
   if (!mapPanelRef.value?.showRouteByHouseId(house.id)) {
     ElMessage.info('路线数据正在加载，请稍后再试');
   }
+}
+
+function showScheduleRoute(plan: ScheduleRoutePlan) {
+  mapStore.showScheduleRoute(plan);
 }
 
 function clearRoute() {
@@ -293,6 +324,8 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   saving,
   filters,
   routes,
+  scheduleRoutePlan,
+  commuteMode,
   focusLocation,
   onlyViewportHouses,
   locations,
@@ -304,6 +337,7 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   toggleViewportHouses,
   selectHouse,
   showRoute,
+  showScheduleRoute,
   submitLocation,
   confirmDeleteLocation,
   setLocationFocus,
@@ -329,13 +363,13 @@ onMounted(async () => {
           <el-icon><LocationIcon /></el-icon>
           <span>地点</span>
         </el-menu-item>
-        <el-menu-item index="chat">
-          <el-icon><ChatDotSquare /></el-icon>
-          <span>对话</span>
-        </el-menu-item>
         <el-menu-item index="schedule">
           <el-icon><Calendar /></el-icon>
           <span>日程</span>
+        </el-menu-item>
+        <el-menu-item index="chat">
+          <el-icon><ChatDotSquare /></el-icon>
+          <span>对话</span>
         </el-menu-item>
       </el-menu>
       <div class="map-directory-bottom">
@@ -389,9 +423,16 @@ onMounted(async () => {
       :cancel-text="houseDialogCancelText"
       :submit-text="houseDialogSubmitText"
       :initial-section="houseDialogInitialSection"
-      :add-viewing-schedule-on-open="houseDialogAddViewingScheduleOnOpen"
       @update:model-value="houseDialogStore.setVisible"
       @submit="submitHouse"
+    />
+    <HouseScheduleDialog
+      :model-value="scheduleDialogVisible"
+      :house="scheduleDialogHouse"
+      :saving="saving"
+      :add-schedule-on-open="scheduleDialogAddScheduleOnOpen"
+      @update:model-value="scheduleDialogStore.setVisible"
+      @submit="submitHouseSchedules"
     />
     <LocationFormDialog
       :model-value="locationDialogVisible"

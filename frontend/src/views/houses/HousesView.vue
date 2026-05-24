@@ -9,6 +9,7 @@ import { statusLabels } from '../../model/house/house-status';
 import { useHouseCompareStore } from '../../stores/houseCompareStore';
 import { useHouseDialogStore } from '../../stores/houseDialogStore';
 import { useMapStore } from '../../stores/mapStore';
+import { useScheduleDialogStore } from '../../stores/scheduleDialogStore';
 import { commuteModeLabels } from '../../model/map/geocode';
 
 const context = inject<MainLayoutContext>(mainLayoutContextKey);
@@ -20,6 +21,7 @@ if (!context) {
 const layoutContext = context;
 const houseCompareStore = useHouseCompareStore();
 const houseDialogStore = useHouseDialogStore();
+const scheduleDialogStore = useScheduleDialogStore();
 const mapStore = useMapStore();
 const maxCompareCount = 4;
 const compareSelectedIds = ref<string[]>([]);
@@ -146,7 +148,7 @@ watch(
           @select="layoutContext.selectHouse"
           @edit="houseDialogStore.openEdit"
           @delete="layoutContext.confirmDeleteHouse"
-          @schedule="houseDialogStore.openSchedule"
+          @schedule="(house) => scheduleDialogStore.open(house, { addScheduleOnOpen: true })"
           @route="layoutContext.showRoute"
           @compare-change="toggleCompareHouse"
         />

@@ -27,7 +27,6 @@ const props = defineProps<{
   cancelText?: string;
   submitText?: string;
   initialSection?: string;
-  addViewingScheduleOnOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -45,7 +44,6 @@ const formSections = [
   { key: 'basic', label: '基础信息' },
   { key: 'location', label: '地理位置' },
   { key: 'fees', label: '租金费用' },
-  { key: 'schedule', label: '看房日程' },
   { key: 'contact', label: '联系方式' }
 ];
 
@@ -56,13 +54,10 @@ const rules: FormRules<HouseForm> = {
 };
 
 watch(
-  () => [props.modelValue, props.house, props.initialForm, props.initialSection, props.addViewingScheduleOnOpen] as const,
-  ([visible, house, initialForm, initialSection, addScheduleOnOpen]) => {
+  () => [props.modelValue, props.house, props.initialForm, props.initialSection] as const,
+  ([visible, house, initialForm, initialSection]) => {
     if (!visible) return;
     Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
-    if (addScheduleOnOpen) {
-      addViewingSchedule();
-    }
     formRef.value?.clearValidate();
     nextTick(() => {
       if (initialSection) {
@@ -121,20 +116,6 @@ const customFeesTotal = computed(() =>
   (form.customFees ?? []).reduce((total, item) => total + (Number(item.amount) || 0), 0)
 );
 
-function createScheduleId() {
-  return globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function formatDateTimeForPicker(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-}
-
 function scrollToSection(sectionKey: string) {
   document.getElementById(`house-form-${sectionKey}`)?.scrollIntoView({
     behavior: 'smooth',
@@ -151,21 +132,6 @@ function addCustomFee() {
 
 function deleteFeeItem(index: number) {
   form.customFees?.splice(index, 1);
-}
-
-function addViewingSchedule() {
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
-  (form.viewingSchedules ??= []).push({
-    id: createScheduleId(),
-    viewingAt: formatDateTimeForPicker(now),
-    note: ''
-  });
-}
-
-function deleteViewingSchedule(index: number) {
-  form.viewingSchedules?.splice(index, 1);
 }
 
 async function submitForm() {
@@ -347,52 +313,6 @@ async function submitForm() {
               </el-form-item>
               <el-form-item label="费用备注" class="span-2">
                 <el-input v-model="form.feeNotes" type="textarea" :rows="3" placeholder="" />
-              </el-form-item>
-            </div>
-          </section>
-
-          <section id="house-form-schedule" class="house-form-section">
-            <h3>看房日程</h3>
-            <div class="form-grid">
-              <el-form-item label="安排" class="span-2 viewing-schedules-form-item">
-                <div class="viewing-schedules-wrap">
-                  <div class="viewing-schedules-header">
-                    <span class="viewing-schedules-count">共 {{ form.viewingSchedules?.length ?? 0 }} 条安排</span>
-                    <el-button :icon="Plus" type="primary" plain size="small" @click="addViewingSchedule">添加日程</el-button>
-                  </div>
-                  <el-table
-                    :data="form.viewingSchedules ?? []"
-                    stripe
-                    size="small"
-                    max-height="260"
-                    class="viewing-schedules-table"
-                    empty-text="暂无看房安排"
-                  >
-                    <el-table-column label="时间" min-width="210">
-                      <template #default="{ row }">
-                        <el-date-picker
-                          v-model="row.viewingAt"
-                          type="datetime"
-                          value-format="YYYY-MM-DDTHH:mm:ss"
-                          format="YYYY-MM-DD HH:mm"
-                          placeholder="选择看房时间"
-                        />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="备注" min-width="220">
-                      <template #default="{ row }">
-                        <el-input v-model="row.note" placeholder="中介、门牌、同行人等" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="82" fixed="right">
-                      <template #default="{ $index }">
-                        <el-button :icon="DeleteIcon" link type="danger" size="small" @click="deleteViewingSchedule($index)">
-                          删除
-                        </el-button>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-                </div>
               </el-form-item>
             </div>
           </section>

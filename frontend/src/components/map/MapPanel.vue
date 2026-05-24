@@ -24,7 +24,8 @@ interface MapContextMenuPosition {
 }
 
 const mapStore = useMapStore();
-const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, highlightedHouseIds, commuteMode } = storeToRefs(mapStore);
+const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, scheduleRoutePlan, highlightedHouseIds, commuteMode } =
+  storeToRefs(mapStore);
 
 // ==================== 地图实例 ====================
 
@@ -330,6 +331,7 @@ function renderMarkers() {
   }
 
   renderRoutePolyline();
+  renderScheduleRoutePolyline();
 }
 
 function fitSearchResultView() {
@@ -350,6 +352,9 @@ function fitSearchResultView() {
 
 let routePolyline: AMapPolyline | undefined;
 let routeInfoWindow: AMapInfoWindow | undefined;
+let scheduleRoutePolyline: AMapPolyline | undefined;
+let scheduleRouteMarkers: AMapMarker[] = [];
+let scheduleRouteInfoWindow: AMapInfoWindow | undefined;
 
 function formatDistanceShort(meters: number): string {
   if (meters >= 1000) {
@@ -380,6 +385,23 @@ function clearRoutePolyline() {
   if (routeInfoWindow) {
     routeInfoWindow.close();
     routeInfoWindow = undefined;
+  }
+}
+
+function clearScheduleRoutePolyline() {
+  if (scheduleRoutePolyline) {
+    scheduleRoutePolyline.setMap(null);
+    scheduleRoutePolyline = undefined;
+  }
+
+  for (const marker of scheduleRouteMarkers) {
+    map.value?.remove(marker);
+  }
+  scheduleRouteMarkers = [];
+
+  if (scheduleRouteInfoWindow) {
+    scheduleRouteInfoWindow.close();
+    scheduleRouteInfoWindow = undefined;
   }
 }
 
@@ -433,6 +455,58 @@ function renderRoutePolyline() {
       }
     }
   }
+}
+
+function renderScheduleRoutePolyline() {
+  if (!map.value || !amap.value || !scheduleRoutePlan.value) return;
+
+  clearScheduleRoutePolyline();
+
+  const fallbackPath: Array<[number, number]> = [
+    [scheduleRoutePlan.value.origin.longitude!, scheduleRoutePlan.value.origin.latitude!],
+    ...scheduleRoutePlan.value.items.map((item) => [item.house.longitude!, item.house.latitude!] as [number, number])
+  ];
+  const routePath = scheduleRoutePlan.value.legs.flatMap((leg) => leg.polyline ?? []);
+  const path = routePath.length >= 2 ? routePath : fallbackPath;
+
+  if (path.length < 2) return;
+
+  const modeColor = commuteModeColors[commuteMode.value];
+  scheduleRoutePolyline = new amap.value.Polyline({
+    path,
+    strokeColor: modeColor,
+    strokeWeight: 5,
+    strokeOpacity: 0.72,
+    strokeStyle: 'dashed',
+    lineJoin: 'round',
+    lineCap: 'round'
+  });
+  scheduleRoutePolyline.setMap(map.value);
+
+  const AMap = amap.value;
+  scheduleRouteMarkers = scheduleRoutePlan.value.items.map((item, index) => {
+    const marker = new AMap.Marker({
+      position: [item.house.longitude!, item.house.latitude!],
+      title: item.house.name,
+      label: {
+        content: `<div class="map-marker-label route-stop">${index + 1}</div>`,
+        direction: 'top'
+      }
+    });
+    marker.on('click', () => {
+      selectHouseById(item.house.id);
+    });
+    return marker;
+  });
+  map.value.add(scheduleRouteMarkers);
+  map.value.setFitView([scheduleRoutePolyline, ...scheduleRouteMarkers]);
+
+  const lastPoint = path[path.length - 1];
+  scheduleRouteInfoWindow = new amap.value.InfoWindow({
+    content: `<div class="map-route-label">当日路线 · ${formatDistanceShort(scheduleRoutePlan.value.totalDistance)}</div>`,
+    offset: new amap.value.Pixel(0, 0)
+  });
+  scheduleRouteInfoWindow.open(map.value, lastPoint);
 }
 
 // ==================== 地图生命周期 ====================
@@ -551,7 +625,18 @@ watch(
   () => {
     if (!map.value || !amap.value) return;
     clearRoutePolyline();
+    clearScheduleRoutePolyline();
     renderRoutePolyline();
+  }
+);
+
+watch(
+  scheduleRoutePlan,
+  () => {
+    if (!map.value || !amap.value) return;
+    clearRoutePolyline();
+    clearScheduleRoutePolyline();
+    renderScheduleRoutePolyline();
   }
 );
 
@@ -595,7 +680,7 @@ defineExpose({
       </button>
     </div>
     <button
-      v-if="routeData"
+      v-if="routeData || scheduleRoutePlan"
       class="map-panel-close-btn map-clear-route-btn"
       title="关闭路线"
       @click.stop="clearRoute"

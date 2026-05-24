@@ -17,7 +17,6 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
   const cancelText = ref<string>();
   const submitText = ref<string>();
   const initialSection = ref<string>();
-  const addViewingScheduleOnOpen = ref(false);
   const pendingAgentCreateDone = ref<((result: ConfirmCreateHouseResult) => void) | null>(null);
 
   function openCreate() {
@@ -45,17 +44,6 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     visible.value = true;
   }
 
-  function openSchedule(house: House) {
-    resetOptions();
-    editingHouse.value = house;
-    initialForm.value = null;
-    title.value = '预约看房';
-    submitText.value = '保存预约';
-    initialSection.value = 'schedule';
-    addViewingScheduleOnOpen.value = true;
-    visible.value = true;
-  }
-
   function openAgentCreate(action: ConfirmCreateHouseAction, done: (result: ConfirmCreateHouseResult) => void) {
     resetOptions();
     editingHouse.value = null;
@@ -73,7 +61,6 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     cancelText.value = undefined;
     submitText.value = undefined;
     initialSection.value = undefined;
-    addViewingScheduleOnOpen.value = false;
   }
 
   function cancelPending() {
@@ -102,7 +89,6 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     cancelText.value = undefined;
     submitText.value = undefined;
     initialSection.value = undefined;
-    addViewingScheduleOnOpen.value = false;
   }
 
   function setVisible(nextVisible: boolean) {
@@ -122,11 +108,9 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     cancelText,
     submitText,
     initialSection,
-    addViewingScheduleOnOpen,
     openCreate,
     openCreateAt,
     openEdit,
-    openSchedule,
     openAgentCreate,
     resolveCreated,
     close,

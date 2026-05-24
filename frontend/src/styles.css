@@ -735,8 +735,16 @@ body {
   display: grid;
   min-height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px;
+  padding: 0;
+}
+
+.schedule-pane-compact {
+  min-height: 320px;
+  padding: 0;
+}
+
+.schedule-pane-no-header {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .schedule-pane-header {
@@ -744,6 +752,8 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .schedule-pane-header h2 {
@@ -760,6 +770,7 @@ body {
 
 .schedule-list-scrollbar {
   min-height: 0;
+  padding: 12px;
 }
 
 .schedule-list-scrollbar .el-scrollbar__view {
@@ -784,6 +795,103 @@ body {
   font-weight: 700;
 }
 
+.schedule-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  gap: 8px;
+}
+
+.schedule-group-header .el-button {
+  height: 24px;
+  margin-left: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+.schedule-route-plan {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 8px;
+  background: var(--el-color-primary-light-9);
+  padding: 12px;
+}
+
+.schedule-route-plan-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.schedule-route-plan-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-text-primary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-route-plan-summary span,
+.schedule-route-plan p {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.schedule-route-plan p {
+  margin: 0;
+}
+
+.schedule-route-stop-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-route-stop-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.schedule-route-stop-list li > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-route-stop-list strong,
+.schedule-route-stop-list small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-route-stop-list strong {
+  color: var(--app-text-primary);
+  font-size: 13px;
+}
+
+.schedule-route-stop-list small {
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
 .schedule-card {
   display: grid;
   gap: 10px;
@@ -797,6 +905,9 @@ body {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 10px;
+}
+
+.schedule-card-main.is-clickable {
   cursor: pointer;
 }
 
@@ -912,6 +1023,7 @@ body {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
   min-height: 112px;
+  cursor: pointer;
 }
 
 .viewing-calendar-cell.is-selected .viewing-calendar-day {
@@ -949,6 +1061,24 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.map-marker-label.route-stop {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid var(--el-bg-color);
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  box-shadow: 0 2px 8px var(--app-shadow-color-strong);
+  color: var(--el-bg-color);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-day-dialog .el-dialog__body {
+  padding-top: 4px;
 }
 
 .address-row,

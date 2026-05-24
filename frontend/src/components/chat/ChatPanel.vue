@@ -562,7 +562,7 @@ watch(loading, () => {
   <div class="chat-panel">
     <div class="chat-header">
       <div class="chat-header-title">
-        <span>对话</span>
+        <h2>对话</h2>
       </div>
       <div class="chat-header-actions">
         <el-button
@@ -818,10 +818,8 @@ watch(loading, () => {
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 16px;
-  font-size: 15px;
-  font-weight: 600;
+  gap: 12px;
+  padding: 12px;
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
@@ -853,8 +851,12 @@ watch(loading, () => {
   background: var(--el-color-info-light-8);
 }
 
-.chat-header-title span {
+.chat-header-title h2 {
+  margin: 0;
   overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
