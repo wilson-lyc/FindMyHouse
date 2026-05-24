@@ -1220,6 +1220,12 @@ body {
   box-shadow: 0 2px 12px var(--app-shadow-color);
 }
 
+.map-focus-location-btn {
+  right: 15px;
+  bottom: 15px;
+  top: auto;
+}
+
 .map-context-menu {
   position: absolute;
   z-index: 1001;

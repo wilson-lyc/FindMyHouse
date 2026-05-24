@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
-import { Close, House as HouseIcon, Location as LocationIcon, OfficeBuilding } from '@element-plus/icons-vue';
+import { Aim, Close, House as HouseIcon, Location as LocationIcon, OfficeBuilding } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { useMapStore } from '../../stores/mapStore';
 import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapMarker, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
@@ -34,6 +34,7 @@ const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
 const isSearchResultMode = computed(() => highlightedHouseIds.value.length > 0);
+const hasFocusLocation = computed(() => locations.value.some((loc) => loc.isFocus));
 
 const houseFocusZoom = 16;
 const locationFocusZoom = 14;
@@ -248,9 +249,16 @@ function focusLocationById(locationId: string) {
 
 function focusFocusLocation() {
   const focusLocation = locations.value.find((location) => location.isFocus);
-  if (!focusLocation) return false;
+  const position = focusLocation ? locationPosition(focusLocation) : undefined;
+  if (!focusLocation || !position || !map.value) return false;
 
-  return focusLocationById(focusLocation.id);
+  if (map.value.setZoomAndCenter) {
+    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
+  } else {
+    map.value.setZoom?.(locationFocusZoom, true, 0);
+    map.value.setCenter(position, true, 0);
+  }
+  return true;
 }
 
 /** 首次加载时跳转到焦点地点 */
@@ -694,6 +702,14 @@ defineExpose({
       @click.stop="clearSearchResults"
     >
       <el-icon><Close /></el-icon>
+    </button>
+    <button
+      v-if="hasFocusLocation"
+      class="map-panel-close-btn map-focus-location-btn"
+      title="回到焦点地点"
+      @click.stop="focusFocusLocation"
+    >
+      <el-icon><Aim /></el-icon>
     </button>
   </section>
 </template>
