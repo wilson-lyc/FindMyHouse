@@ -1,4 +1,12 @@
-import { rentPaymentPeriods, type CustomFeeItem, type House, type HouseSourceChannel, type HouseStatus, type RentPaymentPeriod } from './domain/house.js';
+import {
+  rentPaymentPeriods,
+  type CustomFeeItem,
+  type House,
+  type HouseSourceChannel,
+  type HouseStatus,
+  type RentPaymentPeriod,
+  type ViewingScheduleItem
+} from './domain/house.js';
 import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
 
 export interface HouseRow {
@@ -29,7 +37,14 @@ export interface HouseRow {
   updated_at: string;
 }
 
-export function toHouse(row: HouseRow): House {
+export interface ViewingScheduleRow {
+  house_id: string;
+  id: string;
+  viewing_at: string;
+  note: string | null;
+}
+
+export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[]): House {
   return {
     id: row.id,
     name: row.name,
@@ -49,6 +64,7 @@ export function toHouse(row: HouseRow): House {
     waterFeePerTon: row.water_fee_per_ton ?? undefined,
     electricityFeePerKwh: row.electricity_fee_per_kwh ?? undefined,
     customFees: parseCustomFees(row.custom_fees),
+    viewingSchedules: viewingSchedules?.length ? viewingSchedules : undefined,
     feeNotes: row.fee_notes ?? undefined,
     contactName: row.contact_name ?? undefined,
     phone: row.phone ?? undefined,
@@ -59,7 +75,15 @@ export function toHouse(row: HouseRow): House {
   };
 }
 
-export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput | ImportHouseInput) {
+export function toViewingSchedule(row: ViewingScheduleRow): ViewingScheduleItem {
+  return {
+    id: row.id,
+    viewingAt: row.viewing_at,
+    note: row.note ?? undefined
+  };
+}
+
+export function toHouseRowParams(input: CreateHouseInput | UpdateHouseInput | ImportHouseInput | House) {
   return {
     name: input.name ?? null,
     status: input.status ?? null,

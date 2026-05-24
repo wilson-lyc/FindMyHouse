@@ -21,6 +21,12 @@ export interface CustomFeeItem {
   amount: number;
 }
 
+export interface ViewingScheduleItem {
+  id: string;
+  viewingAt: string;
+  note?: string;
+}
+
 export interface House {
   id: string;
   name: string;
@@ -40,6 +46,7 @@ export interface House {
   waterFeePerTon?: number;
   electricityFeePerKwh?: number;
   customFees?: CustomFeeItem[];
+  viewingSchedules?: ViewingScheduleItem[];
   feeNotes?: string;
   contactName?: string;
   phone?: string;

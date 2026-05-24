@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { House, HouseFilters } from './domain/house.js';
+import type { House, HouseFilters, ViewingScheduleItem } from './domain/house.js';
 import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
-import { toHouse, toHouseRowParams, type HouseRow } from './house.mapper.js';
+import { toHouse, toHouseRowParams, toViewingSchedule, type HouseRow, type ViewingScheduleRow } from './house.mapper.js';
 
 export class HouseRepository {
   constructor(private readonly database: DatabaseType) {}
@@ -21,6 +21,15 @@ export class HouseRepository {
         OR fee_notes LIKE @q ESCAPE '\\'
         OR contact_notes LIKE @q ESCAPE '\\'
         OR custom_fees LIKE @q ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1
+          FROM viewing_schedules
+          WHERE viewing_schedules.house_id = houses.id
+            AND (
+              viewing_schedules.viewing_at LIKE @q ESCAPE '\\'
+              OR viewing_schedules.note LIKE @q ESCAPE '\\'
+            )
+        )
       )`);
       params.q = `%${escapeLikePattern(filters.q)}%`;
     }
@@ -98,38 +107,51 @@ export class HouseRepository {
       params.limit = filters.limit;
     }
 
-    return this.database.prepare(sql).all(params).map((row) => toHouse(row as HouseRow));
+    const rows = this.database.prepare(sql).all(params) as HouseRow[];
+    const schedulesByHouseId = this.findSchedulesByHouseIds(rows.map((row) => row.id));
+
+    return rows.map((row) => toHouse(row, schedulesByHouseId.get(row.id)));
   }
 
   findById(id: string): House | undefined {
     const row = this.database.prepare('SELECT * FROM houses WHERE id = ?').get(id) as HouseRow | undefined;
-    return row ? toHouse(row) : undefined;
+    if (!row) {
+      return undefined;
+    }
+
+    return toHouse(row, this.findSchedulesByHouseIds([id]).get(id));
   }
 
   create(input: CreateHouseInput): House {
     const id = randomUUID();
     const now = new Date().toISOString();
 
-    this.database
-      .prepare(
-        `
-          INSERT INTO houses (
-            id, name, status, bedroom_count, living_room_count, bathroom_count, source_channel,
-            address, latitude, longitude, rent_price, rent_payment_periods, earnest_money, deposit, property_fee, water_fee_per_ton,
-            electricity_fee_per_kwh, custom_fees, fee_notes, contact_name, phone, wechat, contact_notes, created_at, updated_at
-          ) VALUES (
-            @id, @name, @status, @bedroom_count, @living_room_count, @bathroom_count, @source_channel,
-            @address, @latitude, @longitude, @rent_price, @rent_payment_periods, @earnest_money, @deposit, @property_fee, @water_fee_per_ton,
-            @electricity_fee_per_kwh, @custom_fees, @fee_notes, @contact_name, @phone, @wechat, @contact_notes, @created_at, @updated_at
-          )
-        `
-      )
-      .run({
-        id,
-        ...toHouseRowParams(input),
-        created_at: now,
-        updated_at: now
-      });
+    const transaction = this.database.transaction(() => {
+      this.database
+        .prepare(
+          `
+            INSERT INTO houses (
+              id, name, status, bedroom_count, living_room_count, bathroom_count, source_channel,
+              address, latitude, longitude, rent_price, rent_payment_periods, earnest_money, deposit, property_fee, water_fee_per_ton,
+              electricity_fee_per_kwh, custom_fees, fee_notes, contact_name, phone, wechat, contact_notes, created_at, updated_at
+            ) VALUES (
+              @id, @name, @status, @bedroom_count, @living_room_count, @bathroom_count, @source_channel,
+              @address, @latitude, @longitude, @rent_price, @rent_payment_periods, @earnest_money, @deposit, @property_fee, @water_fee_per_ton,
+              @electricity_fee_per_kwh, @custom_fees, @fee_notes, @contact_name, @phone, @wechat, @contact_notes, @created_at, @updated_at
+            )
+          `
+        )
+        .run({
+          id,
+          ...toHouseRowParams(input),
+          created_at: now,
+          updated_at: now
+        });
+
+      this.replaceViewingSchedules(id, input.viewingSchedules ?? [], now);
+    });
+
+    transaction();
 
     return this.findById(id) as House;
   }
@@ -146,41 +168,49 @@ export class HouseRepository {
       updatedAt: new Date().toISOString()
     };
 
-    this.database
-      .prepare(
-        `
-          UPDATE houses SET
-            name = @name,
-            status = @status,
-            bedroom_count = @bedroom_count,
-            living_room_count = @living_room_count,
-            bathroom_count = @bathroom_count,
-            source_channel = @source_channel,
-            address = @address,
-            latitude = @latitude,
-            longitude = @longitude,
-            rent_price = @rent_price,
-            rent_payment_periods = @rent_payment_periods,
-            earnest_money = @earnest_money,
-            deposit = @deposit,
-            property_fee = @property_fee,
-            water_fee_per_ton = @water_fee_per_ton,
-            electricity_fee_per_kwh = @electricity_fee_per_kwh,
-            custom_fees = @custom_fees,
-            fee_notes = @fee_notes,
-            contact_name = @contact_name,
-            phone = @phone,
-            wechat = @wechat,
-            contact_notes = @contact_notes,
-            updated_at = @updated_at
-          WHERE id = @id
-        `
-      )
-      .run({
-        id,
-        ...toHouseRowParams(next),
-        updated_at: next.updatedAt
-      });
+    const transaction = this.database.transaction(() => {
+      this.database
+        .prepare(
+          `
+            UPDATE houses SET
+              name = @name,
+              status = @status,
+              bedroom_count = @bedroom_count,
+              living_room_count = @living_room_count,
+              bathroom_count = @bathroom_count,
+              source_channel = @source_channel,
+              address = @address,
+              latitude = @latitude,
+              longitude = @longitude,
+              rent_price = @rent_price,
+              rent_payment_periods = @rent_payment_periods,
+              earnest_money = @earnest_money,
+              deposit = @deposit,
+              property_fee = @property_fee,
+              water_fee_per_ton = @water_fee_per_ton,
+              electricity_fee_per_kwh = @electricity_fee_per_kwh,
+              custom_fees = @custom_fees,
+              fee_notes = @fee_notes,
+              contact_name = @contact_name,
+              phone = @phone,
+              wechat = @wechat,
+              contact_notes = @contact_notes,
+              updated_at = @updated_at
+            WHERE id = @id
+          `
+        )
+        .run({
+          id,
+          ...toHouseRowParams(next),
+          updated_at: next.updatedAt
+        });
+
+      if (input.viewingSchedules !== undefined) {
+        this.replaceViewingSchedules(id, input.viewingSchedules, next.updatedAt);
+      }
+    });
+
+    transaction();
 
     return this.findById(id);
   }
@@ -238,11 +268,63 @@ export class HouseRepository {
           created_at: house.createdAt,
           updated_at: house.updatedAt
         });
+        this.replaceViewingSchedules(house.id, house.viewingSchedules ?? [], house.updatedAt);
       }
     });
 
     transaction(houses);
     return houses.length;
+  }
+
+  private findSchedulesByHouseIds(houseIds: string[]): Map<string, ViewingScheduleItem[]> {
+    const schedulesByHouseId = new Map<string, ViewingScheduleItem[]>();
+    if (!houseIds.length) {
+      return schedulesByHouseId;
+    }
+
+    const placeholders = houseIds.map((_, index) => `@id${index}`).join(', ');
+    const params = Object.fromEntries(houseIds.map((id, index) => [`id${index}`, id]));
+    const rows = this.database
+      .prepare(
+        `
+          SELECT house_id, id, viewing_at, note
+          FROM viewing_schedules
+          WHERE house_id IN (${placeholders})
+          ORDER BY viewing_at ASC
+        `
+      )
+      .all(params) as ViewingScheduleRow[];
+
+    for (const row of rows) {
+      const schedules = schedulesByHouseId.get(row.house_id) ?? [];
+      schedules.push(toViewingSchedule(row));
+      schedulesByHouseId.set(row.house_id, schedules);
+    }
+
+    return schedulesByHouseId;
+  }
+
+  private replaceViewingSchedules(houseId: string, schedules: ViewingScheduleItem[], updatedAt: string) {
+    const deleteSchedules = this.database.prepare('DELETE FROM viewing_schedules WHERE house_id = ?');
+    const insertSchedule = this.database.prepare(`
+      INSERT INTO viewing_schedules (
+        house_id, id, viewing_at, note, created_at, updated_at
+      ) VALUES (
+        @house_id, @id, @viewing_at, @note, @created_at, @updated_at
+      )
+    `);
+
+    deleteSchedules.run(houseId);
+    for (const schedule of schedules) {
+      insertSchedule.run({
+        house_id: houseId,
+        id: schedule.id,
+        viewing_at: schedule.viewingAt,
+        note: schedule.note ?? null,
+        created_at: updatedAt,
+        updated_at: updatedAt
+      });
+    }
   }
 }
 

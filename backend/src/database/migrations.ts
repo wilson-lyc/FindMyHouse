@@ -48,6 +48,20 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_houses_rent_price ON houses(rent_price);
     CREATE INDEX IF NOT EXISTS idx_houses_updated_at ON houses(updated_at);
 
+    CREATE TABLE IF NOT EXISTS viewing_schedules (
+      house_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      viewing_at TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (house_id, id),
+      FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_viewing_schedules_house_id ON viewing_schedules(house_id);
+    CREATE INDEX IF NOT EXISTS idx_viewing_schedules_viewing_at ON viewing_schedules(viewing_at);
+
     CREATE TABLE IF NOT EXISTS locations (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -114,4 +128,66 @@ export function migrate() {
   db.exec('DROP INDEX IF EXISTS idx_map_route_cache_lookup');
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_map_route_cache_lookup
     ON map_route_cache(focus_location_id, origin, destination, commute_mode, kind)`);
+
+  migrateViewingSchedulesFromHouseColumn();
+}
+
+function migrateViewingSchedulesFromHouseColumn() {
+  const columns = db.prepare('PRAGMA table_info(houses)').all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === 'viewing_schedules')) {
+    return;
+  }
+
+  const rows = db
+    .prepare('SELECT id, viewing_schedules FROM houses WHERE viewing_schedules IS NOT NULL AND viewing_schedules != ?')
+    .all('') as Array<{ id: string; viewing_schedules: string }>;
+
+  if (!rows.length) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO viewing_schedules (
+      house_id, id, viewing_at, note, created_at, updated_at
+    ) VALUES (
+      @house_id, @id, @viewing_at, @note, @created_at, @updated_at
+    )
+  `);
+
+  const transaction = db.transaction((items: typeof rows) => {
+    for (const row of items) {
+      const schedules = parseLegacyViewingSchedules(row.viewing_schedules);
+      for (const schedule of schedules) {
+        insert.run({
+          house_id: row.id,
+          id: schedule.id,
+          viewing_at: schedule.viewingAt,
+          note: schedule.note ?? null,
+          created_at: now,
+          updated_at: now
+        });
+      }
+    }
+  });
+
+  transaction(rows);
+}
+
+function parseLegacyViewingSchedules(value: string): Array<{ id: string; viewingAt: string; note?: string }> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(
+      (item): item is { id: string; viewingAt: string; note?: string } =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as Record<string, unknown>).id === 'string' &&
+        typeof (item as Record<string, unknown>).viewingAt === 'string' &&
+        ((item as Record<string, unknown>).note === undefined || typeof (item as Record<string, unknown>).note === 'string')
+    );
+  } catch {
+    return [];
+  }
 }

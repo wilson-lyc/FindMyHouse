@@ -5,6 +5,8 @@ import ChatView from '../views/chat/ChatView.vue';
 import DataTransferView from '../views/data-transfer/DataTransferView.vue';
 import HousesView from '../views/houses/HousesView.vue';
 import LocationsView from '../views/locations/LocationsView.vue';
+import ScheduleView from '../views/schedule/ScheduleView.vue';
+import ScheduleCalendarView from '../views/schedule/ScheduleCalendarView.vue';
 import StatsView from '../views/stats/StatsView.vue';
 import HelpPage from '../views/help/HelpPage.vue';
 import SettingsView from '../views/settings/SettingsView.vue';
@@ -31,6 +33,11 @@ const routes = [
         path: 'chat',
         name: 'chat',
         component: ChatView
+      },
+      {
+        path: 'schedule',
+        name: 'schedule',
+        component: ScheduleView
       }
     ]
   },
@@ -58,6 +65,11 @@ const routes = [
     path: '/settings',
     name: 'settings',
     component: SettingsView
+  },
+  {
+    path: '/schedule-calendar',
+    name: 'schedule-calendar',
+    component: ScheduleCalendarView
   }
 ];
 
@@ -93,7 +105,8 @@ router.beforeEach(async (to) => {
     to.name !== 'settings' &&
     to.name !== 'help' &&
     to.name !== 'stats' &&
-    to.name !== 'data'
+    to.name !== 'data' &&
+    to.name !== 'schedule-calendar'
   ) {
     return { name: 'welcome' };
   }

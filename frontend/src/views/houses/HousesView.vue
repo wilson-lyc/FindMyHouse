@@ -146,6 +146,7 @@ watch(
           @select="layoutContext.selectHouse"
           @edit="houseDialogStore.openEdit"
           @delete="layoutContext.confirmDeleteHouse"
+          @schedule="houseDialogStore.openSchedule"
           @route="layoutContext.showRoute"
           @compare-change="toggleCompareHouse"
         />

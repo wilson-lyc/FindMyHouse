@@ -8,6 +8,7 @@ import {
   House as HouseIcon,
   Location as LocationIcon,
   QuestionFilled,
+  Calendar,
   Setting,
   Upload
 } from '@element-plus/icons-vue';
@@ -62,7 +63,9 @@ const {
   initialForm: houseDialogInitialForm,
   title: houseDialogTitle,
   cancelText: houseDialogCancelText,
-  submitText: houseDialogSubmitText
+  submitText: houseDialogSubmitText,
+  initialSection: houseDialogInitialSection,
+  addViewingScheduleOnOpen: houseDialogAddViewingScheduleOnOpen
 } = storeToRefs(houseDialogStore);
 const locationDialogStore = useLocationDialogStore();
 const {
@@ -80,7 +83,7 @@ const minContentPanelWidth = 360;
 const maxContentPanelWidth = 760;
 
 const activeMenu = computed(() => {
-  if (route.name === 'locations' || route.name === 'chat') return String(route.name);
+  if (route.name === 'locations' || route.name === 'chat' || route.name === 'schedule') return String(route.name);
   return 'houses';
 });
 
@@ -330,6 +333,10 @@ onMounted(async () => {
           <el-icon><ChatDotSquare /></el-icon>
           <span>对话</span>
         </el-menu-item>
+        <el-menu-item index="schedule">
+          <el-icon><Calendar /></el-icon>
+          <span>日程</span>
+        </el-menu-item>
       </el-menu>
       <div class="map-directory-bottom">
         <el-tooltip content="统计" placement="right">
@@ -381,6 +388,8 @@ onMounted(async () => {
       :title="houseDialogTitle"
       :cancel-text="houseDialogCancelText"
       :submit-text="houseDialogSubmitText"
+      :initial-section="houseDialogInitialSection"
+      :add-viewing-schedule-on-open="houseDialogAddViewingScheduleOnOpen"
       @update:model-value="houseDialogStore.setVisible"
       @submit="submitHouse"
     />

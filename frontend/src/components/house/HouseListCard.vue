@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Delete, Edit, Van } from '@element-plus/icons-vue';
+import { Calendar, Delete, Edit, Van } from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
 import { statusLabels, statusType } from '../../model/house/house-status';
 import type { House } from '../../model/house/house';
@@ -20,6 +20,7 @@ const emit = defineEmits<{
   select: [house: House];
   edit: [house: House];
   delete: [house: House];
+  schedule: [house: House];
   route: [house: House];
   compareChange: [house: House, selected: boolean];
 }>();
@@ -111,6 +112,7 @@ function formatDuration(seconds: number): string {
       </div>
     </div>
     <div class="house-card-actions">
+      <el-button link type="primary" :icon="Calendar" @click.stop="emit('schedule', house)">预约看房</el-button>
       <el-button
         v-if="focusLocationName && house.latitude !== undefined && house.longitude !== undefined"
         link
