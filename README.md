@@ -36,6 +36,14 @@ FindMyHouse 把这些信息变成一个可管理的本地数据库。你可以�
 - AI：LangChain + LangGraph，支持 OpenAI 协议兼容服务
 - 地图：高德地图 JS API + Web Service API
 
+## 快速部署
+
+让 AI Agent 帮你完成从零到一的完整部署：
+
+```text
+帮我部署 FindMyHouse：`https://github.com/wilson-lyc/FindMyHouse/blob/main/Install.md`
+```
+
 ## 本地运行
 
 ### 环境要求
