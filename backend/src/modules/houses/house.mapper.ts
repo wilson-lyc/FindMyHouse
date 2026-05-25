@@ -2,6 +2,7 @@ import {
   rentPaymentPeriods,
   type CustomFeeItem,
   type House,
+  type HouseImageItem,
   type HouseSourceChannel,
   type HouseStatus,
   type RentPaymentPeriod,
@@ -47,7 +48,7 @@ export interface ViewingScheduleRow {
   updated_at: string;
 }
 
-export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[]): House {
+export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[], images?: HouseImageItem[]): House {
   return {
     id: row.id,
     name: row.name,
@@ -68,6 +69,7 @@ export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[])
     electricityFeePerKwh: row.electricity_fee_per_kwh ?? undefined,
     customFees: parseCustomFees(row.custom_fees),
     viewingSchedules: viewingSchedules?.length ? viewingSchedules : undefined,
+    images: images?.length ? images : undefined,
     feeNotes: row.fee_notes ?? undefined,
     contactName: row.contact_name ?? undefined,
     phone: row.phone ?? undefined,

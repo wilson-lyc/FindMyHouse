@@ -1,5 +1,5 @@
-import { deleteData, getData, patchData, postData } from '../http';
-import type { House, HouseFilters, HouseForm } from '../../model/house/house';
+import { deleteData, getData, patchData, postData, postFormData, putData } from '../http';
+import type { House, HouseFilters, HouseForm, HouseImage } from '../../model/house/house';
 
 export async function fetchHouses(filters: HouseFilters) {
   const params = new URLSearchParams();
@@ -33,4 +33,33 @@ export function updateHouse(id: string, payload: HouseForm) {
 
 export function deleteHouse(id: string) {
   return deleteData(`/api/houses/${id}`);
+}
+
+export function fetchHouseImages(houseId: string) {
+  return getData<HouseImage[]>(`/api/houses/${houseId}/images`);
+}
+
+export function uploadHouseImages(houseId: string, files: File[]) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('images', file));
+  return postFormData<HouseImage[]>(`/api/houses/${houseId}/images`, formData);
+}
+
+export function deleteHouseImage(houseId: string, imageId: string) {
+  return deleteData(`/api/houses/${houseId}/images/${imageId}`);
+}
+
+export function updateHouseImage(
+  houseId: string,
+  imageId: string,
+  payload: Partial<Pick<HouseImage, 'isCover' | 'sortOrder'>>
+) {
+  return patchData<HouseImage, Partial<Pick<HouseImage, 'isCover' | 'sortOrder'>>>(
+    `/api/houses/${houseId}/images/${imageId}`,
+    payload
+  );
+}
+
+export function reorderHouseImages(houseId: string, imageIds: string[]) {
+  return putData<HouseImage[], { imageIds: string[] }>(`/api/houses/${houseId}/images/order`, { imageIds });
 }

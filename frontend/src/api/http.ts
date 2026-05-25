@@ -44,6 +44,23 @@ export async function patchData<TResponse, TPayload>(url: string, payload: TPayl
   return response.data;
 }
 
+export async function putData<TResponse, TPayload>(url: string, payload: TPayload) {
+  const response = await request<ApiResponse<TResponse>>(url, {
+    method: 'PUT',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+  return response.data;
+}
+
+export async function postFormData<TResponse>(url: string, payload: FormData) {
+  const response = await request<ApiResponse<TResponse>>(url, {
+    method: 'POST',
+    body: payload
+  });
+  return response.data;
+}
+
 export async function deleteData(url: string) {
   await request<void>(url, {
     method: 'DELETE'

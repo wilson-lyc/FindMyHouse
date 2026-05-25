@@ -455,6 +455,7 @@ onMounted(async () => {
       :submit-text="houseDialogSubmitText"
       :initial-section="houseDialogInitialSection"
       @update:model-value="houseDialogStore.setVisible"
+      @image-changed="loadHouses"
       @submit="submitHouse"
     />
     <ScheduleFormDialog

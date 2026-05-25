@@ -31,6 +31,22 @@ export interface ViewingScheduleItem {
   updatedAt: string;
 }
 
+export interface HouseImageItem {
+  id: string;
+  houseId: string;
+  url: string;
+  storagePath: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+  sortOrder: number;
+  isCover: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface House {
   id: string;
   name: string;
@@ -51,6 +67,7 @@ export interface House {
   electricityFeePerKwh?: number;
   customFees?: CustomFeeItem[];
   viewingSchedules?: ViewingScheduleItem[];
+  images?: HouseImageItem[];
   feeNotes?: string;
   contactName?: string;
   phone?: string;

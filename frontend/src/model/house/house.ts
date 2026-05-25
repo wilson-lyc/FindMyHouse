@@ -43,6 +43,23 @@ export interface ViewingSchedule {
   note?: string;
 }
 
+export interface HouseImage {
+  id: string;
+  houseId: string;
+  url: string;
+  thumbnailUrl?: string;
+  originalName?: string;
+  fileName?: string;
+  mimeType?: string;
+  size?: number;
+  width?: number;
+  height?: number;
+  sortOrder: number;
+  isCover: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface House {
   id: string;
   name: string;
@@ -68,6 +85,7 @@ export interface House {
   wechat?: string;
   contactNotes?: string;
   viewingSchedules?: ViewingSchedule[];
+  images?: HouseImage[];
   createdAt: string;
   updatedAt: string;
 }

@@ -4,6 +4,7 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Aim, Delete as DeleteIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
 import { geocodeAddress, reverseGeocodeCoordinates } from '../../api/map/map-api';
+import HouseImageManager from './HouseImageManager.vue';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
   houseSourceChannelLabels,
@@ -32,6 +33,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [visible: boolean];
   submit: [form: HouseForm];
+  imageChanged: [];
 }>();
 
 const formRef = ref<FormInstance>();
@@ -42,6 +44,7 @@ const form = reactive<HouseForm>(createEmptyHouseForm());
 
 const formSections = [
   { key: 'basic', label: '基础信息' },
+  { key: 'images', label: '房源图片' },
   { key: 'location', label: '地理位置' },
   { key: 'fees', label: '租金费用' },
   { key: 'contact', label: '联系方式' }
@@ -201,6 +204,11 @@ async function submitForm() {
                 </div>
               </el-form-item>
             </div>
+          </section>
+
+          <section id="house-form-images" class="house-form-section">
+            <h3>房源图片</h3>
+            <HouseImageManager :house="house" :visible="modelValue" @changed="emit('imageChanged')" />
           </section>
 
           <section id="house-form-location" class="house-form-section">

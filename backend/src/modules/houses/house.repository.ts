@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { House, HouseFilters, ViewingScheduleItem } from './domain/house.js';
+import type { House, HouseFilters, HouseImageItem, ViewingScheduleItem } from './domain/house.js';
 import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
 import { toHouse, toHouseRowParams, toViewingSchedule, type HouseRow, type ViewingScheduleRow } from './house.mapper.js';
+import { toHouseImage, type HouseImageRow } from '../house-images/house-image.mapper.js';
 
 export class HouseRepository {
   constructor(private readonly database: DatabaseType) {}
@@ -108,9 +109,11 @@ export class HouseRepository {
     }
 
     const rows = this.database.prepare(sql).all(params) as HouseRow[];
-    const schedulesByHouseId = this.findSchedulesByHouseIds(rows.map((row) => row.id));
+    const houseIds = rows.map((row) => row.id);
+    const schedulesByHouseId = this.findSchedulesByHouseIds(houseIds);
+    const imagesByHouseId = this.findImagesByHouseIds(houseIds);
 
-    return rows.map((row) => toHouse(row, schedulesByHouseId.get(row.id)));
+    return rows.map((row) => toHouse(row, schedulesByHouseId.get(row.id), imagesByHouseId.get(row.id)));
   }
 
   findById(id: string): House | undefined {
@@ -119,7 +122,7 @@ export class HouseRepository {
       return undefined;
     }
 
-    return toHouse(row, this.findSchedulesByHouseIds([id]).get(id));
+    return toHouse(row, this.findSchedulesByHouseIds([id]).get(id), this.findImagesByHouseIds([id]).get(id));
   }
 
   create(input: CreateHouseInput): House {
@@ -288,6 +291,34 @@ export class HouseRepository {
     }
 
     return schedulesByHouseId;
+  }
+
+  private findImagesByHouseIds(houseIds: string[]): Map<string, HouseImageItem[]> {
+    const imagesByHouseId = new Map<string, HouseImageItem[]>();
+    if (!houseIds.length) {
+      return imagesByHouseId;
+    }
+
+    const placeholders = houseIds.map((_, index) => `@id${index}`).join(', ');
+    const params = Object.fromEntries(houseIds.map((id, index) => [`id${index}`, id]));
+    const rows = this.database
+      .prepare(
+        `
+          SELECT *
+          FROM house_images
+          WHERE house_id IN (${placeholders})
+          ORDER BY sort_order ASC, created_at ASC
+        `
+      )
+      .all(params) as HouseImageRow[];
+
+    for (const row of rows) {
+      const images = imagesByHouseId.get(row.house_id) ?? [];
+      images.push(toHouseImage(row));
+      imagesByHouseId.set(row.house_id, images);
+    }
+
+    return imagesByHouseId;
   }
 }
 
