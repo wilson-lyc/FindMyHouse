@@ -58,27 +58,7 @@ async function getCachedCommuteRoute(
   origin: string,
   destination: string
 ): Promise<CommuteRouteResult | undefined> {
-  const focusLocation = getMatchingFocusLocation(destination);
-  const cached = focusLocation
-    ? routeCacheRepository.findRoute(focusLocation.id, origin, destination, mode)
-    : undefined;
-  if (cached) return cached;
-
-  const result = await amapService.getCommuteRoute(mode, origin, destination);
-  if (result && focusLocation) {
-    routeCacheRepository.save({
-      focusLocationId: focusLocation.id,
-      origin,
-      destination,
-      kind: 'route',
-      commuteMode: mode,
-      distance: result.distance,
-      duration: result.duration,
-      polyline: result.polyline,
-    });
-  }
-
-  return result;
+  return amapService.getCommuteRoute(mode, origin, destination);
 }
 
 async function getCachedDrivingDistance(

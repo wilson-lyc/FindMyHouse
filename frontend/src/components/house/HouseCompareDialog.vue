@@ -7,13 +7,13 @@ import {
   type CustomFeeItem,
   type House
 } from '../../model/house/house';
-import type { CommuteRouteResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult } from '../../model/map/geocode';
 import { statusLabels } from '../../model/house/house-status';
 
 const props = defineProps<{
   modelValue: boolean;
   houses: House[];
-  routes: Map<string, CommuteRouteResult>;
+  routes: Map<string, CommuteDistanceResult>;
   loading?: boolean;
 }>();
 

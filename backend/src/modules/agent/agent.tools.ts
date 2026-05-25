@@ -860,7 +860,7 @@ async function createLocation(params: Record<string, unknown>, { amapService }: 
         payload: input,
       },
     ],
-    reply: `我已识别出一个待新增地点，请在弹窗中确认后再入库。\n${formatPendingLocationDetails(input)}`,
+    reply: `我已识别出一个待新增地点，请在弹窗中确认后再入库。`,
   };
 }
 

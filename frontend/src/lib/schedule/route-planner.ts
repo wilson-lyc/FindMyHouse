@@ -1,6 +1,6 @@
 import type { House, ViewingSchedule } from '../../model/house/house';
 import type { Location } from '../../model/location/location';
-import type { CommuteRouteResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult } from '../../model/map/geocode';
 
 export interface ScheduleRouteItem {
   house: House;
@@ -102,7 +102,7 @@ function firstLegDistance(
   origin: Location & Coordinate,
   item: RoutableScheduleRouteItem,
   lookup?: ScheduleRouteDistanceLookup,
-  routes?: Map<string, CommuteRouteResult>
+  routes?: Map<string, CommuteDistanceResult>
 ) {
   const distance = lookupDistance(lookup, origin.id, item.house.id, origin, item.house);
   if (!distance.estimated) return distance;
@@ -132,7 +132,7 @@ export function createScheduleRoutePlan(
   items: ScheduleRouteItem[],
   origin: Location | null,
   distanceLookup?: ScheduleRouteDistanceLookup,
-  routes?: Map<string, CommuteRouteResult>
+  routes?: Map<string, CommuteDistanceResult>
 ): ScheduleRoutePlan | null {
   if (!origin || !hasCoordinate(origin)) return null;
   const routeOrigin = origin as Location & Coordinate;

@@ -86,7 +86,6 @@ export function migrate() {
       kind TEXT NOT NULL,
       distance REAL NOT NULL,
       duration REAL NOT NULL,
-      polyline TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -122,6 +121,11 @@ export function migrate() {
   ensureColumn('houses', 'fee_notes', 'TEXT');
 
   ensureColumn('map_route_cache', 'commute_mode', "TEXT NOT NULL DEFAULT 'driving'");
+  db.prepare("DELETE FROM map_route_cache WHERE kind != 'distance'").run();
+  const routeCacheColumns = db.prepare('PRAGMA table_info(map_route_cache)').all() as Array<{ name: string }>;
+  if (routeCacheColumns.some((column) => column.name === 'polyline')) {
+    db.prepare('UPDATE map_route_cache SET polyline = NULL').run();
+  }
 
   // Rebuild unique index to include commute_mode
   db.exec('DROP INDEX IF EXISTS idx_map_route_cache_lookup');

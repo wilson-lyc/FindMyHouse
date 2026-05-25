@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { CommuteDistanceResult, CommuteRouteResult, CommuteMode } from './amap.service.js';
+import type { CommuteDistanceResult, CommuteMode } from './amap.service.js';
 
-export type RouteCacheKind = 'distance' | 'route';
+export type RouteCacheKind = 'distance';
 
 interface RouteCacheRow {
   id: string;
@@ -13,7 +13,6 @@ interface RouteCacheRow {
   commute_mode: string;
   distance: number;
   duration: number;
-  polyline?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,7 +25,6 @@ interface SaveRouteCacheInput {
   commuteMode: CommuteMode;
   distance: number;
   duration: number;
-  polyline?: Array<[number, number]>;
 }
 
 export class RouteCacheRepository {
@@ -50,25 +48,6 @@ export class RouteCacheRepository {
     };
   }
 
-  findRoute(
-    focusLocationId: string,
-    origin: string,
-    destination: string,
-    commuteMode: CommuteMode
-  ): CommuteRouteResult | undefined {
-    const row = this.find(focusLocationId, origin, destination, 'route', commuteMode);
-    if (!row) return undefined;
-
-    return {
-      origin: row.origin,
-      destination: row.destination,
-      distance: row.distance,
-      duration: row.duration,
-      polyline: row.polyline ? (JSON.parse(row.polyline) as Array<[number, number]>) : undefined,
-      mode: commuteMode,
-    };
-  }
-
   save(input: SaveRouteCacheInput) {
     const id = randomUUID();
     const now = new Date().toISOString();
@@ -77,14 +56,13 @@ export class RouteCacheRepository {
       .prepare(
         `
           INSERT INTO map_route_cache (
-            id, focus_location_id, origin, destination, kind, commute_mode, distance, duration, polyline, created_at, updated_at
+            id, focus_location_id, origin, destination, kind, commute_mode, distance, duration, created_at, updated_at
           ) VALUES (
-            @id, @focus_location_id, @origin, @destination, @kind, @commute_mode, @distance, @duration, @polyline, @created_at, @updated_at
+            @id, @focus_location_id, @origin, @destination, @kind, @commute_mode, @distance, @duration, @created_at, @updated_at
           )
           ON CONFLICT(focus_location_id, origin, destination, commute_mode, kind) DO UPDATE SET
             distance = excluded.distance,
             duration = excluded.duration,
-            polyline = excluded.polyline,
             updated_at = excluded.updated_at
         `
       )
@@ -97,7 +75,6 @@ export class RouteCacheRepository {
         commute_mode: input.commuteMode,
         distance: input.distance,
         duration: input.duration,
-        polyline: input.polyline ? JSON.stringify(input.polyline) : null,
         created_at: now,
         updated_at: now,
       });

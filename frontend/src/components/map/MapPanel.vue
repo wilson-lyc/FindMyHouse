@@ -2,15 +2,34 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
-import { Aim, Close, House as HouseIcon, Location as LocationIcon, OfficeBuilding } from '@element-plus/icons-vue';
+import {
+  Aim,
+  Close,
+  House as HouseIcon,
+  Location as LocationIcon,
+  OfficeBuilding
+} from '@element-plus/icons-vue';
 import { formatCurrency } from '../../lib/format';
+import { defaultMapZoom, focusedHouseMapZoom, focusedPlaceMapZoom } from '../../lib/map/map-zoom';
+import { formatDistanceShort } from '../../lib/map/route-format';
 import { useMapStore } from '../../stores/mapStore';
-import { loadAmap, type AMapInfoWindow, type AMapMap, type AMapMarker, type AMapNamespace, type AMapPolyline } from '../../lib/map/amap-loader';
+import {
+  loadAmap,
+  type AMapInfoWindow,
+  type AMapLngLat,
+  type AMapMap,
+  type AMapMarker,
+  type AMapNamespace,
+  type AMapRoutePlanner,
+  type AMapRouteSearchResult,
+  type AMapRouteStatus
+} from '../../lib/map/amap-loader';
 import type { House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location as KeyLocation } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
-import { commuteModeColors, type CommuteMode } from '../../model/map/geocode';
+import type { CommuteMode } from '../../model/map/geocode';
+import MapPointRoutePanel from './MapPointRoutePanel.vue';
 
 const emit = defineEmits<{
   editHouse: [house: House];
@@ -24,20 +43,34 @@ interface MapContextMenuPosition {
 }
 
 const mapStore = useMapStore();
-const { houses, locations, selectedHouseId, selectedHouseFocusKey, routeData, scheduleRoutePlan, highlightedHouseIds, commuteMode } =
-  storeToRefs(mapStore);
+const {
+  houses,
+  locations,
+  mode,
+  selectedHouseId,
+  selectedHouseFocusKey,
+  pointRouteOrigin,
+  pointRouteDestination,
+  pointRouteRequestKey,
+  scheduleRoutePlan,
+  searchResultHouses,
+  commuteMode
+} = storeToRefs(mapStore);
 
 // ==================== 地图实例 ====================
 
 const mapContainer = ref<HTMLDivElement>();
+const pointRouteResultPanel = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
-const isSearchResultMode = computed(() => highlightedHouseIds.value.length > 0);
+const nativeRouteCollapse = ref<string[]>([]);
+const isSearchResultMode = computed(() => mode.value === 'house-search-results');
+const visibleHouses = computed(() => (isSearchResultMode.value ? searchResultHouses.value : houses.value));
 const hasFocusLocation = computed(() => locations.value.some((loc) => loc.isFocus));
 
-const houseFocusZoom = 16;
-const locationFocusZoom = 14;
+const houseFocusZoom = focusedHouseMapZoom;
+const locationFocusZoom = focusedPlaceMapZoom;
 
 let hasAppliedInitialFocus = false;
 let resizeObserver: ResizeObserver | undefined;
@@ -105,6 +138,18 @@ function createLocationFromContextMenu() {
     latitude: contextMenu.value.latitude
   });
   closeContextMenu();
+}
+
+function setupNativeControls() {
+  if (!map.value || !amap.value) return;
+
+  amap.value.plugin(['AMap.Scale'], () => {
+    if (!map.value || !amap.value) return;
+
+    if (amap.value.Scale) {
+      map.value.addControl(new amap.value.Scale({ position: 'LB' }));
+    }
+  });
 }
 
 // ==================== 信息窗口 ====================
@@ -206,18 +251,12 @@ function locationPosition(location: KeyLocation): [number, number] | undefined {
 function focusHouse(house: House, position: [number, number]) {
   if (!map.value) return;
 
-  if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(houseFocusZoom, position, true, 0);
-  } else {
-    map.value.setZoom?.(houseFocusZoom, true, 0);
-    map.value.setCenter(position, true, 0);
-  }
-
+  map.value.setZoomAndCenter(houseFocusZoom, position, true, 0);
   openHouseInfoWindow(house, position);
 }
 
 function focusHouseById(houseId: string) {
-  const house = houses.value.find((item) => item.id === houseId);
+  const house = visibleHouses.value.find((item) => item.id === houseId) ?? houses.value.find((item) => item.id === houseId);
   const position = house ? housePosition(house) : undefined;
   if (!house || !position || !map.value) return false;
 
@@ -233,13 +272,7 @@ function selectHouseById(houseId: string) {
 function focusLocation(location: KeyLocation, position: [number, number]) {
   if (!map.value) return;
 
-  if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
-  } else {
-    map.value.setZoom?.(locationFocusZoom, true, 0);
-    map.value.setCenter(position, true, 0);
-  }
-
+  map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
   createInfoWindow(locationInfoContent(location), position);
   bindInfoCloseAction();
 }
@@ -258,12 +291,7 @@ function focusFocusLocation() {
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
   if (!focusLocation || !position || !map.value) return false;
 
-  if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
-  } else {
-    map.value.setZoom?.(locationFocusZoom, true, 0);
-    map.value.setCenter(position, true, 0);
-  }
+  map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
   return true;
 }
 
@@ -275,31 +303,31 @@ function applyInitialFocusLocation() {
   const position = focusLocation ? locationPosition(focusLocation) : undefined;
   if (!focusLocation || !position) return false;
 
-  if (map.value.setZoomAndCenter) {
-    map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
-  } else {
-    map.value.setZoom?.(locationFocusZoom, true, 0);
-    map.value.setCenter(position, true, 0);
-  }
+  map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
 
   hasAppliedInitialFocus = true;
   return true;
 }
 
-/** 渲染房源和地点的大头针；搜索结果模式下只渲染匹配房源。 */
+/** 渲染房源和地点的大头针；搜索结果模式下房源收敛到搜索结果，地点保持全量展示。 */
 let houseMarkersById = new Map<string, AMapMarker>();
+let mapPointMarkers: AMapMarker[] = [];
+
+function clearMapPointMarkers() {
+  if (!map.value || mapPointMarkers.length === 0) return;
+
+  map.value.remove(mapPointMarkers);
+  mapPointMarkers = [];
+  houseMarkersById = new Map();
+}
 
 function renderMarkers() {
   if (!map.value || !amap.value) return;
 
-  map.value.clearMap();
+  clearMapPointMarkers();
   const markers = [];
-  houseMarkersById = new Map();
 
-  const highlightedIds = new Set(highlightedHouseIds.value ?? []);
-  const visibleHouses = highlightedIds.size > 0 ? houses.value.filter((house) => highlightedIds.has(house.id)) : houses.value;
-
-  for (const house of visibleHouses) {
+  for (const house of visibleHouses.value) {
     const position = housePosition(house);
     if (!position) continue;
 
@@ -319,40 +347,39 @@ function renderMarkers() {
     markers.push(marker);
   }
 
-  if (highlightedIds.size === 0) {
-    for (const location of locations.value) {
-      const position = locationPosition(location);
-      if (!position) continue;
+  for (const location of locations.value) {
+    const position = locationPosition(location);
+    if (!position) continue;
 
-      const marker = new amap.value.Marker({
-        position,
-        title: location.name,
-        label: {
-          content: `<div class="map-marker-label location">${location.name}</div>`,
-          direction: 'top'
-        }
-      });
+    const marker = new amap.value.Marker({
+      position,
+      title: location.name,
+      label: {
+        content: `<div class="map-marker-label location">${location.name}</div>`,
+        direction: 'top'
+      }
+    });
 
-      marker.on('click', () => {
-        focusLocation(location, position);
-      });
-      markers.push(marker);
-    }
+    marker.on('click', () => {
+      focusLocation(location, position);
+    });
+    markers.push(marker);
   }
 
   if (markers.length) {
     map.value.add(markers);
   }
+  mapPointMarkers = markers;
 
-  renderRoutePolyline();
+  renderPointRoute();
   renderScheduleRoutePolyline();
 }
 
 function fitSearchResultView() {
-  if (!map.value || highlightedHouseIds.value.length === 0) return false;
+  if (!map.value || !isSearchResultMode.value) return false;
 
-  const resultMarkers = highlightedHouseIds.value
-    .map((houseId) => houseMarkersById.get(houseId))
+  const resultMarkers = searchResultHouses.value
+    .map((house) => houseMarkersById.get(house.id))
     .filter((marker): marker is AMapMarker => Boolean(marker));
 
   if (!resultMarkers.length) return false;
@@ -364,49 +391,29 @@ function fitSearchResultView() {
 
 // ==================== 路线 ====================
 
-let routePolyline: AMapPolyline | undefined;
-let routeInfoWindow: AMapInfoWindow | undefined;
-let scheduleRoutePolyline: AMapPolyline | undefined;
+let activePointRouteRequestId = 0;
+const pointRoutePlanners = new Set<AMapRoutePlanner>();
+let activeScheduleRouteRequestId = 0;
+let scheduleRoutePlanner: AMapRoutePlanner | undefined;
 let scheduleRouteMarkers: AMapMarker[] = [];
 let scheduleRouteInfoWindow: AMapInfoWindow | undefined;
 
-function formatDistanceShort(meters: number): string {
-  if (meters >= 1000) {
-    return (meters / 1000).toFixed(1) + 'km';
-  }
-  return Math.round(meters) + 'm';
-}
-
-function formatDurationShort(seconds: number): string {
-  if (seconds >= 60) {
-    const minutes = Math.round(seconds / 60);
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return hours + 'h' + (mins > 0 ? mins + 'min' : '');
-    }
-    return minutes + 'min';
-  }
-  return Math.round(seconds) + 's';
-}
-
 /** 清除路线折线和信息窗口 */
-function clearRoutePolyline() {
-  if (routePolyline) {
-    routePolyline.setMap(null);
-    routePolyline = undefined;
+function clearPointRoutePlanner() {
+  activePointRouteRequestId += 1;
+  for (const planner of pointRoutePlanners) {
+    planner.clear?.();
   }
-  if (routeInfoWindow) {
-    routeInfoWindow.close();
-    routeInfoWindow = undefined;
+  pointRoutePlanners.clear();
+  if (pointRouteResultPanel.value) {
+    pointRouteResultPanel.value.innerHTML = '';
   }
 }
 
 function clearScheduleRoutePolyline() {
-  if (scheduleRoutePolyline) {
-    scheduleRoutePolyline.setMap(null);
-    scheduleRoutePolyline = undefined;
-  }
+  activeScheduleRouteRequestId += 1;
+  scheduleRoutePlanner?.clear?.();
+  scheduleRoutePlanner = undefined;
 
   for (const marker of scheduleRouteMarkers) {
     map.value?.remove(marker);
@@ -419,86 +426,99 @@ function clearScheduleRoutePolyline() {
   }
 }
 
-/** 绘制路线折线并显示距离时长标签 */
-function renderRoutePolyline() {
-  if (!map.value || !amap.value || !routeData.value) return;
+function routePluginName(mode: CommuteMode) {
+  if (mode === 'walking') return 'AMap.Walking';
+  if (mode === 'cycling') return 'AMap.Riding';
+  if (mode === 'transit') return 'AMap.Transfer';
+  return 'AMap.Driving';
+}
 
-  const currentMode = commuteMode.value;
-  const modeColor = commuteModeColors[currentMode];
+function createRoutePlanner(mode: CommuteMode) {
+  if (!map.value || !amap.value) return undefined;
 
-  clearRoutePolyline();
+  const options: Record<string, unknown> = {
+    map: map.value,
+    panel: pointRouteResultPanel.value,
+    autoFitView: true,
+    hideMarkers: false,
+    extensions: 'all'
+  };
 
-  const path = routeData.value.polyline;
-  if (path && path.length >= 2) {
-    routePolyline = new amap.value.Polyline({
-      path,
-      strokeColor: modeColor,
-      strokeWeight: 5,
-      strokeOpacity: 0.8,
-      lineJoin: 'round',
-      lineCap: 'round'
-    });
-
-    routePolyline.setMap(map.value);
-
-    map.value?.setFitView([routePolyline]);
-
-    const midIndex = Math.floor(path.length / 2);
-    const midPoint = path[midIndex];
-
-    const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
-    routeInfoWindow = new amap.value.InfoWindow({
-      content: routeInfoContent,
-      offset: new amap.value.Pixel(0, 0)
-    });
-    routeInfoWindow.open(map.value, midPoint);
-  } else {
-    // 公交/无折线模式：在目的地显示信息窗
-    const routeInfoContent = `<div class="map-route-label">${formatDistanceShort(routeData.value.distance)} · ${formatDurationShort(routeData.value.duration)}</div>`;
-    routeInfoWindow = new amap.value.InfoWindow({
-      content: routeInfoContent,
-      offset: new amap.value.Pixel(0, 0)
-    });
-    // 尝试从 destination 解析坐标
-    const destParts = routeData.value.destination.split(',');
-    if (destParts.length === 2) {
-      const destLng = Number(destParts[0]);
-      const destLat = Number(destParts[1]);
-      if (!isNaN(destLng) && !isNaN(destLat)) {
-        routeInfoWindow.open(map.value, [destLng, destLat]);
-      }
-    }
+  if (mode === 'transit') {
+    return new amap.value.Transfer({ ...options, city: '全国' });
   }
+  if (mode === 'walking') {
+    return new amap.value.Walking(options);
+  }
+  if (mode === 'cycling') {
+    return new amap.value.Riding(options);
+  }
+
+  return new amap.value.Driving({ ...options, showTraffic: true });
+}
+
+function firstRouteSummary(result: AMapRouteSearchResult) {
+  return result.routes?.[0] ?? result.plans?.[0];
+}
+
+function renderPointRoute() {
+  if (!map.value || !amap.value || mode.value !== 'point-route' || !pointRouteOrigin.value || !pointRouteDestination.value) return;
+
+  clearPointRoutePlanner();
+  const requestId = activePointRouteRequestId;
+  const routeMode = commuteMode.value;
+  const originPoint = pointRouteOrigin.value;
+  const destinationPoint = pointRouteDestination.value;
+  const pluginName = routePluginName(routeMode);
+  amap.value.plugin(pluginName, () => {
+    if (requestId !== activePointRouteRequestId || mode.value !== 'point-route') return;
+
+    const planner = createRoutePlanner(routeMode);
+    if (!planner) return;
+
+    pointRoutePlanners.add(planner);
+
+    const origin: AMapLngLat = new amap.value!.LngLat(originPoint.longitude, originPoint.latitude);
+    const destination: AMapLngLat = new amap.value!.LngLat(destinationPoint.longitude, destinationPoint.latitude);
+    planner.search(origin, destination, (status: AMapRouteStatus, result: AMapRouteSearchResult | string) => {
+      if (requestId !== activePointRouteRequestId || commuteMode.value !== routeMode) {
+        planner.clear?.();
+        pointRoutePlanners.delete(planner);
+        return;
+      }
+      if (status !== 'complete' || typeof result === 'string') return;
+
+      const summary = firstRouteSummary(result);
+      if (!summary?.distance || !summary.time) return;
+
+      mapStore.setPointRouteResult({
+        origin: `${originPoint.longitude},${originPoint.latitude}`,
+        destination: `${destinationPoint.longitude},${destinationPoint.latitude}`,
+        distance: summary.distance,
+        duration: summary.time,
+        mode: routeMode
+      });
+    });
+  });
 }
 
 function renderScheduleRoutePolyline() {
   if (!map.value || !amap.value || !scheduleRoutePlan.value) return;
 
   clearScheduleRoutePolyline();
+  const requestId = activeScheduleRouteRequestId;
+  const plan = scheduleRoutePlan.value;
+  const originPoint = new amap.value.LngLat(plan.origin.longitude!, plan.origin.latitude!);
+  const destinationItem = plan.items[plan.items.length - 1];
+  if (!destinationItem) return;
 
-  const fallbackPath: Array<[number, number]> = [
-    [scheduleRoutePlan.value.origin.longitude!, scheduleRoutePlan.value.origin.latitude!],
-    ...scheduleRoutePlan.value.items.map((item) => [item.house.longitude!, item.house.latitude!] as [number, number])
-  ];
-  const routePath = scheduleRoutePlan.value.legs.flatMap((leg) => leg.polyline ?? []);
-  const path = routePath.length >= 2 ? routePath : fallbackPath;
-
-  if (path.length < 2) return;
-
-  const modeColor = commuteModeColors[commuteMode.value];
-  scheduleRoutePolyline = new amap.value.Polyline({
-    path,
-    strokeColor: modeColor,
-    strokeWeight: 5,
-    strokeOpacity: 0.72,
-    strokeStyle: 'dashed',
-    lineJoin: 'round',
-    lineCap: 'round'
-  });
-  scheduleRoutePolyline.setMap(map.value);
+  const destinationPoint = new amap.value.LngLat(destinationItem.house.longitude!, destinationItem.house.latitude!);
+  const waypoints = plan.items
+    .slice(0, -1)
+    .map((item) => new amap.value!.LngLat(item.house.longitude!, item.house.latitude!));
 
   const AMap = amap.value;
-  scheduleRouteMarkers = scheduleRoutePlan.value.items.map((item, index) => {
+  scheduleRouteMarkers = plan.items.map((item, index) => {
     const marker = new AMap.Marker({
       position: [item.house.longitude!, item.house.latitude!],
       title: item.house.name,
@@ -513,14 +533,33 @@ function renderScheduleRoutePolyline() {
     return marker;
   });
   map.value.add(scheduleRouteMarkers);
-  map.value.setFitView([scheduleRoutePolyline, ...scheduleRouteMarkers]);
 
-  const lastPoint = path[path.length - 1];
-  scheduleRouteInfoWindow = new amap.value.InfoWindow({
-    content: `<div class="map-route-label">当日路线 · ${formatDistanceShort(scheduleRoutePlan.value.totalDistance)}</div>`,
-    offset: new amap.value.Pixel(0, 0)
+  amap.value.plugin('AMap.Driving', () => {
+    if (!map.value || !amap.value || requestId !== activeScheduleRouteRequestId || scheduleRoutePlan.value !== plan) return;
+
+    scheduleRoutePlanner = new amap.value.Driving({
+      map: map.value,
+      autoFitView: true,
+      hideMarkers: true,
+      extensions: 'all',
+      showTraffic: true
+    });
+
+    scheduleRoutePlanner.search(originPoint, destinationPoint, { waypoints }, (status, result) => {
+      if (!map.value || !amap.value || requestId !== activeScheduleRouteRequestId || scheduleRoutePlan.value !== plan) {
+        scheduleRoutePlanner?.clear?.();
+        return;
+      }
+
+      const summary = status === 'complete' && typeof result !== 'string' ? firstRouteSummary(result) : undefined;
+      const distance = summary?.distance ?? plan.totalDistance;
+      scheduleRouteInfoWindow = new amap.value.InfoWindow({
+        content: `<div class="map-route-label">当日路线 · ${formatDistanceShort(distance)}</div>`,
+        offset: new amap.value.Pixel(0, 0)
+      });
+      scheduleRouteInfoWindow.open(map.value, [destinationItem.house.longitude!, destinationItem.house.latitude!]);
+    });
   });
-  scheduleRouteInfoWindow.open(map.value, lastPoint);
 }
 
 // ==================== 地图生命周期 ====================
@@ -549,15 +588,11 @@ function clearRoute() {
 }
 
 function clearSearchResults() {
-  mapStore.clearHighlightedHouseIds();
+  mapStore.clearHouseSearchResults();
 }
 
 function showRouteByHouseId(houseId: string) {
   return mapStore.showRoute(houseId);
-}
-
-function setHighlightedHouseIds(houseIds: string[]) {
-  mapStore.setHighlightedHouseIds(houseIds);
 }
 
 onMounted(async () => {
@@ -567,15 +602,18 @@ onMounted(async () => {
     amap.value = await loadAmap();
     await nextTick();
     map.value = new amap.value.Map(mapContainer.value, {
-      zoom: 11,
+      zoom: defaultMapZoom,
       center: [116.397428, 39.90923],
       viewMode: '2D',
-      animateEnable: false
+      mapStyle: 'amap://styles/normal',
+      animateEnable: false,
+      zooms: [3, 20]
     });
     map.value.on('moveend', scheduleBoundsChange);
     map.value.on('zoomend', scheduleBoundsChange);
     map.value.on('click', closeContextMenu);
     map.value.on('rightclick', openContextMenu);
+    setupNativeControls();
     resizeObserver = new ResizeObserver(resizeMap);
     resizeObserver.observe(mapContainer.value);
     renderMarkers();
@@ -603,7 +641,7 @@ watch(
   [houses, locations],
   () => {
     renderMarkers();
-    if (highlightedHouseIds.value.length > 0) {
+    if (isSearchResultMode.value) {
       fitSearchResultView();
     }
     if (applyInitialFocusLocation()) {
@@ -614,10 +652,10 @@ watch(
 );
 
 watch(
-  highlightedHouseIds,
+  [mode, searchResultHouses],
   () => {
     renderMarkers();
-    if (highlightedHouseIds.value.length > 0) {
+    if (isSearchResultMode.value) {
       fitSearchResultView();
     }
   },
@@ -627,7 +665,7 @@ watch(
 watch(
   [selectedHouseId, selectedHouseFocusKey],
   ([id]) => {
-    const house = houses.value.find((item) => item.id === id);
+    const house = visibleHouses.value.find((item) => item.id === id) ?? houses.value.find((item) => item.id === id);
     const position = house ? housePosition(house) : undefined;
     if (!house || !position) return;
     focusHouse(house, position);
@@ -635,20 +673,23 @@ watch(
 );
 
 watch(
-  routeData,
-  () => {
+  [mode, pointRouteOrigin, pointRouteDestination, pointRouteRequestKey, commuteMode],
+  async () => {
     if (!map.value || !amap.value) return;
-    clearRoutePolyline();
+    nativeRouteCollapse.value = [];
+    await nextTick();
+    clearPointRoutePlanner();
     clearScheduleRoutePolyline();
-    renderRoutePolyline();
-  }
+    renderPointRoute();
+  },
+  { deep: true }
 );
 
 watch(
   scheduleRoutePlan,
   () => {
     if (!map.value || !amap.value) return;
-    clearRoutePolyline();
+    clearPointRoutePlanner();
     clearScheduleRoutePolyline();
     renderScheduleRoutePolyline();
   }
@@ -664,8 +705,7 @@ defineExpose({
   focusFocusLocation,
   clearRoute,
   clearSearchResults,
-  showRouteByHouseId,
-  setHighlightedHouseIds
+  showRouteByHouseId
 });
 </script>
 
@@ -677,6 +717,18 @@ defineExpose({
       <span>{{ loadError }}</span>
     </div>
     <div ref="mapContainer" class="amap-container" @contextmenu.prevent />
+    <MapPointRoutePanel
+      v-if="mode === 'point-route' && pointRouteOrigin && pointRouteDestination"
+      @click.stop
+    >
+      <template #native-route-result>
+        <el-collapse v-model="nativeRouteCollapse" class="map-native-route-collapse">
+          <el-collapse-item title="路线详情" name="route-detail">
+            <div ref="pointRouteResultPanel" class="map-native-route-result-panel" />
+          </el-collapse-item>
+        </el-collapse>
+      </template>
+    </MapPointRoutePanel>
     <div
       v-if="contextMenu.visible"
       class="map-context-menu"
@@ -694,7 +746,7 @@ defineExpose({
       </button>
     </div>
     <button
-      v-if="routeData || scheduleRoutePlan"
+      v-if="mode === 'point-route' || scheduleRoutePlan"
       class="map-panel-close-btn map-clear-route-btn"
       title="关闭路线"
       @click.stop="clearRoute"

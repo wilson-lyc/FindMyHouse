@@ -19,7 +19,7 @@ import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
 import ScheduleFormDialog from '../components/schedule/ScheduleFormDialog.vue';
-import { getCommuteRoute } from '../api/map/map-api';
+import { getCommuteDistance } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
@@ -27,7 +27,7 @@ import { normalizeHouseForm } from '../lib/house/house-form';
 import type { House, HouseForm } from '../model/house/house';
 import type { ScheduleForm } from '../model/schedule/schedule';
 import type { Location, LocationForm } from '../model/location/location';
-import type { CommuteRouteResult, CommuteMode } from '../model/map/geocode';
+import type { CommuteDistanceResult, CommuteMode } from '../model/map/geocode';
 import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 import { useHouseCompareStore } from '../stores/houseCompareStore';
 import { useHouseDialogStore } from '../stores/houseDialogStore';
@@ -55,6 +55,9 @@ const mapStore = useMapStore();
 const {
   currentBounds,
   onlyViewportHouses,
+  mode: mapPanelMode,
+  pointRouteOrigin,
+  pointRouteDestination,
   routes,
   scheduleRoutePlan,
   commuteMode,
@@ -198,11 +201,11 @@ async function toggleViewportHouses(enabled: boolean) {
 }
 
 function selectHouse(house: House) {
-  mapPanelRef.value?.selectHouseById(house.id);
+  mapStore.selectHouse(house.id);
 }
 
 function showRoute(house: House) {
-  if (!mapPanelRef.value?.showRouteByHouseId(house.id)) {
+  if (!mapStore.showRoute(house.id)) {
     ElMessage.info('路线数据正在加载，请稍后再试');
   }
 }
@@ -212,7 +215,7 @@ function showScheduleRoute(plan: ScheduleRoutePlan) {
 }
 
 function clearRoute() {
-  mapPanelRef.value?.clearRoute();
+  mapStore.clearRoute();
 }
 
 async function loadRoutes(mode?: CommuteMode) {
@@ -233,13 +236,13 @@ async function loadRoutes(mode?: CommuteMode) {
   }
 
   const destination = `${focus.longitude},${focus.latitude}`;
-  const results = new Map<string, CommuteRouteResult>();
+  const results = new Map<string, CommuteDistanceResult>();
 
   try {
     await Promise.all(
       targets.map(async (house) => {
         const origin = `${house.longitude},${house.latitude}`;
-        const result = await getCommuteRoute(origin, destination, currentMode);
+        const result = await getCommuteDistance(origin, destination, currentMode);
         if (result) {
           results.set(house.id, result);
         }
@@ -281,8 +284,7 @@ async function confirmDeleteLocation(location: Location) {
 }
 
 function onChatHousesFound(foundHouses: House[]) {
-  const ids = foundHouses.map((h) => h.id);
-  mapPanelRef.value?.setHighlightedHouseIds(ids);
+  mapStore.showHouseSearchResults(foundHouses);
 }
 
 function onChatSelectHouse(house: House) {
@@ -301,7 +303,9 @@ async function navigateTo(name: string) {
 }
 
 watch(commuteMode, () => {
-  clearRoute();
+  if (!(mapPanelMode.value === 'point-route' && pointRouteOrigin.value && pointRouteDestination.value)) {
+    clearRoute();
+  }
   void loadRoutes();
 });
 

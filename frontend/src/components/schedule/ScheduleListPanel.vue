@@ -13,7 +13,7 @@ import {
 import type { House, ViewingSchedule } from '../../model/house/house';
 import type { Schedule } from '../../model/schedule/schedule';
 import type { Location } from '../../model/location/location';
-import type { CommuteMode, CommuteRouteResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult, CommuteMode } from '../../model/map/geocode';
 
 const props = withDefaults(
   defineProps<{
@@ -28,7 +28,7 @@ const props = withDefaults(
     hideHeader?: boolean;
     hideGroupLabels?: boolean;
     focusLocation?: Location | null;
-    routes?: Map<string, CommuteRouteResult>;
+    routes?: Map<string, CommuteDistanceResult>;
     scheduleRoutePlan?: ScheduleRoutePlan | null;
     commuteMode?: CommuteMode;
     onSelectHouse?: (house: House) => void;

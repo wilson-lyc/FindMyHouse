@@ -2,8 +2,8 @@
 import { reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { Aim } from '@element-plus/icons-vue';
-import { geocodeAddress } from '../../api/map/map-api';
+import { Aim, LocationFilled } from '@element-plus/icons-vue';
+import { geocodeAddress, reverseGeocodeCoordinates } from '../../api/map/map-api';
 import { createEmptyLocationForm, locationToForm } from '../../lib/location/location-form';
 import { locationCategories, locationCategoryLabels, type Location, type LocationForm } from '../../model/location/location';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
@@ -24,7 +24,8 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<FormInstance>();
-const geocoding = ref(false);
+const addressGeocoding = ref(false);
+const coordinateGeocoding = ref(false);
 const form = reactive<LocationForm>(createEmptyLocationForm());
 
 const rules: FormRules<LocationForm> = {
@@ -42,23 +43,43 @@ watch(
   { immediate: true }
 );
 
-async function geocode() {
+async function convertAddressToCoordinates() {
   if (!form.address.trim()) {
     ElMessage.warning('请先输入地址');
     return;
   }
 
-  geocoding.value = true;
+  addressGeocoding.value = true;
   try {
     const result = await geocodeAddress(form.address);
     form.address = result.formattedAddress || form.address;
     form.latitude = result.latitude;
     form.longitude = result.longitude;
-    ElMessage.success('已定位');
+    ElMessage.success('已将地址转为坐标');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '定位失败');
+    ElMessage.error(error instanceof Error ? error.message : '地址转坐标失败');
   } finally {
-    geocoding.value = false;
+    addressGeocoding.value = false;
+  }
+}
+
+async function convertCoordinatesToAddress() {
+  if (form.longitude === undefined || form.latitude === undefined) {
+    ElMessage.warning('请先选择或输入坐标');
+    return;
+  }
+
+  coordinateGeocoding.value = true;
+  try {
+    const result = await reverseGeocodeCoordinates(form.longitude, form.latitude);
+    form.address = result.formattedAddress || form.address;
+    form.latitude = result.latitude;
+    form.longitude = result.longitude;
+    ElMessage.success('已将坐标转为地址');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '坐标转地址失败');
+  } finally {
+    coordinateGeocoding.value = false;
   }
 }
 
@@ -90,12 +111,23 @@ async function submitForm() {
           </el-select>
         </el-form-item>
         <el-form-item label="地址" prop="address">
-          <div class="address-row">
+          <div class="address-row geocode-address-row">
             <el-input v-model="form.address" placeholder="输入关键地点地址" />
-            <el-button :icon="Aim" :loading="geocoding" @click="geocode">定位</el-button>
+            <div class="geocode-button-group">
+              <el-button :icon="Aim" :loading="addressGeocoding" @click="convertAddressToCoordinates">
+                地址转坐标
+              </el-button>
+              <el-button
+                :icon="LocationFilled"
+                :loading="coordinateGeocoding"
+                @click="convertCoordinatesToAddress"
+              >
+                坐标转地址
+              </el-button>
+            </div>
           </div>
         </el-form-item>
-        <el-form-item label="定位">
+        <el-form-item label="定位" required>
           <div class="coordinate-map-field">
             <CoordinatePicker
               v-if="modelValue"

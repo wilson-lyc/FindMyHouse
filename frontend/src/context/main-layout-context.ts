@@ -1,7 +1,7 @@
 import type { ComputedRef, Ref } from 'vue';
 import type { House, HouseFilters, HouseForm } from '../model/house/house';
 import type { Location, LocationForm } from '../model/location/location';
-import type { CommuteMode, CommuteRouteResult } from '../model/map/geocode';
+import type { CommuteMode, CommuteDistanceResult } from '../model/map/geocode';
 import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 
 export interface MainLayoutContext {
@@ -9,7 +9,7 @@ export interface MainLayoutContext {
   loading: Ref<boolean>;
   saving: Ref<boolean>;
   filters: HouseFilters;
-  routes: Ref<Map<string, CommuteRouteResult>>;
+  routes: Ref<Map<string, CommuteDistanceResult>>;
   scheduleRoutePlan: Ref<ScheduleRoutePlan | null>;
   commuteMode: Ref<CommuteMode>;
   focusLocation: ComputedRef<Location | null>;
