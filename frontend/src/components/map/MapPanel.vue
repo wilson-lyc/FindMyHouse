@@ -122,7 +122,7 @@ function createInfoWindow(content: string, position: [number, number]) {
 }
 
 function houseInfoContent(house: House) {
-  return `<div class="map-info map-house-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
+  return `<div class="map-info map-house-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${house.name}</strong><span>${house.address}</span><span>${formatCurrency(house.rentPrice)} · ${statusLabels[house.status]}</span><div class="map-info-actions"><button class="el-button el-button--small map-info-route-button" data-house-id="${house.id}" type="button"><span>路线</span></button><button class="el-button el-button--small map-info-detail-button" data-house-id="${house.id}" type="button"><span>详情</span></button></div></div>`;
 }
 
 function bindInfoCloseAction() {
@@ -136,10 +136,16 @@ function bindInfoCloseAction() {
 
 function bindHouseInfoAction(house: House) {
   window.setTimeout(() => {
-    const buttons = document.querySelectorAll<HTMLButtonElement>('.map-info-detail-button');
-    for (const button of buttons) {
+    const detailButtons = document.querySelectorAll<HTMLButtonElement>('.map-info-detail-button');
+    for (const button of detailButtons) {
       if (button.dataset.houseId === house.id) {
         button.onclick = () => emit('editHouse', house);
+      }
+    }
+    const routeButtons = document.querySelectorAll<HTMLButtonElement>('.map-info-route-button');
+    for (const button of routeButtons) {
+      if (button.dataset.houseId === house.id) {
+        button.onclick = () => showRouteByHouseId(house.id);
       }
     }
   }, 0);
