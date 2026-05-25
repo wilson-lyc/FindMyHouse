@@ -6,6 +6,20 @@ dist/
 build/
 coverage/
 
+# Rust / Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/
+src-tauri/icons/*.png
+src-tauri/icons/*.icns
+src-tauri/icons/*.ico
+!src-tauri/icons/.gitkeep
+
+# Backend sidecar build artifacts
+target/
+backend/bundle.cjs
+backend/dist/
+
 # Logs
 *.log
 npm-debug.log*

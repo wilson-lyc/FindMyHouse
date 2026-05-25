@@ -145,7 +145,10 @@ async function fetchAmapConfig(): Promise<AmapConfig> {
     return configPromise;
   }
 
-  configPromise = fetch('/api/config')
+  const hasTauriInternals = typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+  const apiBase = hasTauriInternals ? 'http://localhost:3001' : '';
+
+  configPromise = fetch(`${apiBase}/api/config`)
     .then((res) => res.json())
     .then((json: { data: { viteAmapJsKey: string; viteAmapSecurityJsCode: string } }) => {
       const key = json.data.viteAmapJsKey;

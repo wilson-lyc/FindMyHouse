@@ -1,4 +1,14 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router';
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: Record<string, unknown>;
+  }
+}
+
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && window.__TAURI_INTERNALS__ !== undefined;
+}
 import { fetchLocations } from '../api/location/location-api';
 import MainLayout from '../layouts/MainLayout.vue';
 import ChatView from '../views/chat/ChatView.vue';
@@ -80,7 +90,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: isTauri() ? createWebHashHistory() : createWebHistory(),
   routes
 });
 

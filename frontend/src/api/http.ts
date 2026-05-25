@@ -1,3 +1,20 @@
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: Record<string, unknown>;
+  }
+}
+
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && window.__TAURI_INTERNALS__ !== undefined;
+}
+
+function resolveUrl(url: string): string {
+  if (isTauri() && url.startsWith('/')) {
+    return `http://localhost:3001${url}`;
+  }
+  return url;
+}
+
 interface ApiResponse<T> {
   data: T;
 }
@@ -7,7 +24,7 @@ const jsonHeaders = {
 };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  const response = await fetch(resolveUrl(url), options);
 
   if (!response.ok) {
     const message = await response.text();
