@@ -48,6 +48,27 @@ export function migrate() {
     CREATE INDEX IF NOT EXISTS idx_houses_rent_price ON houses(rent_price);
     CREATE INDEX IF NOT EXISTS idx_houses_updated_at ON houses(updated_at);
 
+    CREATE TABLE IF NOT EXISTS house_images (
+      id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_cover INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_house_images_house_id ON house_images(house_id);
+    CREATE INDEX IF NOT EXISTS idx_house_images_sort_order ON house_images(house_id, sort_order);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_house_images_single_cover ON house_images(house_id) WHERE is_cover = 1;
+
     CREATE TABLE IF NOT EXISTS viewing_schedules (
       id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -113,6 +134,9 @@ export function migrate() {
   `);
 
   ensureColumn('locations', 'is_focus', 'INTEGER NOT NULL DEFAULT 0');
+
+  ensureColumn('house_images', 'width', 'INTEGER');
+  ensureColumn('house_images', 'height', 'INTEGER');
 
   ensureColumn('houses', 'earnest_money', 'INTEGER');
   ensureColumn('houses', 'deposit', 'INTEGER');

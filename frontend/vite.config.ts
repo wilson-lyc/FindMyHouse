@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: `http://localhost:${Number(env.PORT) || 3001}`,
           changeOrigin: true
+        },
+        '/uploads': {
+          target: `http://localhost:${Number(env.PORT) || 3001}`,
+          changeOrigin: true
         }
       }
     }
