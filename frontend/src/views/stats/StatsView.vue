@@ -6,11 +6,11 @@ import * as echarts from 'echarts';
 import type { ECharts, EChartsOption } from 'echarts';
 import { fetchHouses } from '../../api/house/house-api';
 import { fetchLocations } from '../../api/location/location-api';
-import { getCommuteRoute } from '../../api/map/map-api';
+import { getCommuteDistance } from '../../api/map/map-api';
 import { houseSourceChannelLabels, houseSourceChannels, houseStatuses, type House } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import type { Location } from '../../model/location/location';
-import type { CommuteRouteResult } from '../../model/map/geocode';
+import type { CommuteDistanceResult } from '../../model/map/geocode';
 import { formatCurrency } from '../../lib/format';
 
 const router = useRouter();
@@ -18,7 +18,7 @@ const router = useRouter();
 const loading = ref(true);
 const rawHouses = ref<House[]>([]);
 const rawLocations = ref<Location[]>([]);
-const rawRoutes = ref<Map<string, CommuteRouteResult>>(new Map());
+const rawRoutes = ref<Map<string, CommuteDistanceResult>>(new Map());
 
 const statusChartRef = ref<HTMLDivElement | null>(null);
 const rentChartRef = ref<HTMLDivElement | null>(null);
@@ -274,12 +274,12 @@ async function loadData() {
     if (focus) {
       const destination = `${focus.longitude},${focus.latitude}`;
       const targets = allHouses.filter((house) => house.latitude !== undefined && house.longitude !== undefined);
-      const results = new Map<string, CommuteRouteResult>();
+      const results = new Map<string, CommuteDistanceResult>();
 
       await Promise.all(
         targets.map(async (house) => {
           const origin = `${house.longitude},${house.latitude}`;
-          const result = await getCommuteRoute(origin, destination, 'driving');
+          const result = await getCommuteDistance(origin, destination, 'driving');
           if (result) {
             results.set(house.id, result);
           }

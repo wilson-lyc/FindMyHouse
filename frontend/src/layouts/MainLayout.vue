@@ -5,9 +5,11 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   ChatDotSquare,
   DataAnalysis,
+  Download,
   House as HouseIcon,
   Location as LocationIcon,
   QuestionFilled,
+  Calendar,
   Setting,
   Upload
 } from '@element-plus/icons-vue';
@@ -16,18 +18,23 @@ import HouseCompareDialog from '../components/house/HouseCompareDialog.vue';
 import HouseFormDialog from '../components/house/HouseFormDialog.vue';
 import LocationFormDialog from '../components/location/LocationFormDialog.vue';
 import MapPanel from '../components/map/MapPanel.vue';
-import { getCommuteRoute } from '../api/map/map-api';
+import ScheduleFormDialog from '../components/schedule/ScheduleFormDialog.vue';
+import { getCommuteDistance } from '../api/map/map-api';
 import { useHouses } from '../composables/house/useHouses';
 import { useLocations } from '../composables/location/useLocations';
 import { mainLayoutContextKey, type MainLayoutContext } from '../context/main-layout-context';
 import { normalizeHouseForm } from '../lib/house/house-form';
 import type { House, HouseForm } from '../model/house/house';
+import type { ScheduleForm } from '../model/schedule/schedule';
 import type { Location, LocationForm } from '../model/location/location';
-import type { CommuteRouteResult, CommuteMode } from '../model/map/geocode';
+import type { CommuteDistanceResult, CommuteMode } from '../model/map/geocode';
+import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 import { useHouseCompareStore } from '../stores/houseCompareStore';
 import { useHouseDialogStore } from '../stores/houseDialogStore';
 import { useLocationDialogStore } from '../stores/locationDialogStore';
 import { useMapStore } from '../stores/mapStore';
+import { useScheduleStore } from '../stores/scheduleStore';
+import { useScheduleFormDialogStore } from '../stores/scheduleFormDialogStore';
 
 const {
   houses,
@@ -40,6 +47,7 @@ const {
 } = useHouses();
 const { locations, loading: locationsLoading, saving: locationSaving, loadLocations, saveLocation, removeLocation, setLocationFocus } =
   useLocations();
+const scheduleStore = useScheduleStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -47,11 +55,14 @@ const mapStore = useMapStore();
 const {
   currentBounds,
   onlyViewportHouses,
+  mode: mapPanelMode,
+  pointRouteOrigin,
+  pointRouteDestination,
   routes,
+  scheduleRoutePlan,
   commuteMode,
   activeRouteHouseId,
-  selectedHouseId,
-  routeData
+  selectedHouseId
 } = storeToRefs(mapStore);
 const houseCompareStore = useHouseCompareStore();
 const { visible: houseCompareDialogVisible, houses: houseCompareDialogHouses } = storeToRefs(houseCompareStore);
@@ -62,8 +73,15 @@ const {
   initialForm: houseDialogInitialForm,
   title: houseDialogTitle,
   cancelText: houseDialogCancelText,
-  submitText: houseDialogSubmitText
+  submitText: houseDialogSubmitText,
+  initialSection: houseDialogInitialSection
 } = storeToRefs(houseDialogStore);
+const scheduleFormDialogStore = useScheduleFormDialogStore();
+const {
+  visible: scheduleFormDialogVisible,
+  editingSchedule: scheduleFormEditingSchedule,
+  prefillHouseId: scheduleFormPrefillHouseId
+} = storeToRefs(scheduleFormDialogStore);
 const locationDialogStore = useLocationDialogStore();
 const {
   visible: locationDialogVisible,
@@ -74,13 +92,15 @@ const {
   submitText: locationDialogSubmitText
 } = storeToRefs(locationDialogStore);
 
+const scheduleSaving = ref(false);
+
 const mapPanelRef = ref<InstanceType<typeof MapPanel> | null>(null);
 const contentPanelWidth = ref(420);
 const minContentPanelWidth = 360;
 const maxContentPanelWidth = 760;
 
 const activeMenu = computed(() => {
-  if (route.name === 'locations' || route.name === 'chat') return String(route.name);
+  if (route.name === 'locations' || route.name === 'chat' || route.name === 'schedule') return String(route.name);
   return 'houses';
 });
 
@@ -128,6 +148,40 @@ async function confirmDeleteHouse(house: House) {
   }
 }
 
+async function deleteSchedule(scheduleId: string) {
+  try {
+    await scheduleStore.removeSchedule(scheduleId);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '删除日程失败');
+  }
+}
+
+async function submitScheduleForm(form: ScheduleForm) {
+  const editing = scheduleFormEditingSchedule.value;
+  scheduleSaving.value = true;
+
+  try {
+    if (editing) {
+      await scheduleStore.editSchedule(editing.id, {
+        viewingAt: form.viewingAt,
+        note: form.note
+      });
+    } else {
+      await scheduleStore.addSchedule(form);
+    }
+
+    scheduleFormDialogStore.close();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存日程失败');
+  } finally {
+    scheduleSaving.value = false;
+  }
+}
+
+function editSchedule(schedule: import('../model/schedule/schedule').Schedule) {
+  scheduleFormDialogStore.open(schedule);
+}
+
 async function applyHouseFilters() {
   if (onlyViewportHouses.value && currentBounds.value) {
     Object.assign(filters, currentBounds.value);
@@ -147,17 +201,21 @@ async function toggleViewportHouses(enabled: boolean) {
 }
 
 function selectHouse(house: House) {
-  mapPanelRef.value?.selectHouseById(house.id);
+  mapStore.selectHouse(house.id);
 }
 
 function showRoute(house: House) {
-  if (!mapPanelRef.value?.showRouteByHouseId(house.id)) {
+  if (!mapStore.showRoute(house.id)) {
     ElMessage.info('路线数据正在加载，请稍后再试');
   }
 }
 
+function showScheduleRoute(plan: ScheduleRoutePlan) {
+  mapStore.showScheduleRoute(plan);
+}
+
 function clearRoute() {
-  mapPanelRef.value?.clearRoute();
+  mapStore.clearRoute();
 }
 
 async function loadRoutes(mode?: CommuteMode) {
@@ -178,13 +236,13 @@ async function loadRoutes(mode?: CommuteMode) {
   }
 
   const destination = `${focus.longitude},${focus.latitude}`;
-  const results = new Map<string, CommuteRouteResult>();
+  const results = new Map<string, CommuteDistanceResult>();
 
   try {
     await Promise.all(
       targets.map(async (house) => {
         const origin = `${house.longitude},${house.latitude}`;
-        const result = await getCommuteRoute(origin, destination, currentMode);
+        const result = await getCommuteDistance(origin, destination, currentMode);
         if (result) {
           results.set(house.id, result);
         }
@@ -226,8 +284,7 @@ async function confirmDeleteLocation(location: Location) {
 }
 
 function onChatHousesFound(foundHouses: House[]) {
-  const ids = foundHouses.map((h) => h.id);
-  mapPanelRef.value?.setHighlightedHouseIds(ids);
+  mapStore.showHouseSearchResults(foundHouses);
 }
 
 function onChatSelectHouse(house: House) {
@@ -246,7 +303,9 @@ async function navigateTo(name: string) {
 }
 
 watch(commuteMode, () => {
-  clearRoute();
+  if (!(mapPanelMode.value === 'point-route' && pointRouteOrigin.value && pointRouteDestination.value)) {
+    clearRoute();
+  }
   void loadRoutes();
 });
 
@@ -290,17 +349,21 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
   saving,
   filters,
   routes,
+  scheduleRoutePlan,
+  commuteMode,
   focusLocation,
   onlyViewportHouses,
   locations,
   locationsLoading,
   locationSaving,
   submitHouse,
+  deleteSchedule,
   confirmDeleteHouse,
   applyHouseFilters,
   toggleViewportHouses,
   selectHouse,
   showRoute,
+  showScheduleRoute,
   submitLocation,
   confirmDeleteLocation,
   setLocationFocus,
@@ -309,7 +372,7 @@ provide<MainLayoutContext>(mainLayoutContextKey, {
 });
 
 onMounted(async () => {
-  await Promise.all([loadHouses(), loadLocations()]);
+  await Promise.all([loadHouses(), loadLocations(), scheduleStore.loadSchedules()]);
   await loadRoutes();
 });
 </script>
@@ -326,6 +389,10 @@ onMounted(async () => {
           <el-icon><LocationIcon /></el-icon>
           <span>地点</span>
         </el-menu-item>
+        <el-menu-item index="schedule">
+          <el-icon><Calendar /></el-icon>
+          <span>日程</span>
+        </el-menu-item>
         <el-menu-item index="chat">
           <el-icon><ChatDotSquare /></el-icon>
           <span>对话</span>
@@ -337,8 +404,13 @@ onMounted(async () => {
             <el-icon><DataAnalysis /></el-icon>
           </router-link>
         </el-tooltip>
-        <el-tooltip content="数据导入 / 导出" placement="right">
-          <router-link class="map-directory-icon-button" to="/data" aria-label="数据导入 / 导出">
+        <el-tooltip content="导出" placement="right">
+          <router-link class="map-directory-icon-button" to="/export" aria-label="导出">
+            <el-icon><Download /></el-icon>
+          </router-link>
+        </el-tooltip>
+        <el-tooltip content="导入" placement="right">
+          <router-link class="map-directory-icon-button" to="/import" aria-label="导入">
             <el-icon><Upload /></el-icon>
           </router-link>
         </el-tooltip>
@@ -381,8 +453,18 @@ onMounted(async () => {
       :title="houseDialogTitle"
       :cancel-text="houseDialogCancelText"
       :submit-text="houseDialogSubmitText"
+      :initial-section="houseDialogInitialSection"
       @update:model-value="houseDialogStore.setVisible"
       @submit="submitHouse"
+    />
+    <ScheduleFormDialog
+      :model-value="scheduleFormDialogVisible"
+      :editing-schedule="scheduleFormEditingSchedule"
+      :prefill-house-id="scheduleFormPrefillHouseId"
+      :houses="houses"
+      :saving="scheduleSaving"
+      @update:model-value="scheduleFormDialogStore.setVisible"
+      @submit="submitScheduleForm"
     />
     <LocationFormDialog
       :model-value="locationDialogVisible"

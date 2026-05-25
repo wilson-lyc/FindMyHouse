@@ -202,13 +202,12 @@ onMounted(loadConfig);
 
           <section v-if="activeStep === 0" class="welcome-form">
             <DataImportPanel
-              title="导入已有数据"
-              description="选择之前导出的 JSON 文件，快速导入房源、地点或服务配置。导入成功后将直接进入主应用。"
+              title="导入数据"
               @imported="onImported"
             />
 
             <footer class="welcome-actions">
-              <el-button type="primary" plain @click="continueWithoutImport">不导入，继续配置</el-button>
+              <el-button type="primary" plain @click="continueWithoutImport">跳过导入</el-button>
             </footer>
           </section>
 

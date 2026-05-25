@@ -2,7 +2,8 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Location } from '@element-plus/icons-vue';
-import { loadAmap, type AMapMap, type AMapMouseEvent, type AMapNamespace } from '../../lib/map/amap-loader';
+import { loadAmap, type AMapMap, type AMapMarker, type AMapMouseEvent, type AMapNamespace } from '../../lib/map/amap-loader';
+import { defaultMapZoom, focusedPlaceMapZoom } from '../../lib/map/map-zoom';
 
 const props = defineProps<{
   markerLabel?: string;
@@ -17,6 +18,7 @@ const mapContainer = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
+let coordinateMarker: AMapMarker | undefined;
 
 const defaultCenter: [number, number] = [116.397428, 39.90923];
 
@@ -42,28 +44,33 @@ function eventCoordinate(event?: AMapMouseEvent): [number, number] | undefined {
 function renderMarker() {
   if (!map.value || !amap.value) return;
 
-  map.value.clearMap();
+  if (coordinateMarker) {
+    map.value.remove(coordinateMarker);
+    coordinateMarker = undefined;
+  }
   if (longitude.value === undefined || latitude.value === undefined) return;
 
   const position: [number, number] = [longitude.value, latitude.value];
   const markerLabel = props.markerLabel ?? '房源';
   const markerClass = props.markerClass ?? 'house';
-  map.value.add(
-    new amap.value.Marker({
-      position,
-      title: props.markerTitle ?? `${markerLabel}坐标`,
-      label: {
-        content: `<div class="map-marker-label ${markerClass}">${markerLabel}</div>`,
-        direction: 'top'
-      }
-    })
-  );
+  coordinateMarker = new amap.value.Marker({
+    position,
+    title: props.markerTitle ?? `${markerLabel}坐标`,
+    label: {
+      content: `<div class="map-marker-label ${markerClass}">${markerLabel}</div>`,
+      direction: 'top'
+    }
+  });
+  map.value.add(coordinateMarker);
 }
 
 function syncCenterAndMarker() {
   if (!map.value) return;
 
   map.value.setCenter(currentCenter());
+  if (longitude.value !== undefined && latitude.value !== undefined) {
+    map.value.setZoom(focusedPlaceMapZoom, true, 0);
+  }
   renderMarker();
 }
 
@@ -79,7 +86,7 @@ async function initializeMap() {
     amap.value = await loadAmap();
     await nextTick();
     map.value = new amap.value.Map(mapContainer.value, {
-      zoom: longitude.value !== undefined && latitude.value !== undefined ? 16 : 11,
+      zoom: longitude.value !== undefined && latitude.value !== undefined ? focusedPlaceMapZoom : defaultMapZoom,
       center: currentCenter(),
       viewMode: '2D'
     });

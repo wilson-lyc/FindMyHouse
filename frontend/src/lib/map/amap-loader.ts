@@ -20,14 +20,16 @@ export interface AMapBounds {
 
 export interface AMapMap {
   add(marker: AMapMarker | AMapMarker[] | AMapPolyline): void;
-  remove(marker: AMapMarker | AMapPolyline): void;
-  clearMap(): void;
+  remove(marker: AMapMarker | AMapMarker[] | AMapPolyline | AMapPolyline[]): void;
+  addControl(control: AMapControl): void;
   getBounds(): AMapBounds;
   resize?(): void;
   setCenter(position: [number, number], immediately?: boolean, duration?: number): void;
-  setZoom?(zoom: number, immediately?: boolean, duration?: number): void;
-  setZoomAndCenter?(zoom: number, position: [number, number], immediately?: boolean, duration?: number): void;
-  setFitView(overlays?: unknown[]): void;
+  setZoom(zoom: number, immediately?: boolean, duration?: number): void;
+  setZoomAndCenter(zoom: number, position: [number, number], immediately?: boolean, duration?: number): void;
+  setFitView(overlays?: unknown[], immediately?: boolean, avoid?: number[], maxZoom?: number): void;
+  zoomIn?(): void;
+  zoomOut?(): void;
   on(eventName: string, handler: (event?: AMapMouseEvent) => void): void;
   destroy(): void;
 }
@@ -65,16 +67,65 @@ export interface AMapPixel {
   offset: [number, number];
 }
 
+export interface AMapControl {
+  show?(): void;
+  hide?(): void;
+  remove?(): void;
+}
+
 export interface AMapPolyline {
   setMap(map: AMapMap | null): void;
 }
 
+export interface AMapContextMenu {
+  addItem(label: string, handler: () => void, index?: number): void;
+  open(map: AMapMap, position: AMapLngLat | [number, number]): void;
+  close?(): void;
+}
+
+export type AMapRouteStatus = 'complete' | 'error' | 'no_data';
+
+export interface AMapRouteSearchResult {
+  routes?: Array<{
+    distance?: number;
+    time?: number;
+  }>;
+  plans?: Array<{
+    distance?: number;
+    time?: number;
+  }>;
+}
+
+export interface AMapRoutePlanner {
+  search(
+    origin: AMapLngLat | [number, number],
+    destination: AMapLngLat | [number, number],
+    callback?: (status: AMapRouteStatus, result: AMapRouteSearchResult | string) => void
+  ): void;
+  search(
+    origin: AMapLngLat | [number, number],
+    destination: AMapLngLat | [number, number],
+    options: Record<string, unknown>,
+    callback?: (status: AMapRouteStatus, result: AMapRouteSearchResult | string) => void
+  ): void;
+  clear?(): void;
+}
+
 export interface AMapNamespace {
   Map: new (container: string | HTMLDivElement, options: Record<string, unknown>) => AMapMap;
+  LngLat: new (lng: number, lat: number, noWrap?: boolean) => AMapLngLat;
   Marker: new (options: Record<string, unknown>) => AMapMarker;
   InfoWindow: new (options: Record<string, unknown>) => AMapInfoWindow;
   Polyline: new (options: Record<string, unknown>) => AMapPolyline;
   Pixel: new (x: number, y: number) => AMapPixel;
+  ContextMenu?: new () => AMapContextMenu;
+  Scale?: new (options?: Record<string, unknown>) => AMapControl;
+  Driving: new (options: Record<string, unknown>) => AMapRoutePlanner;
+  Walking: new (options: Record<string, unknown>) => AMapRoutePlanner;
+  Riding: new (options: Record<string, unknown>) => AMapRoutePlanner;
+  Transfer: new (options: Record<string, unknown>) => AMapRoutePlanner;
+  plugin(pluginNames: string | string[], callback: () => void): void;
+  getConfig?(): { appname?: string };
 }
 
 interface AmapConfig {
@@ -112,6 +163,7 @@ let loadingPromise: Promise<AMapNamespace> | undefined;
 
 export async function loadAmap(): Promise<AMapNamespace> {
   if (window.AMap) {
+    window.AMap.getConfig && (window.AMap.getConfig().appname = 'amap-jsapi-skill');
     return window.AMap;
   }
 
@@ -138,6 +190,7 @@ export async function loadAmap(): Promise<AMapNamespace> {
 
     window.__initFindMyHouseAmap = () => {
       if (window.AMap) {
+        window.AMap.getConfig && (window.AMap.getConfig().appname = 'amap-jsapi-skill');
         cleanup();
         resolve(window.AMap);
       } else {
@@ -147,7 +200,8 @@ export async function loadAmap(): Promise<AMapNamespace> {
     };
 
     const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(config.key)}&callback=__initFindMyHouseAmap`;
+    const plugins = ['AMap.Scale', 'AMap.Driving', 'AMap.Walking', 'AMap.Riding', 'AMap.Transfer'];
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(config.key)}&plugin=${plugins.join(',')}&callback=__initFindMyHouseAmap`;
     script.async = true;
     script.onerror = () => {
       cleanup();

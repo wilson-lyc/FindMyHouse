@@ -2,7 +2,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { Aim, Delete as DeleteIcon, Edit as EditIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
+import { Aim, Delete as DeleteIcon, LocationFilled, Plus } from '@element-plus/icons-vue';
 import { geocodeAddress, reverseGeocodeCoordinates } from '../../api/map/map-api';
 import CoordinatePicker from '../map/CoordinatePicker.vue';
 import {
@@ -11,14 +11,12 @@ import {
   houseStatuses,
   rentPaymentPeriodLabels,
   rentPaymentPeriods,
-  type CustomFeeItem,
   type House,
   type HouseForm
 } from '../../model/house/house';
 import { statusLabels } from '../../model/house/house-status';
 import { createEmptyHouseForm, houseToForm } from '../../lib/house/house-form';
 import { formatCurrency } from '../../lib/format';
-import CustomFeeDialog from './CustomFeeDialog.vue';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -28,6 +26,7 @@ const props = defineProps<{
   title?: string;
   cancelText?: string;
   submitText?: string;
+  initialSection?: string;
 }>();
 
 const emit = defineEmits<{
@@ -55,13 +54,17 @@ const rules: FormRules<HouseForm> = {
 };
 
 watch(
-  () => [props.modelValue, props.house, props.initialForm] as const,
-  ([visible, house, initialForm]) => {
+  () => [props.modelValue, props.house, props.initialForm, props.initialSection] as const,
+  ([visible, house, initialForm, initialSection]) => {
     if (!visible) return;
     Object.assign(form, house ? houseToForm(house) : { ...createEmptyHouseForm(), ...(initialForm ?? {}) });
     formRef.value?.clearValidate();
     nextTick(() => {
-      scrollbarRef.value?.wrapRef?.scrollTo(0, 0);
+      if (initialSection) {
+        scrollToSection(initialSection);
+      } else {
+        scrollbarRef.value?.wrapRef?.scrollTo(0, 0);
+      }
     });
   },
   { immediate: true }
@@ -109,9 +112,6 @@ async function convertCoordinatesToAddress() {
 
 
 
-const feeItemDialogVisible = ref(false);
-const feeItemDialogItem = ref<CustomFeeItem | null>(null);
-const feeEditingIndex = ref(-1);
 const customFeesTotal = computed(() =>
   (form.customFees ?? []).reduce((total, item) => total + (Number(item.amount) || 0), 0)
 );
@@ -123,34 +123,31 @@ function scrollToSection(sectionKey: string) {
   });
 }
 
-function openAddFeeDialog() {
-  feeItemDialogItem.value = null;
-  feeEditingIndex.value = -1;
-  feeItemDialogVisible.value = true;
-}
-
-function openEditFeeDialog(item: CustomFeeItem, index: number) {
-  feeItemDialogItem.value = { ...item };
-  feeEditingIndex.value = index;
-  feeItemDialogVisible.value = true;
+function addCustomFee() {
+  (form.customFees ??= []).push({
+    name: '',
+    amount: 0
+  });
 }
 
 function deleteFeeItem(index: number) {
   form.customFees?.splice(index, 1);
 }
 
-function onFeeItemSave(item: CustomFeeItem) {
-  if (feeEditingIndex.value >= 0) {
-    form.customFees![feeEditingIndex.value] = item;
-  } else {
-    (form.customFees ??= []).push(item);
-  }
-}
-
 async function submitForm() {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
-  emit('submit', { ...form });
+  const customFees = form.customFees
+    ?.map((item) => ({
+      name: item.name.trim(),
+      amount: Number(item.amount) || 0
+    }))
+    .filter((item) => item.name);
+
+  emit('submit', {
+    ...form,
+    customFees: customFees?.length ? customFees : undefined
+  });
 }
 </script>
 
@@ -281,7 +278,7 @@ async function submitForm() {
                     <div class="custom-fees-summary">
                       <span class="custom-fees-count">共 {{ form.customFees?.length ?? 0 }} 项，合计 {{ formatCurrency(customFeesTotal) }}</span>
                     </div>
-                    <el-button :icon="Plus" type="primary" plain size="small" @click="openAddFeeDialog">添加费用</el-button>
+                    <el-button :icon="Plus" type="primary" plain size="small" @click="addCustomFee">添加费用</el-button>
                   </div>
                   <el-table
                     :data="form.customFees ?? []"
@@ -291,15 +288,23 @@ async function submitForm() {
                     class="custom-fees-table"
                     empty-text="暂无自定义费用"
                   >
-                    <el-table-column label="费用项目" prop="name" show-overflow-tooltip />
-                    <el-table-column label="金额" width="120">
+                    <el-table-column label="费用项目" min-width="220">
                       <template #default="{ row }">
-                        <span>{{ formatCurrency(row.amount) }}</span>
+                        <el-input v-model="row.name" placeholder="如：网费、保洁费" />
                       </template>
                     </el-table-column>
-                    <el-table-column label="操作" width="132">
-                      <template #default="{ row, $index }">
-                        <el-button :icon="EditIcon" link type="primary" size="small" @click="openEditFeeDialog(row, $index)">编辑</el-button>
+                    <el-table-column label="金额" min-width="180">
+                      <template #default="{ row }">
+                        <el-input-number
+                          v-model="row.amount"
+                          :min="0"
+                          :step="50"
+                          controls-position="right"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="82" fixed="right">
+                      <template #default="{ $index }">
                         <el-button :icon="DeleteIcon" link type="danger" size="small" @click="deleteFeeItem($index)">删除</el-button>
                       </template>
                     </el-table-column>
@@ -309,7 +314,6 @@ async function submitForm() {
               <el-form-item label="费用备注" class="span-2">
                 <el-input v-model="form.feeNotes" type="textarea" :rows="3" placeholder="" />
               </el-form-item>
-              <CustomFeeDialog v-model="feeItemDialogVisible" :item="feeItemDialogItem" @save="onFeeItemSave" />
             </div>
           </section>
 

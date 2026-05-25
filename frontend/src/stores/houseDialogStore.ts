@@ -16,6 +16,7 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
   const title = ref<string>();
   const cancelText = ref<string>();
   const submitText = ref<string>();
+  const initialSection = ref<string>();
   const pendingAgentCreateDone = ref<((result: ConfirmCreateHouseResult) => void) | null>(null);
 
   function openCreate() {
@@ -59,6 +60,7 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     title.value = undefined;
     cancelText.value = undefined;
     submitText.value = undefined;
+    initialSection.value = undefined;
   }
 
   function cancelPending() {
@@ -86,6 +88,7 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     title.value = undefined;
     cancelText.value = undefined;
     submitText.value = undefined;
+    initialSection.value = undefined;
   }
 
   function setVisible(nextVisible: boolean) {
@@ -104,6 +107,7 @@ export const useHouseDialogStore = defineStore('houseDialog', () => {
     title,
     cancelText,
     submitText,
+    initialSection,
     openCreate,
     openCreateAt,
     openEdit,

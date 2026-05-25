@@ -1,5 +1,23 @@
 import type { CustomFeeItem, House, HouseForm } from '../../model/house/house';
 
+function normalizeViewingAtForPicker(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+function normalizeViewingAtForApi(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 export function createEmptyHouseForm(): HouseForm {
   return {
     name: '',
@@ -23,7 +41,8 @@ export function createEmptyHouseForm(): HouseForm {
     contactName: '',
     phone: '',
     wechat: '',
-    contactNotes: ''
+    contactNotes: '',
+    viewingSchedules: []
   };
 }
 
@@ -50,7 +69,11 @@ export function houseToForm(house: House): HouseForm {
     contactName: house.contactName ?? '',
     phone: house.phone ?? '',
     wechat: house.wechat ?? '',
-    contactNotes: house.contactNotes ?? ''
+    contactNotes: house.contactNotes ?? '',
+    viewingSchedules: (house.viewingSchedules ?? []).map((schedule) => ({
+      ...schedule,
+      viewingAt: normalizeViewingAtForPicker(schedule.viewingAt)
+    }))
   };
 }
 
@@ -72,6 +95,13 @@ export function normalizeHouseForm(payload: HouseForm): HouseForm {
     waterFeePerTon: payload.waterFeePerTon ?? undefined,
     electricityFeePerKwh: payload.electricityFeePerKwh ?? undefined,
     customFees: payload.customFees?.length ? payload.customFees : undefined,
-    feeNotes: payload.feeNotes?.trim() ?? ''
+    feeNotes: payload.feeNotes?.trim() ?? '',
+    viewingSchedules: payload.viewingSchedules
+      ?.filter((schedule) => schedule.viewingAt)
+      .map((schedule) => ({
+        id: schedule.id,
+        viewingAt: normalizeViewingAtForApi(schedule.viewingAt),
+        note: schedule.note?.trim() || undefined
+      }))
   };
 }

@@ -560,11 +560,9 @@ watch(loading, () => {
 
 <template>
   <div class="chat-panel">
-    <div class="chat-header">
-      <div class="chat-header-title">
-        <span>对话</span>
-      </div>
-      <div class="chat-header-actions">
+    <div class="panel-header">
+      <h2>对话</h2>
+      <div class="panel-header-actions">
         <el-button
           text
           :icon="Plus"
@@ -811,52 +809,6 @@ watch(loading, () => {
 
 :deep(.chat-splitter > .el-splitter__panel) {
   min-height: 0;
-}
-
-.chat-header {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 16px;
-  font-size: 15px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--el-border-color-light);
-}
-
-.chat-header-title,
-.chat-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-
-.chat-header-actions .el-button {
-  width: 32px;
-  height: 32px;
-  margin-left: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--el-text-color-regular);
-}
-
-.chat-header-actions .el-button:hover,
-.chat-header-actions .el-button:focus {
-  background: var(--el-fill-color-light);
-  color: var(--app-text-primary);
-}
-
-.chat-header-actions .el-button:active {
-  background: var(--el-color-info-light-8);
-}
-
-.chat-header-title span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .chat-notice {

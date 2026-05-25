@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { House, HouseFilters } from './domain/house.js';
+import type { House, HouseFilters, ViewingScheduleItem } from './domain/house.js';
 import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
-import { toHouse, toHouseRowParams, type HouseRow } from './house.mapper.js';
+import { toHouse, toHouseRowParams, toViewingSchedule, type HouseRow, type ViewingScheduleRow } from './house.mapper.js';
 
 export class HouseRepository {
   constructor(private readonly database: DatabaseType) {}
@@ -21,6 +21,15 @@ export class HouseRepository {
         OR fee_notes LIKE @q ESCAPE '\\'
         OR contact_notes LIKE @q ESCAPE '\\'
         OR custom_fees LIKE @q ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1
+          FROM viewing_schedules
+          WHERE viewing_schedules.house_id = houses.id
+            AND (
+              viewing_schedules.viewing_at LIKE @q ESCAPE '\\'
+              OR viewing_schedules.note LIKE @q ESCAPE '\\'
+            )
+        )
       )`);
       params.q = `%${escapeLikePattern(filters.q)}%`;
     }
@@ -98,12 +107,19 @@ export class HouseRepository {
       params.limit = filters.limit;
     }
 
-    return this.database.prepare(sql).all(params).map((row) => toHouse(row as HouseRow));
+    const rows = this.database.prepare(sql).all(params) as HouseRow[];
+    const schedulesByHouseId = this.findSchedulesByHouseIds(rows.map((row) => row.id));
+
+    return rows.map((row) => toHouse(row, schedulesByHouseId.get(row.id)));
   }
 
   findById(id: string): House | undefined {
     const row = this.database.prepare('SELECT * FROM houses WHERE id = ?').get(id) as HouseRow | undefined;
-    return row ? toHouse(row) : undefined;
+    if (!row) {
+      return undefined;
+    }
+
+    return toHouse(row, this.findSchedulesByHouseIds([id]).get(id));
   }
 
   create(input: CreateHouseInput): House {
@@ -243,6 +259,35 @@ export class HouseRepository {
 
     transaction(houses);
     return houses.length;
+  }
+
+  private findSchedulesByHouseIds(houseIds: string[]): Map<string, ViewingScheduleItem[]> {
+    const schedulesByHouseId = new Map<string, ViewingScheduleItem[]>();
+    if (!houseIds.length) {
+      return schedulesByHouseId;
+    }
+
+    const placeholders = houseIds.map((_, index) => `@id${index}`).join(', ');
+    const params = Object.fromEntries(houseIds.map((id, index) => [`id${index}`, id]));
+    const rows = this.database
+      .prepare(
+        `
+          SELECT s.*, h.name AS house_name
+          FROM viewing_schedules s
+          LEFT JOIN houses h ON h.id = s.house_id
+          WHERE s.house_id IN (${placeholders})
+          ORDER BY s.viewing_at ASC
+        `
+      )
+      .all(params) as ViewingScheduleRow[];
+
+    for (const row of rows) {
+      const schedules = schedulesByHouseId.get(row.house_id) ?? [];
+      schedules.push(toViewingSchedule(row));
+      schedulesByHouseId.set(row.house_id, schedules);
+    }
+
+    return schedulesByHouseId;
   }
 }
 

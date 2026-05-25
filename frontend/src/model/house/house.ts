@@ -37,6 +37,12 @@ export interface CustomFeeItem {
   amount: number;
 }
 
+export interface ViewingSchedule {
+  id: string;
+  viewingAt: string;
+  note?: string;
+}
+
 export interface House {
   id: string;
   name: string;
@@ -61,6 +67,7 @@ export interface House {
   phone?: string;
   wechat?: string;
   contactNotes?: string;
+  viewingSchedules?: ViewingSchedule[];
   createdAt: string;
   updatedAt: string;
 }

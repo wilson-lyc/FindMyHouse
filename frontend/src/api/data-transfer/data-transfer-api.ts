@@ -1,6 +1,6 @@
 import { getData, postData } from '../http';
 
-export type DataExportScope = 'all' | 'data' | 'serviceConfig';
+export type DataExportScope = 'all' | 'data' | 'schedules' | 'serviceConfig';
 
 export type DataImportPayload = Record<string, unknown>;
 
@@ -8,6 +8,7 @@ export interface DataImportSummary {
   imported: {
     houses: number;
     locations: number;
+    schedules: number;
     serviceConfig: number;
   };
 }

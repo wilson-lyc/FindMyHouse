@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from '@element-plus/icons-vue';
-import DataExportPanel from '../../components/data-transfer/DataExportPanel.vue';
 import DataImportPanel from '../../components/data-transfer/DataImportPanel.vue';
 
 const router = useRouter();
@@ -14,15 +13,14 @@ const router = useRouter();
         <el-tooltip content="返回地图" placement="bottom">
           <el-button class="data-back-button" :icon="ArrowLeft" text aria-label="返回地图" @click="router.push('/')" />
         </el-tooltip>
-        <h1>数据导入 / 导出</h1>
+        <h1>导入数据</h1>
       </div>
     </el-header>
 
     <el-main class="data-main">
       <el-scrollbar class="data-scrollbar">
         <section class="data-content">
-          <DataImportPanel description="导入房源、地点或服务配置数据，JSON 中包含什么就提交什么。" />
-          <DataExportPanel />
+          <DataImportPanel />
         </section>
       </el-scrollbar>
     </el-main>
