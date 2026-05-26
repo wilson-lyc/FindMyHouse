@@ -92,10 +92,16 @@ export function useChatShare() {
 }
 
 export async function renderElementToPng(element: HTMLElement, width: number, height: number) {
+  const MAX_CANVAS_SIZE = 8192;
+  let scale = Math.min(window.devicePixelRatio || 1, 2);
+  if (width * scale > MAX_CANVAS_SIZE || height * scale > MAX_CANVAS_SIZE) {
+    scale = Math.min(scale, MAX_CANVAS_SIZE / Math.max(width, height));
+  }
+
   const canvas = await html2canvas(element, {
     backgroundColor: '#ffffff',
     height,
-    scale: Math.min(window.devicePixelRatio || 1, 2),
+    scale,
     useCORS: true,
     width,
     windowHeight: height,
