@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { formatCurrency } from '../../lib/format';
 import {
   houseSourceChannelLabels,
   rentPaymentPeriodLabels,
-  type CustomFeeItem,
   type House
 } from '../../model/house/house';
 import type { CommuteDistanceResult } from '../../model/map/geocode';
@@ -21,17 +20,24 @@ const emit = defineEmits<{
   'update:modelValue': [visible: boolean];
 }>();
 
-const tableData = computed(() =>
-  comparisonRows.value.map((row) => {
-    const obj: Record<string, string> = { label: row.label };
-    props.houses.forEach((house, index) => {
-      obj[house.id] = row.values[index];
-    });
-    return obj;
-  })
+const allFields = [
+  '状态', '户型', '月租', '月成本', '付款周期', '定金', '押金',
+  '通勤', '渠道', '物业费', '水费', '电费', '其他费用', '费用备注',
+  '联系方式', '地址', '联系备注'
+];
+
+const selectedFields = ref<string[]>([...allFields]);
+
+const isAllSelected = computed(() => selectedFields.value.length === allFields.length);
+const isIndeterminate = computed(
+  () => selectedFields.value.length > 0 && selectedFields.value.length < allFields.length
 );
 
-const comparisonRows = computed(() => [
+function toggleAll(checked: boolean) {
+  selectedFields.value = checked ? [...allFields] : [];
+}
+
+const allComparisonRows = computed(() => [
   {
     label: '状态',
     values: props.houses.map((house) => statusLabels[house.status])
@@ -102,6 +108,20 @@ const comparisonRows = computed(() => [
   }
 ]);
 
+const comparisonRows = computed(() =>
+  allComparisonRows.value.filter((row) => selectedFields.value.includes(row.label))
+);
+
+const tableData = computed(() =>
+  comparisonRows.value.map((row) => {
+    const obj: Record<string, string> = { label: row.label };
+    props.houses.forEach((house, index) => {
+      obj[house.id] = row.values[index];
+    });
+    return obj;
+  })
+);
+
 function getMonthlyTotalCost(house: House) {
   const customFeesTotal = (house.customFees ?? []).reduce((sum, fee) => sum + fee.amount, 0);
   return house.rentPrice + (house.propertyFee ?? 0) + customFeesTotal;
@@ -114,13 +134,11 @@ function formatCustomFees(house: House) {
 
 function formatPaymentPeriods(house: House) {
   if (!house.rentPaymentPeriods?.length) return '-';
-
   return house.rentPaymentPeriods.map((period) => rentPaymentPeriodLabels[period]).join('、');
 }
 
 function formatUnitFee(value: number | undefined, suffix: string) {
   if (value === undefined) return '-';
-
   return `${formatCurrency(value)}${suffix}`;
 }
 
@@ -131,7 +149,6 @@ function formatDistance(meters: number) {
 function formatDuration(seconds: number) {
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}分钟`;
-
   const hours = Math.floor(minutes / 60);
   const restMinutes = minutes % 60;
   return `${hours}小时${restMinutes ? `${restMinutes}分钟` : ''}`;
@@ -140,7 +157,6 @@ function formatDuration(seconds: number) {
 function formatRoute(house: House) {
   const route = props.routes.get(house.id);
   if (!route) return house.latitude !== undefined && house.longitude !== undefined ? '计算中' : '无坐标';
-
   return `${formatDuration(route.duration)} / ${formatDistance(route.distance)}`;
 }
 
@@ -158,9 +174,33 @@ function formatContact(house: House) {
     width="min(1080px, calc(100vw - 32px))"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <div class="compare-toolbar">
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small">显示字段 ({{ selectedFields.length }}/{{ allFields.length }})</el-button>
+        </template>
+        <div class="field-selector">
+          <div class="field-selector-header">
+            <el-checkbox
+              :model-value="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="toggleAll"
+            >
+              全选
+            </el-checkbox>
+          </div>
+          <el-divider style="margin: 8px 0" />
+          <el-checkbox-group v-model="selectedFields" class="field-checkbox-group">
+            <el-checkbox v-for="field in allFields" :key="field" :value="field">
+              {{ field }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </div>
+      </el-popover>
+    </div>
     <el-table
       :data="tableData"
-      height="calc(70vh - 60px)"
+      height="calc(70vh - 100px)"
       border
       v-loading="loading"
       header-cell-class-name="compare-table-header"
@@ -178,7 +218,22 @@ function formatContact(house: House) {
 </template>
 
 <style scoped>
-.compare-table-header {
-  background: var(--el-fill-color-light, #f5f7fa) !important;
+.compare-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.field-selector-header {
+  padding: 0 2px;
+}
+
+.field-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 </style>
