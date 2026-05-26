@@ -6,7 +6,8 @@ import type {
   DrivingRouteResult,
   CommuteDistanceResult,
   CommuteRouteResult,
-  CommuteMode
+  CommuteMode,
+  IsochroneResult
 } from '../../model/map/geocode';
 
 export function geocodeAddress(address: string, city?: string) {
@@ -46,4 +47,16 @@ export function getCommuteRoute(origin: string, destination: string, commuteMode
     '/api/maps/commute-route',
     { origin, destination, commuteMode }
   );
+}
+
+export function getTransitIsochrone(longitude: number, latitude: number, minutes = [10, 20, 30]) {
+  return postData<
+    IsochroneResult,
+    { longitude: number; latitude: number; commuteMode: 'transit'; minutes: number[] }
+  >('/api/maps/isochrone', {
+    longitude,
+    latitude,
+    commuteMode: 'transit',
+    minutes
+  });
 }

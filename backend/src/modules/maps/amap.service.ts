@@ -55,6 +55,17 @@ export interface CommuteRouteResult {
   mode: CommuteMode;
 }
 
+export interface IsochroneRing {
+  minutes: number;
+  path: Array<[number, number]>;
+}
+
+export interface IsochroneResult {
+  center: [number, number];
+  mode: 'transit';
+  rings: IsochroneRing[];
+}
+
 // 向后兼容别名
 export type DrivingDistanceResult = CommuteDistanceResult;
 export type DrivingRouteResult = CommuteRouteResult;
@@ -67,6 +78,55 @@ function getApiUrl(mode: CommuteMode): string {
     case 'cycling': return `${base}/bicycling`;
     case 'walking': return `${base}/walking`;
   }
+}
+
+function coordinatesToParam(longitude: number, latitude: number) {
+  return `${longitude},${latitude}`;
+}
+
+function destinationByDistance(
+  origin: [number, number],
+  distanceMeters: number,
+  bearingDegrees: number
+): [number, number] {
+  const earthRadius = 6378137;
+  const angularDistance = distanceMeters / earthRadius;
+  const bearing = (bearingDegrees * Math.PI) / 180;
+  const lat1 = (origin[1] * Math.PI) / 180;
+  const lng1 = (origin[0] * Math.PI) / 180;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angularDistance) +
+      Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
+  );
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+      Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+  return [(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI];
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 export class AmapService {
@@ -168,6 +228,10 @@ export class AmapService {
       extensions: 'base'
     });
 
+    if (mode === 'transit') {
+      params.set('city', '全国');
+    }
+
     const url = getApiUrl(mode);
     const response = await fetch(`${url}?${params.toString()}`);
     if (!response.ok) {
@@ -177,13 +241,16 @@ export class AmapService {
     const payload = (await response.json()) as {
       status: string;
       info: string;
-      route?: { paths?: Array<{ distance: string; duration: string }> };
+      route?: {
+        paths?: Array<{ distance: string; duration: string }>;
+        transits?: Array<{ distance: string; duration: string }>;
+      };
     };
     if (payload.status !== '1') {
       throw new Error(payload.info || `Amap ${mode} direction failed`);
     }
 
-    const path = payload.route?.paths?.[0];
+    const path = mode === 'transit' ? payload.route?.transits?.[0] : payload.route?.paths?.[0];
     if (!path) {
       return undefined;
     }
@@ -214,6 +281,10 @@ export class AmapService {
       extensions: 'all'
     });
 
+    if (mode === 'transit') {
+      params.set('city', '全国');
+    }
+
     const url = getApiUrl(mode);
     const response = await fetch(`${url}?${params.toString()}`);
     if (!response.ok) {
@@ -229,10 +300,27 @@ export class AmapService {
           duration: string;
           steps?: Array<{ polyline?: string }>;
         }>;
+        transits?: Array<{
+          distance: string;
+          duration: string;
+        }>;
       };
     };
     if (payload.status !== '1') {
       throw new Error(payload.info || `Amap ${mode} direction failed`);
+    }
+
+    if (mode === 'transit') {
+      const transit = payload.route?.transits?.[0];
+      if (!transit) return undefined;
+
+      return {
+        origin,
+        destination,
+        distance: Number(transit.distance),
+        duration: Number(transit.duration),
+        mode
+      };
     }
 
     const path = payload.route?.paths?.[0];
@@ -240,18 +328,14 @@ export class AmapService {
       return undefined;
     }
 
-    // 公交模式下不提取 polyline（无连续路径）
-    let polyline: Array<[number, number]> | undefined;
-    if (mode !== 'transit') {
-      polyline = [];
-      for (const step of path.steps ?? []) {
-        if (!step.polyline) continue;
-        const points = step.polyline.split(';');
-        for (const point of points) {
-          const [lng, lat] = point.split(',').map(Number);
-          if (!isNaN(lng) && !isNaN(lat)) {
-            polyline.push([lng, lat]);
-          }
+    const polyline: Array<[number, number]> = [];
+    for (const step of path.steps ?? []) {
+      if (!step.polyline) continue;
+      const points = step.polyline.split(';');
+      for (const point of points) {
+        const [lng, lat] = point.split(',').map(Number);
+        if (!isNaN(lng) && !isNaN(lat)) {
+          polyline.push([lng, lat]);
         }
       }
     }
@@ -279,5 +363,48 @@ export class AmapService {
     destination: string
   ): Promise<CommuteRouteResult | undefined> {
     return this.getCommuteRoute('driving', origin, destination);
+  }
+
+  async getTransitIsochrone(
+    longitude: number,
+    latitude: number,
+    minutes: number[]
+  ): Promise<IsochroneResult> {
+    const center: [number, number] = [longitude, latitude];
+    const centerParam = coordinatesToParam(longitude, latitude);
+    const bearings = Array.from({ length: 12 }, (_, index) => index * 30);
+    const rings: IsochroneRing[] = [];
+
+    for (const minute of minutes) {
+      const targetSeconds = minute * 60;
+      const maxRadius = minute * 1000;
+      const path = await mapWithConcurrency(bearings, 4, async (bearing) => {
+        let low = maxRadius * 0.2;
+        let high = maxRadius;
+
+        for (let step = 0; step < 3; step += 1) {
+          const mid = (low + high) / 2;
+          const originPoint = destinationByDistance(center, mid, bearing);
+          const origin = coordinatesToParam(originPoint[0], originPoint[1]);
+          const result = await this.getCommuteDistance('transit', origin, centerParam).catch(() => undefined);
+
+          if (result?.duration !== undefined && result.duration <= targetSeconds) {
+            low = mid;
+          } else {
+            high = mid;
+          }
+        }
+
+        return destinationByDistance(center, low, bearing);
+      });
+
+      rings.push({ minutes: minute, path });
+    }
+
+    return {
+      center,
+      mode: 'transit',
+      rings
+    };
   }
 }

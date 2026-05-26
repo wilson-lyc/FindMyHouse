@@ -28,3 +28,10 @@ export const commuteRouteSchema = z.object({
   destination: z.string().trim().min(1, 'destination is required'),
   commuteMode: commuteModeSchema.default('driving')
 });
+
+export const isochroneSchema = z.object({
+  longitude: z.coerce.number().finite().min(-180).max(180),
+  latitude: z.coerce.number().finite().min(-90).max(90),
+  commuteMode: z.enum(['transit']).default('transit'),
+  minutes: z.array(z.coerce.number().int().positive().max(180)).default([10, 20, 30])
+});

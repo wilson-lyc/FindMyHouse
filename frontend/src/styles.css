@@ -1305,6 +1305,49 @@ body {
   box-shadow: 0 2px 12px var(--app-shadow-color);
 }
 
+.map-ring-legend {
+  position: absolute;
+  z-index: 980;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  gap: 7px;
+  min-width: 118px;
+  border: 1px solid var(--app-border-light);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 96%);
+  padding: 10px;
+  color: var(--app-text-primary);
+  font-size: 12px;
+  box-shadow: 0 2px 12px var(--app-shadow-color);
+}
+
+.map-panel-close-btn--left ~ .map-ring-legend,
+.map-ring-legend:has(~ .map-panel-close-btn--left) {
+  top: 52px;
+}
+
+.map-ring-legend strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.map-ring-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.map-ring-legend-swatch {
+  width: 18px;
+  height: 10px;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 999px;
+  opacity: 0.62;
+}
+
 .map-point-route-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -1400,11 +1443,11 @@ body {
   border: 0;
 }
 
-.map-clear-search-results-btn {
+.map-panel-close-btn--left {
   left: 10px;
 }
 
-.map-clear-route-btn {
+.map-panel-close-btn--right {
   right: 10px;
 }
 
@@ -1556,6 +1599,18 @@ body {
   box-shadow: 0 4px 12px var(--app-shadow-color);
 }
 
+.map-marker-label.isochrone {
+  border-color: rgb(47 128 237 / 28%);
+  background: rgb(255 255 255 / 96%);
+  color: var(--app-text-primary);
+}
+
+.map-marker-label.distance-ring {
+  border-color: rgb(20 184 166 / 28%);
+  background: rgb(255 255 255 / 96%);
+  color: var(--app-text-primary);
+}
+
 .amap-marker-label {
   border: 0 !important;
   background: transparent !important;
@@ -1623,6 +1678,8 @@ body {
 
 .map-info-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
   margin-top: 2px;
 }

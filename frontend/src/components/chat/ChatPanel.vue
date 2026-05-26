@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Delete, Plus, Setting, Top } from '@element-plus/icons-vue';
+import { CopyDocument, Delete, Download, Plus, Setting, Share, Top } from '@element-plus/icons-vue';
+import html2canvas from 'html2canvas';
 import MarkdownIt from 'markdown-it';
 import {
   sendChatMessage,
@@ -43,6 +44,10 @@ const inputValue = ref('');
 const loading = ref(false);
 const sessionsLoading = ref(false);
 const sessionDialogVisible = ref(false);
+const shareDialogVisible = ref(false);
+const shareImageUrl = ref('');
+const shareGenerating = ref(false);
+const shareRenderMessages = ref<ChatMessage[]>([]);
 const currentSessionId = ref<string | null>(null);
 const sessions = ref<ChatSessionSummary[]>([]);
 const selectedSessionIds = ref<string[]>([]);
@@ -51,12 +56,15 @@ const pendingCompareAction = ref<Extract<AgentFrontendAction, { type: 'confirm_c
 const pendingCompareResolve = ref<((result: ConfirmCompareHousesResult) => void) | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const messagesContainerRef = ref<HTMLDivElement | null>(null);
+const shareCaptureMessagesRef = ref<HTMLDivElement | null>(null);
+const shareCaptureCardRef = ref<HTMLDivElement | null>(null);
 const composerPanelSize = ref('152px');
 const customChoiceInputs = ref<Record<string, string>>({});
 
 const canSubmit = computed(() => inputValue.value.trim().length > 0 && !loading.value);
 const visibleMessages = computed(() => messages.value.filter((message) => !message.hidden));
 const hasSelectedSessions = computed(() => selectedSessionIds.value.length > 0);
+const canShareConversation = computed(() => visibleMessages.value.length > 0 && !shareGenerating.value);
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
@@ -544,6 +552,131 @@ function formatSessionTime(value: string) {
   }).format(new Date(value));
 }
 
+async function openShareDialog() {
+  if (!canShareConversation.value) return;
+
+  await generateShareImage(visibleMessages.value);
+}
+
+async function shareSession(sessionId: string) {
+  if (shareGenerating.value) return;
+
+  try {
+    const session = await fetchChatSession(sessionId);
+    await generateShareImage(session.messages.filter((message) => !message.hidden));
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载会话失败');
+  }
+}
+
+async function generateShareImage(sourceMessages: ChatMessage[]) {
+  if (sourceMessages.length === 0) return;
+
+  try {
+    await ElMessageBox.confirm(
+      '分享图片会包含当前对话中展示的文字和房源信息，发送给他人后可能造成隐私泄露。请确认已检查内容，并注意识别敏感信息。',
+      '确认分享对话',
+      {
+        type: 'warning',
+        confirmButtonText: '确认生成',
+        cancelButtonText: '取消'
+      }
+    );
+  } catch {
+    return;
+  }
+
+  shareImageUrl.value = '';
+  shareRenderMessages.value = sourceMessages;
+    shareDialogVisible.value = true;
+    shareGenerating.value = true;
+  try {
+    await nextTick();
+    shareImageUrl.value = await createConversationShareImage();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '生成分享图失败');
+    shareDialogVisible.value = false;
+  } finally {
+    shareGenerating.value = false;
+  }
+}
+
+async function copyShareImage() {
+  if (!shareImageUrl.value) return;
+
+  try {
+    const response = await fetch(shareImageUrl.value);
+    const blob = await response.blob();
+
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+      throw new Error('当前浏览器不支持复制图片');
+    }
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        [blob.type]: blob
+      })
+    ]);
+    ElMessage.success('分享图已复制');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '复制失败，请下载后分享');
+  }
+}
+
+function downloadShareImage() {
+  if (!shareImageUrl.value) return;
+
+  const link = document.createElement('a');
+  link.href = shareImageUrl.value;
+  link.download = `findmyhouse-chat-${new Date().toISOString().slice(0, 10)}.png`;
+  link.click();
+}
+
+async function createConversationShareImage() {
+  await nextTick();
+
+  const card = shareCaptureCardRef.value;
+  const source = shareCaptureMessagesRef.value;
+
+  if (!card) {
+    throw new Error('没有可分享的对话内容');
+  }
+
+  if (!source) {
+    throw new Error('没有可分享的对话内容');
+  }
+
+  await new Promise(requestAnimationFrame);
+  await new Promise(requestAnimationFrame);
+  const imageWidth = Math.max(360, card.offsetWidth);
+  const cardRect = card.getBoundingClientRect();
+  const footer = card.querySelector<HTMLElement>('.chat-share-capture-footer');
+  const footerRect = footer?.getBoundingClientRect();
+  const footerHeight = footer ? Math.max(footer.offsetHeight, footer.scrollHeight) : 0;
+  const imageHeight = Math.ceil(Math.max(
+    card.scrollHeight,
+    card.offsetHeight,
+    footerRect ? footerRect.bottom - cardRect.top : 0
+  ) + footerHeight-10);
+  card.style.height = `${imageHeight}px`;
+
+  return renderElementToPng(card, imageWidth, imageHeight);
+}
+
+async function renderElementToPng(element: HTMLElement, width: number, height: number) {
+  const canvas = await html2canvas(element, {
+    backgroundColor: '#ffffff',
+    height,
+    scale: Math.min(window.devicePixelRatio || 1, 2),
+    useCORS: true,
+    width,
+    windowHeight: height,
+    windowWidth: width
+  });
+
+  return canvas.toDataURL('image/png');
+}
+
 function scrollToBottom() {
   nextTick(() => {
     if (messagesContainerRef.value) {
@@ -563,6 +696,15 @@ watch(loading, () => {
     <div class="panel-header">
       <h2>对话</h2>
       <div class="panel-header-actions">
+        <el-button
+          text
+          :icon="Share"
+          aria-label="生成分享图"
+          title="生成分享图"
+          :disabled="!canShareConversation"
+          :loading="shareGenerating"
+          @click="openShareDialog"
+        />
         <el-button
           text
           :icon="Plus"
@@ -752,13 +894,97 @@ watch(loading, () => {
             {{ formatSessionTime(row.updatedAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="restoreSession(row.id)">恢复</el-button>
+            <el-button link type="primary" :disabled="shareGenerating" @click="shareSession(row.id)">分享</el-button>
             <el-button link type="danger" @click="removeSession(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+    </el-dialog>
+
+    <el-dialog v-model="shareDialogVisible" title="分享对话" width="760px" class="chat-share-dialog" align-center>
+      <div v-loading="shareGenerating" class="chat-share-preview">
+        <div v-if="shareGenerating && !shareImageUrl" class="chat-share-generating">
+          正在生成分享图...
+        </div>
+        <img v-if="shareImageUrl" :src="shareImageUrl" alt="对话分享图">
+      </div>
+      <div class="chat-share-capture-host" aria-hidden="true">
+        <div v-if="shareRenderMessages.length > 0" ref="shareCaptureCardRef" class="chat-share-capture-card">
+          <div class="chat-share-capture-header">
+            <div class="chat-share-capture-title-group">
+              <div class="chat-share-capture-title">FindMyHouse</div>
+              <div class="chat-share-capture-slogan">您贴心的租房智能专家</div>
+            </div>
+            <el-tag type="primary">对话分享</el-tag>
+          </div>
+          <div ref="shareCaptureMessagesRef" class="chat-messages">
+            <div v-for="(msg, index) in shareRenderMessages" :key="index" class="chat-message-wrapper" :class="msg.role">
+              <div class="chat-bubble">
+                <div v-if="msg.role === 'assistant'">
+                  <div
+                    v-if="getVisibleAssistantContent(msg)"
+                    class="chat-bubble-markdown markdown-body"
+                    v-html="renderAssistantContent(getVisibleAssistantContent(msg))"
+                  />
+                  <div v-if="msg.choicePrompt" class="chat-choice-prompt">
+                    <div class="chat-choice-question">{{ msg.choicePrompt.question }}</div>
+                    <div class="chat-choice-options" role="radiogroup" :aria-label="msg.choicePrompt.question">
+                      <button
+                        v-for="option in msg.choicePrompt.options"
+                        :key="option.id"
+                        class="chat-choice-option"
+                        type="button"
+                        role="radio"
+                        :aria-checked="msg.choicePrompt.answeredValue === option.value"
+                        :class="{ selected: msg.choicePrompt.answeredValue === option.value }"
+                        disabled
+                      >
+                        <span class="chat-choice-radio" />
+                        <span class="chat-choice-label">{{ option.label }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="chat-bubble-text">{{ msg.content }}</div>
+                <div v-if="msg.houses && msg.houses.length > 0" class="chat-house-results">
+                  <div class="chat-house-results-header">
+                    {{ msg.housesTitle ?? `找到 ${msg.houses.length} 套房源` }}
+                  </div>
+                  <div
+                    v-for="house in msg.houses"
+                    :key="house.id"
+                    class="chat-house-card"
+                  >
+                    <div class="chat-house-name">{{ house.name }}</div>
+                    <div class="chat-house-meta">
+                      <span class="chat-house-price">{{ formatCurrency(house.rentPrice) }}</span>
+                      <span class="chat-house-type">{{ house.bedroomCount }}室{{ house.livingRoomCount }}厅{{ house.bathroomCount }}卫</span>
+                      <span class="chat-house-status" :class="house.status">{{ statusLabels[house.status] }}</span>
+                    </div>
+                    <div class="chat-house-address">{{ house.address }}</div>
+                  </div>
+                </div>
+                <div v-if="msg.compareHouses && msg.compareHouses.length > 1" class="chat-compare-actions">
+                  <el-button type="primary" plain disabled>
+                    打开对比表
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-share-capture-footer">
+            <div class="chat-share-capture-footer-brand">FindMyHouse</div>
+            <div class="chat-share-capture-footer-slogan">您贴心的租房智能专家</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button :icon="CopyDocument" :disabled="shareGenerating || !shareImageUrl" @click="copyShareImage">复制图片</el-button>
+        <el-button type="primary" :icon="Download" :disabled="shareGenerating || !shareImageUrl" @click="downloadShareImage">下载图片</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -863,6 +1089,129 @@ watch(loading, () => {
 }
 
 .chat-session-dialog-actions .el-button {
+  margin-left: 0;
+}
+
+.chat-share-capture-host {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 760px;
+  pointer-events: none;
+}
+
+.chat-share-capture-card {
+  width: 760px;
+  overflow: visible;
+  border-radius: 18px;
+  background: var(--el-bg-color);
+  color: var(--app-text-primary);
+}
+
+.chat-share-capture-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px 34px 18px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--el-bg-color);
+}
+
+.chat-share-capture-title-group {
+  min-width: 0;
+}
+
+.chat-share-capture-title {
+  color: var(--app-text-primary);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.chat-share-capture-slogan {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.chat-share-capture-header .el-tag {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.chat-share-capture-card .chat-messages {
+  width: 760px;
+  height: auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+.chat-share-capture-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 70px;
+  padding: 18px 34px 28px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  background: var(--el-bg-color);
+  box-sizing: border-box;
+}
+
+.chat-share-capture-footer-brand {
+  color: #606266;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.chat-share-capture-footer-slogan {
+  min-width: 0;
+  color: #909399;
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.chat-share-preview {
+  display: flex;
+  max-height: min(68vh, 780px);
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--app-bg-soft);
+  padding: 12px;
+}
+
+.chat-share-preview img {
+  display: block;
+  width: min(100%, 420px);
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--app-shadow-color);
+}
+
+.chat-share-generating {
+  display: flex;
+  min-height: 240px;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:deep(.chat-share-dialog .el-dialog__footer) {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+:deep(.chat-share-dialog .el-dialog__footer .el-button) {
   margin-left: 0;
 }
 

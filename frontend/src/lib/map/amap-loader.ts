@@ -19,8 +19,8 @@ export interface AMapBounds {
 }
 
 export interface AMapMap {
-  add(marker: AMapMarker | AMapMarker[] | AMapPolyline): void;
-  remove(marker: AMapMarker | AMapMarker[] | AMapPolyline | AMapPolyline[]): void;
+  add(marker: AMapOverlay | AMapOverlay[]): void;
+  remove(marker: AMapOverlay | AMapOverlay[]): void;
   addControl(control: AMapControl): void;
   getBounds(): AMapBounds;
   resize?(): void;
@@ -77,6 +77,17 @@ export interface AMapPolyline {
   setMap(map: AMapMap | null): void;
 }
 
+export interface AMapPolygon {
+  setMap(map: AMapMap | null): void;
+  setPath?(path: Array<[number, number]> | Array<Array<[number, number]>>): void;
+}
+
+export interface AMapCircle {
+  setMap(map: AMapMap | null): void;
+}
+
+export type AMapOverlay = AMapMarker | AMapPolyline | AMapPolygon | AMapCircle;
+
 export interface AMapContextMenu {
   addItem(label: string, handler: () => void, index?: number): void;
   open(map: AMapMap, position: AMapLngLat | [number, number]): void;
@@ -117,6 +128,8 @@ export interface AMapNamespace {
   Marker: new (options: Record<string, unknown>) => AMapMarker;
   InfoWindow: new (options: Record<string, unknown>) => AMapInfoWindow;
   Polyline: new (options: Record<string, unknown>) => AMapPolyline;
+  Polygon: new (options: Record<string, unknown>) => AMapPolygon;
+  Circle: new (options: Record<string, unknown>) => AMapCircle;
   Pixel: new (x: number, y: number) => AMapPixel;
   ContextMenu?: new () => AMapContextMenu;
   Scale?: new (options?: Record<string, unknown>) => AMapControl;

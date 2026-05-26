@@ -5,9 +5,23 @@ import type { Location } from '../model/location/location';
 import type { CommuteDistanceResult, MapBoundsFilter, CommuteMode } from '../model/map/geocode';
 import type { ScheduleRoutePlan } from '../lib/schedule/route-planner';
 
-export type MapPanelMode = 'default' | 'house-search-results' | 'point-route' | 'multi-point-route';
+export type MapPanelMode = 'default' | 'house-search-results' | 'point-route' | 'multi-point-route' | 'isochrone' | 'distance-ring';
 
 export type MapPointKind = 'house' | 'location';
+
+export type IsochroneMode = 'driving' | 'transit';
+
+export interface IsochroneRequest {
+  location: Location;
+  mode: IsochroneMode;
+  requestKey: number;
+}
+
+export interface DistanceRingRequest {
+  location: Location;
+  radii: number[];
+  requestKey: number;
+}
 
 export interface MapRoutePoint {
   id: string;
@@ -35,6 +49,10 @@ export const useMapStore = defineStore('map', () => {
   const scheduleRoutePlan = ref<ScheduleRoutePlan | null>(null);
   const activeRouteHouseId = ref<string | null>(null);
   const searchResultHouses = ref<House[]>([]);
+  const isochroneRequest = ref<IsochroneRequest | null>(null);
+  const isochroneRequestKey = ref(0);
+  const distanceRingRequest = ref<DistanceRingRequest | null>(null);
+  const distanceRingRequestKey = ref(0);
 
   function setHouses(newHouses: House[]) {
     houses.value = newHouses;
@@ -113,6 +131,8 @@ export const useMapStore = defineStore('map', () => {
     pointRouteOrigin.value = origin;
     pointRouteDestination.value = destination;
     scheduleRoutePlan.value = null;
+    isochroneRequest.value = null;
+    distanceRingRequest.value = null;
     activeRouteHouseId.value = null;
     pointRouteRequestKey.value += 1;
     mode.value = 'point-route';
@@ -144,6 +164,8 @@ export const useMapStore = defineStore('map', () => {
     pointRouteRequestKey.value += 1;
     scheduleRoutePlan.value = null;
     activeRouteHouseId.value = null;
+    isochroneRequest.value = null;
+    distanceRingRequest.value = null;
     mode.value = searchResultHouses.value.length > 0 ? 'house-search-results' : 'default';
   }
 
@@ -154,7 +176,53 @@ export const useMapStore = defineStore('map', () => {
     pointRouteRequestKey.value += 1;
     activeRouteHouseId.value = null;
     scheduleRoutePlan.value = plan;
+    isochroneRequest.value = null;
+    distanceRingRequest.value = null;
     mode.value = 'multi-point-route';
+  }
+
+  function showIsochrone(location: Location, isochroneMode: IsochroneMode) {
+    routeData.value = null;
+    pointRouteOrigin.value = null;
+    pointRouteDestination.value = null;
+    pointRouteRequestKey.value += 1;
+    scheduleRoutePlan.value = null;
+    activeRouteHouseId.value = null;
+    distanceRingRequest.value = null;
+    isochroneRequestKey.value += 1;
+    isochroneRequest.value = {
+      location,
+      mode: isochroneMode,
+      requestKey: isochroneRequestKey.value
+    };
+    mode.value = 'isochrone';
+  }
+
+  function clearIsochrone() {
+    isochroneRequest.value = null;
+    mode.value = searchResultHouses.value.length > 0 ? 'house-search-results' : 'default';
+  }
+
+  function showDistanceRing(location: Location, radii = [1000, 3000, 5000]) {
+    routeData.value = null;
+    pointRouteOrigin.value = null;
+    pointRouteDestination.value = null;
+    pointRouteRequestKey.value += 1;
+    scheduleRoutePlan.value = null;
+    activeRouteHouseId.value = null;
+    isochroneRequest.value = null;
+    distanceRingRequestKey.value += 1;
+    distanceRingRequest.value = {
+      location,
+      radii,
+      requestKey: distanceRingRequestKey.value
+    };
+    mode.value = 'distance-ring';
+  }
+
+  function clearDistanceRing() {
+    distanceRingRequest.value = null;
+    mode.value = searchResultHouses.value.length > 0 ? 'house-search-results' : 'default';
   }
 
   function showHouseSearchResults(results: House[]) {
@@ -165,12 +233,22 @@ export const useMapStore = defineStore('map', () => {
     pointRouteRequestKey.value += 1;
     scheduleRoutePlan.value = null;
     activeRouteHouseId.value = null;
+    isochroneRequest.value = null;
+    distanceRingRequest.value = null;
     mode.value = 'house-search-results';
   }
 
   function clearHouseSearchResults() {
     searchResultHouses.value = [];
-    mode.value = routeData.value ? 'point-route' : scheduleRoutePlan.value ? 'multi-point-route' : 'default';
+    mode.value = routeData.value
+      ? 'point-route'
+      : scheduleRoutePlan.value
+        ? 'multi-point-route'
+        : isochroneRequest.value
+          ? 'isochrone'
+          : distanceRingRequest.value
+            ? 'distance-ring'
+          : 'default';
   }
 
   function resetMode() {
@@ -181,6 +259,8 @@ export const useMapStore = defineStore('map', () => {
     pointRouteRequestKey.value += 1;
     scheduleRoutePlan.value = null;
     activeRouteHouseId.value = null;
+    isochroneRequest.value = null;
+    distanceRingRequest.value = null;
     mode.value = 'default';
   }
 
@@ -201,6 +281,8 @@ export const useMapStore = defineStore('map', () => {
     scheduleRoutePlan,
     activeRouteHouseId,
     searchResultHouses,
+    isochroneRequest,
+    distanceRingRequest,
     setHouses,
     setLocations,
     selectHouse,
@@ -215,6 +297,10 @@ export const useMapStore = defineStore('map', () => {
     showRoute,
     clearRoute,
     showScheduleRoute,
+    showIsochrone,
+    clearIsochrone,
+    showDistanceRing,
+    clearDistanceRing,
     showHouseSearchResults,
     clearHouseSearchResults,
     resetMode

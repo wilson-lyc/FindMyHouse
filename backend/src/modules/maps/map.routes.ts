@@ -1,6 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import { geocodeSchema, reverseGeocodeSchema, drivingDistanceSchema, commuteDistanceSchema, commuteRouteSchema } from './dto/map.schema.js';
+import {
+  geocodeSchema,
+  reverseGeocodeSchema,
+  drivingDistanceSchema,
+  commuteDistanceSchema,
+  commuteRouteSchema,
+  isochroneSchema
+} from './dto/map.schema.js';
 import { AmapService, type CommuteDistanceResult, type CommuteRouteResult, type CommuteMode } from './amap.service.js';
 import { RouteCacheRepository } from './route-cache.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
@@ -146,6 +153,13 @@ export async function registerMapRoutes(app: FastifyInstance) {
     if (!result) {
       return reply.code(404).send({ error: 'Route not found' });
     }
+
+    return { data: result };
+  });
+
+  app.post('/api/maps/isochrone', async (request) => {
+    const input = isochroneSchema.parse(request.body);
+    const result = await amapService.getTransitIsochrone(input.longitude, input.latitude, input.minutes);
 
     return { data: result };
   });

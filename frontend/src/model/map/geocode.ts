@@ -29,6 +29,17 @@ export interface CommuteRouteResult {
   mode: CommuteMode;
 }
 
+export interface IsochroneRing {
+  minutes: number;
+  path: Array<[number, number]>;
+}
+
+export interface IsochroneResult {
+  center: [number, number];
+  mode: 'transit';
+  rings: IsochroneRing[];
+}
+
 // 向后兼容别名
 export type DrivingDistanceResult = CommuteDistanceResult;
 export type DrivingRouteResult = CommuteRouteResult;

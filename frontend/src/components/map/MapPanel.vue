@@ -12,6 +12,7 @@ import {
 import { formatCurrency } from '../../lib/format';
 import { defaultMapZoom, focusedHouseMapZoom, focusedPlaceMapZoom } from '../../lib/map/map-zoom';
 import { formatDistanceShort } from '../../lib/map/route-format';
+import { getTransitIsochrone } from '../../api/map/map-api';
 import { useMapStore } from '../../stores/mapStore';
 import {
   loadAmap,
@@ -20,6 +21,7 @@ import {
   type AMapMap,
   type AMapMarker,
   type AMapNamespace,
+  type AMapOverlay,
   type AMapRoutePlanner,
   type AMapRouteSearchResult,
   type AMapRouteStatus
@@ -54,7 +56,9 @@ const {
   pointRouteRequestKey,
   scheduleRoutePlan,
   searchResultHouses,
-  commuteMode
+  commuteMode,
+  isochroneRequest,
+  distanceRingRequest
 } = storeToRefs(mapStore);
 
 // ==================== 地图实例 ====================
@@ -64,10 +68,78 @@ const pointRouteResultPanel = ref<HTMLDivElement>();
 const map = ref<AMapMap>();
 const amap = ref<AMapNamespace>();
 const loadError = ref('');
+const mapOverlayLoading = ref(false);
+const mapOverlayLoadingText = ref('正在绘制');
 const nativeRouteCollapse = ref<string[]>([]);
 const isSearchResultMode = computed(() => mode.value === 'house-search-results');
+const isIsochroneMode = computed(() => mode.value === 'isochrone');
+const isDistanceRingMode = computed(() => mode.value === 'distance-ring');
 const visibleHouses = computed(() => (isSearchResultMode.value ? searchResultHouses.value : houses.value));
 const hasFocusLocation = computed(() => locations.value.some((loc) => loc.isFocus));
+const isochroneModeLabel = computed(() => {
+  if (!isochroneRequest.value) return '';
+  return isochroneRequest.value.mode === 'driving' ? '驾车等时圈' : '公交等时圈';
+});
+const ringLegend = computed<{
+  title: string;
+  items: Array<{ label: string; color: string }>;
+} | null>(() => {
+  if (isIsochroneMode.value && isochroneRequest.value) {
+    return {
+      title: isochroneModeLabel.value,
+      items: isochroneMinutes.map((minutes, index) => ({
+        label: `${minutes} 分钟`,
+        color: isochroneStyles[index].strokeColor
+      }))
+    };
+  }
+
+  if (isDistanceRingMode.value && distanceRingRequest.value) {
+    return {
+      title: '等距圈',
+      items: distanceRingRequest.value.radii.map((radius, index) => ({
+        label: `${radius / 1000} km`,
+        color: distanceRingStyles[Math.min(index, distanceRingStyles.length - 1)].strokeColor
+      }))
+    };
+  }
+
+  return null;
+});
+const activeCloseControl = computed<{
+  title: string;
+  placement: 'left' | 'right';
+} | null>(() => {
+  if (isSearchResultMode.value) {
+    return {
+      title: '退出搜索结果',
+      placement: 'left'
+    };
+  }
+
+  if (isIsochroneMode.value) {
+    return {
+      title: `关闭${isochroneModeLabel.value}`,
+      placement: 'right'
+    };
+  }
+
+  if (isDistanceRingMode.value) {
+    return {
+      title: '关闭等距圈',
+      placement: 'right'
+    };
+  }
+
+  if (mode.value === 'point-route' || scheduleRoutePlan.value) {
+    return {
+      title: '关闭路线',
+      placement: 'right'
+    };
+  }
+
+  return null;
+});
 
 const houseFocusZoom = focusedHouseMapZoom;
 const locationFocusZoom = focusedPlaceMapZoom;
@@ -203,7 +275,29 @@ function openHouseInfoWindow(house: House, position: [number, number]) {
 }
 
 function locationInfoContent(location: KeyLocation) {
-  return `<div class="map-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${location.name}</strong><span>${locationCategoryLabels[location.category]} · ${location.address}</span></div>`;
+  const disabledAttr = location.longitude === undefined || location.latitude === undefined ? ' disabled' : '';
+  return `<div class="map-info"><button class="map-info-close-button" type="button" aria-label="关闭">×</button><strong>${location.name}</strong><span>${locationCategoryLabels[location.category]} · ${location.address}</span><div class="map-info-actions"><button class="el-button el-button--small map-info-isochrone-button" data-location-id="${location.id}" data-mode="driving" type="button"${disabledAttr}><span>驾车等时圈</span></button><button class="el-button el-button--small map-info-isochrone-button" data-location-id="${location.id}" data-mode="transit" type="button"${disabledAttr}><span>公交等时圈</span></button><button class="el-button el-button--small map-info-distance-ring-button" data-location-id="${location.id}" type="button"${disabledAttr}><span>等距圈</span></button></div></div>`;
+}
+
+function bindLocationInfoAction(location: KeyLocation) {
+  window.setTimeout(() => {
+    const isochroneButtons = document.querySelectorAll<HTMLButtonElement>('.map-info-isochrone-button');
+    for (const button of isochroneButtons) {
+      if (button.dataset.locationId === location.id) {
+        button.onclick = () => {
+          if (button.dataset.mode === 'driving' || button.dataset.mode === 'transit') {
+            mapStore.showIsochrone(location, button.dataset.mode);
+          }
+        };
+      }
+    }
+    const distanceRingButtons = document.querySelectorAll<HTMLButtonElement>('.map-info-distance-ring-button');
+    for (const button of distanceRingButtons) {
+      if (button.dataset.locationId === location.id) {
+        button.onclick = () => mapStore.showDistanceRing(location);
+      }
+    }
+  }, 0);
 }
 
 // ==================== 视野与边界 ====================
@@ -275,6 +369,7 @@ function focusLocation(location: KeyLocation, position: [number, number]) {
   map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
   createInfoWindow(locationInfoContent(location), position);
   bindInfoCloseAction();
+  bindLocationInfoAction(location);
 }
 
 function focusLocationById(locationId: string) {
@@ -397,6 +492,22 @@ let activeScheduleRouteRequestId = 0;
 let scheduleRoutePlanner: AMapRoutePlanner | undefined;
 let scheduleRouteMarkers: AMapMarker[] = [];
 let scheduleRouteInfoWindow: AMapInfoWindow | undefined;
+let activeIsochroneRequestId = 0;
+let isochroneOverlays: AMapOverlay[] = [];
+let isochroneRoutePlanner: AMapRoutePlanner | undefined;
+let distanceRingOverlays: AMapOverlay[] = [];
+
+const isochroneMinutes = [10, 20, 30] as const;
+const isochroneStyles = [
+  { fillColor: '#2f80ed', strokeColor: '#1f5fbf', fillOpacity: 0.18 },
+  { fillColor: '#22a06b', strokeColor: '#167a4f', fillOpacity: 0.14 },
+  { fillColor: '#f59f00', strokeColor: '#b87503', fillOpacity: 0.12 }
+] as const;
+const distanceRingStyles = [
+  { fillColor: '#6b7280', strokeColor: '#374151', fillOpacity: 0.08 },
+  { fillColor: '#14b8a6', strokeColor: '#0f766e', fillOpacity: 0.06 },
+  { fillColor: '#ef4444', strokeColor: '#b91c1c', fillOpacity: 0.05 }
+] as const;
 
 /** 清除路线折线和信息窗口 */
 function clearPointRoutePlanner() {
@@ -424,6 +535,25 @@ function clearScheduleRoutePolyline() {
     scheduleRouteInfoWindow.close();
     scheduleRouteInfoWindow = undefined;
   }
+}
+
+function clearIsochroneOverlays() {
+  activeIsochroneRequestId += 1;
+  mapOverlayLoading.value = false;
+  isochroneRoutePlanner?.clear?.();
+  isochroneRoutePlanner = undefined;
+  if (isochroneOverlays.length) {
+    map.value?.remove(isochroneOverlays);
+  }
+  isochroneOverlays = [];
+}
+
+function clearDistanceRingOverlays() {
+  mapOverlayLoading.value = false;
+  if (distanceRingOverlays.length) {
+    map.value?.remove(distanceRingOverlays);
+  }
+  distanceRingOverlays = [];
 }
 
 function routePluginName(mode: CommuteMode) {
@@ -459,6 +589,273 @@ function createRoutePlanner(mode: CommuteMode) {
 
 function firstRouteSummary(result: AMapRouteSearchResult) {
   return result.routes?.[0] ?? result.plans?.[0];
+}
+
+function destinationByDistance(origin: [number, number], distanceMeters: number, bearingDegrees: number): [number, number] {
+  const earthRadius = 6378137;
+  const angularDistance = distanceMeters / earthRadius;
+  const bearing = (bearingDegrees * Math.PI) / 180;
+  const lat1 = (origin[1] * Math.PI) / 180;
+  const lng1 = (origin[0] * Math.PI) / 180;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angularDistance) +
+      Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
+  );
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+      Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+  return [(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI];
+}
+
+function searchDrivingDuration(planner: AMapRoutePlanner, origin: [number, number], destination: [number, number]) {
+  return new Promise<number | undefined>((resolve) => {
+    const timeout = window.setTimeout(() => resolve(undefined), 8000);
+    planner.search(origin, destination, (status, result) => {
+      window.clearTimeout(timeout);
+      if (status !== 'complete' || typeof result === 'string') {
+        resolve(undefined);
+        return;
+      }
+      resolve(firstRouteSummary(result)?.time);
+    });
+  });
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function createIsochronePolygon(path: Array<[number, number]>, styleIndex: number, zIndex: number) {
+  if (!amap.value) return undefined;
+  const style = isochroneStyles[styleIndex];
+  return new amap.value.Polygon({
+    path,
+    fillColor: style.fillColor,
+    fillOpacity: style.fillOpacity,
+    strokeColor: style.strokeColor,
+    strokeOpacity: 0.85,
+    strokeWeight: 2,
+    strokeStyle: 'solid',
+    zIndex
+  });
+}
+
+function addIsochroneLegendMarker(position: [number, number], label: string) {
+  if (!amap.value) return undefined;
+  return new amap.value.Marker({
+    position,
+    title: label,
+    label: {
+      content: `<div class="map-marker-label isochrone">${label}</div>`,
+      direction: 'top'
+    }
+  });
+}
+
+function createDistanceCircle(center: [number, number], radius: number, styleIndex: number) {
+  if (!amap.value) return undefined;
+  const style = distanceRingStyles[styleIndex];
+  return new amap.value.Circle({
+    center,
+    radius,
+    fillColor: style.fillColor,
+    fillOpacity: style.fillOpacity,
+    strokeColor: style.strokeColor,
+    strokeOpacity: 0.9,
+    strokeWeight: 2,
+    strokeStyle: 'dashed',
+    strokeDasharray: [8, 6],
+    zIndex: 12 + styleIndex
+  });
+}
+
+function addDistanceRingLabel(center: [number, number], radius: number) {
+  if (!amap.value) return undefined;
+  const position = destinationByDistance(center, radius, 90);
+  const label = `${radius / 1000} km`;
+  return new amap.value.Marker({
+    position,
+    title: label,
+    label: {
+      content: `<div class="map-marker-label distance-ring">${label}</div>`,
+      direction: 'right'
+    }
+  });
+}
+
+async function renderDrivingIsochrone(location: KeyLocation, center: [number, number], requestId: number) {
+  if (!amap.value || !map.value) {
+    mapOverlayLoading.value = false;
+    return;
+  }
+
+  const planner = new amap.value.Driving({
+    extensions: 'base',
+    hideMarkers: true,
+    showTraffic: true
+  });
+  isochroneRoutePlanner = planner;
+
+  const bearings = Array.from({ length: 12 }, (_, index) => index * 30);
+  const overlays: AMapOverlay[] = [];
+
+  for (const [minuteIndex, minutes] of isochroneMinutes.entries()) {
+    if (requestId !== activeIsochroneRequestId) return;
+    const maxRadius = minutes * 850;
+    const targetSeconds = minutes * 60;
+    const points = await mapWithConcurrency(bearings, 4, async (bearing) => {
+      let low = maxRadius * 0.35;
+      let high = maxRadius;
+
+      for (let step = 0; step < 3; step += 1) {
+        const mid = (low + high) / 2;
+        const destination = destinationByDistance(center, mid, bearing);
+        const duration = await searchDrivingDuration(planner, center, destination);
+        if (duration !== undefined && duration <= targetSeconds) {
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+
+      return destinationByDistance(center, low, bearing);
+    });
+
+    if (requestId !== activeIsochroneRequestId) return;
+    const polygon = createIsochronePolygon(points, minuteIndex, 18 + minuteIndex);
+    if (polygon) overlays.push(polygon);
+  }
+
+  const marker = addIsochroneLegendMarker(center, `${location.name} · 驾车等时圈`);
+  if (marker) overlays.push(marker);
+  if (requestId !== activeIsochroneRequestId || !map.value) return;
+
+  isochroneOverlays = overlays;
+  map.value.add(overlays);
+  map.value.setFitView(overlays, false, [60, 60, 60, 60], 14);
+  mapOverlayLoading.value = false;
+}
+
+async function renderTransitIsochrone(location: KeyLocation, center: [number, number], requestId: number) {
+  if (!map.value) {
+    mapOverlayLoading.value = false;
+    return;
+  }
+
+  try {
+    const result = await getTransitIsochrone(center[0], center[1], [...isochroneMinutes]);
+    if (requestId !== activeIsochroneRequestId) return;
+
+    const overlays: AMapOverlay[] = [];
+    for (const ring of result.rings) {
+      const minuteIndex = isochroneMinutes.findIndex((minutes) => minutes === ring.minutes);
+      const polygon = createIsochronePolygon(ring.path, Math.max(0, minuteIndex), 18 + Math.max(0, minuteIndex));
+      if (polygon) overlays.push(polygon);
+    }
+
+    const marker = addIsochroneLegendMarker(center, `${location.name} · 公交等时圈`);
+    if (marker) overlays.push(marker);
+    if (requestId !== activeIsochroneRequestId || !map.value) return;
+
+    isochroneOverlays = overlays;
+    if (overlays.length) {
+      map.value.add(overlays);
+      map.value.setFitView(overlays, false, [60, 60, 60, 60], 14);
+    } else {
+      ElMessage.warning('未获取到该地点的公交等时圈');
+    }
+  } catch (error) {
+    if (requestId === activeIsochroneRequestId) {
+      ElMessage.error(error instanceof Error ? error.message : '公交等时圈绘制失败');
+    }
+  } finally {
+    if (requestId === activeIsochroneRequestId) {
+      mapOverlayLoading.value = false;
+    }
+  }
+}
+
+function renderIsochrone() {
+  clearIsochroneOverlays();
+  if (!map.value || !amap.value || !isochroneRequest.value || mode.value !== 'isochrone') return;
+
+  const { location, mode: isochroneMode, requestKey } = isochroneRequest.value;
+  const position = locationPosition(location);
+  if (!position) {
+    ElMessage.warning('该地点缺少坐标，无法绘制等时圈');
+    mapOverlayLoading.value = false;
+    return;
+  }
+
+  const requestId = activeIsochroneRequestId;
+  mapOverlayLoadingText.value = '正在绘制等时圈';
+  mapOverlayLoading.value = true;
+  map.value.setZoomAndCenter(locationFocusZoom, position, true, 0);
+
+  if (isochroneMode === 'transit') {
+    void renderTransitIsochrone(location, position, requestId);
+  } else {
+    void renderDrivingIsochrone(location, position, requestId);
+  }
+
+  if (requestKey > 0) {
+    ElMessage.info(`正在绘制「${location.name}」${isochroneMode === 'driving' ? '驾车' : '公交'}等时圈`);
+  }
+}
+
+function renderDistanceRing() {
+  clearDistanceRingOverlays();
+  if (!map.value || !amap.value || !distanceRingRequest.value || mode.value !== 'distance-ring') return;
+
+  const { location, radii } = distanceRingRequest.value;
+  const position = locationPosition(location);
+  if (!position) {
+    ElMessage.warning('该地点缺少坐标，无法绘制等距圈');
+    mapOverlayLoading.value = false;
+    return;
+  }
+
+  mapOverlayLoadingText.value = '正在绘制等距圈';
+  mapOverlayLoading.value = true;
+
+  const overlays: AMapOverlay[] = [];
+  for (const [index, radius] of radii.entries()) {
+    const circle = createDistanceCircle(position, radius, Math.min(index, distanceRingStyles.length - 1));
+    const label = addDistanceRingLabel(position, radius);
+    if (circle) overlays.push(circle);
+    if (label) overlays.push(label);
+  }
+
+  const marker = addIsochroneLegendMarker(position, `${location.name} · 等距圈`);
+  if (marker) overlays.push(marker);
+
+  distanceRingOverlays = overlays;
+  if (overlays.length) {
+    map.value.add(overlays);
+    map.value.setFitView(overlays, false, [60, 60, 60, 60], 14);
+  }
+  window.setTimeout(() => {
+    if (mode.value === 'distance-ring') {
+      mapOverlayLoading.value = false;
+    }
+  }, 150);
 }
 
 function renderPointRoute() {
@@ -591,6 +988,25 @@ function clearSearchResults() {
   mapStore.clearHouseSearchResults();
 }
 
+function closeActiveMapControl() {
+  if (isSearchResultMode.value) {
+    clearSearchResults();
+    return;
+  }
+
+  if (isIsochroneMode.value) {
+    mapStore.clearIsochrone();
+    return;
+  }
+
+  if (isDistanceRingMode.value) {
+    mapStore.clearDistanceRing();
+    return;
+  }
+
+  clearRoute();
+}
+
 function showRouteByHouseId(houseId: string) {
   return mapStore.showRoute(houseId);
 }
@@ -632,6 +1048,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.clearTimeout(boundsTimer);
   resizeObserver?.disconnect();
+  clearIsochroneOverlays();
+  clearDistanceRingOverlays();
   map.value?.destroy();
 });
 
@@ -646,6 +1064,9 @@ watch(
     }
     if (applyInitialFocusLocation()) {
       emitBounds();
+    }
+    if (isDistanceRingMode.value) {
+      renderDistanceRing();
     }
   },
   { deep: true }
@@ -695,6 +1116,24 @@ watch(
   }
 );
 
+watch(
+  [mode, isochroneRequest],
+  () => {
+    if (!map.value || !amap.value) return;
+    renderIsochrone();
+  },
+  { deep: true }
+);
+
+watch(
+  [mode, distanceRingRequest],
+  () => {
+    if (!map.value || !amap.value) return;
+    renderDistanceRing();
+  },
+  { deep: true }
+);
+
 defineExpose({
   resize: resizeMap,
   fitView,
@@ -710,7 +1149,12 @@ defineExpose({
 </script>
 
 <template>
-  <section class="map-panel">
+  <section
+    v-loading="mapOverlayLoading"
+    class="map-panel"
+    :element-loading-text="mapOverlayLoadingText"
+    element-loading-background="rgb(255 255 255 / 72%)"
+  >
     <div v-if="loadError" class="map-empty">
       <el-icon><LocationIcon /></el-icon>
       <strong>高德地图未就绪</strong>
@@ -729,6 +1173,13 @@ defineExpose({
         </el-collapse>
       </template>
     </MapPointRoutePanel>
+    <div v-if="ringLegend" class="map-ring-legend" @click.stop>
+      <strong>{{ ringLegend.title }}</strong>
+      <div v-for="item in ringLegend.items" :key="item.label" class="map-ring-legend-item">
+        <span class="map-ring-legend-swatch" :style="{ borderColor: item.color, backgroundColor: item.color }" />
+        <span>{{ item.label }}</span>
+      </div>
+    </div>
     <div
       v-if="contextMenu.visible"
       class="map-context-menu"
@@ -746,18 +1197,11 @@ defineExpose({
       </button>
     </div>
     <button
-      v-if="mode === 'point-route' || scheduleRoutePlan"
-      class="map-panel-close-btn map-clear-route-btn"
-      title="关闭路线"
-      @click.stop="clearRoute"
-    >
-      <el-icon><Close /></el-icon>
-    </button>
-    <button
-      v-if="isSearchResultMode"
-      class="map-panel-close-btn map-clear-search-results-btn"
-      title="退出搜索结果"
-      @click.stop="clearSearchResults"
+      v-if="activeCloseControl"
+      class="map-panel-close-btn"
+      :class="`map-panel-close-btn--${activeCloseControl.placement}`"
+      :title="activeCloseControl.title"
+      @click.stop="closeActiveMapControl"
     >
       <el-icon><Close /></el-icon>
     </button>

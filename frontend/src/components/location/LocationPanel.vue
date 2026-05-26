@@ -2,6 +2,7 @@
 import { Aim, Delete, Edit, Plus } from '@element-plus/icons-vue';
 import type { Location } from '../../model/location/location';
 import { locationCategoryLabels } from '../../model/location/location';
+import { useMapStore, type IsochroneMode } from '../../stores/mapStore';
 
 defineProps<{
   locations: Location[];
@@ -14,6 +15,12 @@ const emit = defineEmits<{
   delete: [location: Location];
   'set-focus': [location: Location];
 }>();
+
+const mapStore = useMapStore();
+
+function showIsochrone(location: Location, mode: IsochroneMode) {
+  mapStore.showIsochrone(location, mode);
+}
 </script>
 
 <template>
@@ -36,6 +43,28 @@ const emit = defineEmits<{
             </div>
           </div>
           <div class="house-card-actions">
+            <el-dropdown
+              v-if="location.longitude !== undefined && location.latitude !== undefined"
+              trigger="click"
+              @command="(mode: IsochroneMode) => showIsochrone(location, mode)"
+            >
+              <el-button link type="success" :icon="Aim">等时圈</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="driving">驾车 10/20/30 分钟</el-dropdown-item>
+                  <el-dropdown-item command="transit">公交 10/20/30 分钟</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button
+              v-if="location.longitude !== undefined && location.latitude !== undefined"
+              link
+              type="success"
+              :icon="Aim"
+              @click="mapStore.showDistanceRing(location)"
+            >
+              等距圈
+            </el-button>
             <el-button v-if="!location.isFocus" link type="warning" :icon="Aim" @click="emit('set-focus', location)">设为焦点</el-button>
             <el-button link type="primary" :icon="Edit" @click="emit('edit', location)">编辑</el-button>
             <el-button link type="danger" :icon="Delete" @click="emit('delete', location)">删除</el-button>
