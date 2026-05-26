@@ -8,6 +8,8 @@ export interface ConfigData {
   amapWebServiceKey: string;
   viteAmapJsKey: string;
   viteAmapSecurityJsCode: string;
+  monthlyWaterUsage: number;
+  monthlyElectricityUsage: number;
 }
 
 export function fetchConfig() {

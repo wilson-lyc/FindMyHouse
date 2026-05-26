@@ -19,7 +19,9 @@ const defaultConfig: ConfigData = {
   openaiTemperature: 0.7,
   amapWebServiceKey: '',
   viteAmapJsKey: '',
-  viteAmapSecurityJsCode: ''
+  viteAmapSecurityJsCode: '',
+  monthlyWaterUsage: 0,
+  monthlyElectricityUsage: 0
 };
 
 const form = reactive<ConfigData>({ ...defaultConfig });
@@ -57,6 +59,8 @@ function applyConfig(data: Partial<ConfigData>) {
   form.amapWebServiceKey = data.amapWebServiceKey || defaultConfig.amapWebServiceKey;
   form.viteAmapJsKey = data.viteAmapJsKey || defaultConfig.viteAmapJsKey;
   form.viteAmapSecurityJsCode = data.viteAmapSecurityJsCode || defaultConfig.viteAmapSecurityJsCode;
+  form.monthlyWaterUsage = data.monthlyWaterUsage ?? defaultConfig.monthlyWaterUsage;
+  form.monthlyElectricityUsage = data.monthlyElectricityUsage ?? defaultConfig.monthlyElectricityUsage;
 }
 
 async function loadConfig() {
@@ -83,7 +87,9 @@ async function submit() {
       openaiTemperature: form.openaiTemperature,
       amapWebServiceKey: form.amapWebServiceKey.trim(),
       viteAmapJsKey: form.viteAmapJsKey.trim(),
-      viteAmapSecurityJsCode: form.viteAmapSecurityJsCode.trim()
+      viteAmapSecurityJsCode: form.viteAmapSecurityJsCode.trim(),
+      monthlyWaterUsage: form.monthlyWaterUsage,
+      monthlyElectricityUsage: form.monthlyElectricityUsage
     });
     ElMessage.success('设置已保存');
   } catch (error) {
@@ -163,6 +169,33 @@ onMounted(loadConfig);
                     type="password"
                     show-password
                     placeholder="输入高德 Security JS Code"
+                  />
+                </el-form-item>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <h2>居家用量</h2>
+              </div>
+
+              <div class="settings-grid">
+                <el-form-item label="预估每月用水量（吨）" prop="monthlyWaterUsage">
+                  <el-input-number
+                    v-model="form.monthlyWaterUsage"
+                    :min="0"
+                    :step="1"
+                    :precision="0"
+                    style="width: 100%"
+                  />
+                </el-form-item>
+                <el-form-item label="预估每月用电量（度）" prop="monthlyElectricityUsage">
+                  <el-input-number
+                    v-model="form.monthlyElectricityUsage"
+                    :min="0"
+                    :step="10"
+                    :precision="0"
+                    style="width: 100%"
                   />
                 </el-form-item>
               </div>

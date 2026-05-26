@@ -326,7 +326,7 @@ function timeRiskCount(plan: ScheduleRoutePlan) {
       <el-empty v-if="!loading && !scheduleItems.length" :description="emptyDescription" />
       <div v-else class="schedule-group-list">
         <section v-for="group in groupedSchedules" :key="group.key" class="schedule-group">
-          <div class="schedule-group-header">
+          <div v-if="!hideGroupLabels || focusLocation" class="schedule-group-header">
             <h3 v-if="!hideGroupLabels">{{ group.label }}</h3>
             <el-button
               v-if="focusLocation"
