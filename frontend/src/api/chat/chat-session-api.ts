@@ -1,22 +1,10 @@
 import { deleteData, getData, patchData, postData } from '../http';
-import type { AskSingleChoiceAction } from '../chat/chat-api';
-import type { House } from '../../model/house/house';
-
-export interface PersistedChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  houses?: House[];
-  housesTitle?: string;
-  choicePrompt?: AskSingleChoiceAction & {
-    answeredValue?: string;
-  };
-  hidden?: boolean;
-}
+import type { ChatMessage } from '../../model/chat/chat-message';
 
 export interface ChatSession {
   id: string;
   title: string;
-  messages: PersistedChatMessage[];
+  messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -38,16 +26,16 @@ export function fetchChatSessions() {
   return getData<ChatSessionSummary[]>('/api/chat/sessions');
 }
 
-export function createChatSession(payload: { title?: string; messages?: PersistedChatMessage[] }) {
-  return postData<ChatSession, { title?: string; messages?: PersistedChatMessage[] }>('/api/chat/sessions', payload);
+export function createChatSession(payload: { title?: string; messages?: ChatMessage[] }) {
+  return postData<ChatSession, { title?: string; messages?: ChatMessage[] }>('/api/chat/sessions', payload);
 }
 
 export function fetchChatSession(id: string) {
   return getData<ChatSession>(`/api/chat/sessions/${id}`);
 }
 
-export function updateChatSession(id: string, payload: { title?: string; messages?: PersistedChatMessage[] }) {
-  return patchData<ChatSession, { title?: string; messages?: PersistedChatMessage[] }>(`/api/chat/sessions/${id}`, payload);
+export function updateChatSession(id: string, payload: { title?: string; messages?: ChatMessage[] }) {
+  return patchData<ChatSession, { title?: string; messages?: ChatMessage[] }>(`/api/chat/sessions/${id}`, payload);
 }
 
 export function deleteChatSession(id: string) {
