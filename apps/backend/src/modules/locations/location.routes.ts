@@ -11,15 +11,15 @@ const locationService = new LocationService(
 );
 
 export async function registerLocationRoutes(app: FastifyInstance) {
-  app.get('/api/locations', async (request) => {
+  app.get('/api/locations', async (request, reply) => {
     const filters = listLocationsQuerySchema.parse(request.query);
-    return { data: locationService.listLocations(filters) };
+    return reply.ok(locationService.listLocations(filters));
   });
 
   app.post('/api/locations', async (request, reply) => {
     const input = createLocationSchema.parse(request.body);
     const location = locationService.createLocation(input);
-    return reply.code(201).send({ data: location });
+    return reply.created(location, '地点已创建');
   });
 
   app.get('/api/locations/:id', async (request, reply) => {
@@ -27,10 +27,10 @@ export async function registerLocationRoutes(app: FastifyInstance) {
     const location = locationService.getLocation(id);
 
     if (!location) {
-      return reply.code(404).send({ error: 'Location not found' });
+      return reply.fail({ code: 404, message: '地点不存在', error: 'LOCATION_NOT_FOUND' });
     }
 
-    return { data: location };
+    return reply.ok(location);
   });
 
   app.patch('/api/locations/:id', async (request, reply) => {
@@ -39,10 +39,10 @@ export async function registerLocationRoutes(app: FastifyInstance) {
     const location = locationService.updateLocation(id, input);
 
     if (!location) {
-      return reply.code(404).send({ error: 'Location not found' });
+      return reply.fail({ code: 404, message: '地点不存在', error: 'LOCATION_NOT_FOUND' });
     }
 
-    return { data: location };
+    return reply.ok(location, '地点已更新');
   });
 
   app.patch('/api/locations/:id/focus', async (request, reply) => {
@@ -50,10 +50,10 @@ export async function registerLocationRoutes(app: FastifyInstance) {
     const location = locationService.setFocusLocation(id);
 
     if (!location) {
-      return reply.code(404).send({ error: 'Location not found' });
+      return reply.fail({ code: 404, message: '地点不存在', error: 'LOCATION_NOT_FOUND' });
     }
 
-    return { data: location };
+    return reply.ok(location, '关注地点已更新');
   });
 
   app.delete('/api/locations/:id', async (request, reply) => {
@@ -61,9 +61,9 @@ export async function registerLocationRoutes(app: FastifyInstance) {
     const deleted = locationService.deleteLocation(id);
 
     if (!deleted) {
-      return reply.code(404).send({ error: 'Location not found' });
+      return reply.fail({ code: 404, message: '地点不存在', error: 'LOCATION_NOT_FOUND' });
     }
 
-    return reply.code(204).send();
+    return reply.noContent();
   });
 }

@@ -12,15 +12,15 @@ import { ScheduleService } from './schedule.service.js';
 const scheduleService = new ScheduleService(new ScheduleRepository(db));
 
 export async function registerScheduleRoutes(app: FastifyInstance) {
-  app.get('/api/schedules', async (request) => {
+  app.get('/api/schedules', async (request, reply) => {
     const filters = listSchedulesQuerySchema.parse(request.query);
-    return { data: scheduleService.listSchedules(filters) };
+    return reply.ok(scheduleService.listSchedules(filters));
   });
 
   app.post('/api/schedules', async (request, reply) => {
     const input = createScheduleSchema.parse(request.body);
     const schedule = scheduleService.createSchedule(input);
-    return reply.code(201).send({ data: schedule });
+    return reply.created(schedule, '日程已创建');
   });
 
   app.patch('/api/schedules/:id', async (request, reply) => {
@@ -29,10 +29,10 @@ export async function registerScheduleRoutes(app: FastifyInstance) {
     const schedule = scheduleService.updateSchedule(id, input);
 
     if (!schedule) {
-      return reply.code(404).send({ error: 'Schedule not found' });
+      return reply.fail({ code: 404, message: '日程不存在', error: 'SCHEDULE_NOT_FOUND' });
     }
 
-    return { data: schedule };
+    return reply.ok(schedule, '日程已更新');
   });
 
   app.delete('/api/schedules/:id', async (request, reply) => {
@@ -40,9 +40,9 @@ export async function registerScheduleRoutes(app: FastifyInstance) {
     const deleted = scheduleService.deleteSchedule(id);
 
     if (!deleted) {
-      return reply.code(404).send({ error: 'Schedule not found' });
+      return reply.fail({ code: 404, message: '日程不存在', error: 'SCHEDULE_NOT_FOUND' });
     }
 
-    return reply.code(204).send();
+    return reply.noContent();
   });
 }

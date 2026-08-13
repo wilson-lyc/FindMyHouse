@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { mkdirSync } from 'node:fs';
 import { registerErrorHandler } from './error-handler.js';
+import { registerReplyHelpers } from './response.js';
 import { registerHealthRoutes } from '../routes/health.routes.js';
 import { registerConfigRoutes } from '../modules/config/config.routes.js';
 import { registerHouseRoutes } from '../modules/houses/house.routes.js';
@@ -37,6 +38,7 @@ export async function createApp() {
     prefix: `${uploadsUrlPrefix}/`
   });
 
+  registerReplyHelpers(app);
   registerErrorHandler(app);
 
   await registerHealthRoutes(app);

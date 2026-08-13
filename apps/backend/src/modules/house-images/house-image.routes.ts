@@ -18,17 +18,21 @@ export async function registerHouseImageRoutes(app: FastifyInstance) {
     const images = houseImageService.listHouseImages(houseId);
 
     if (!images) {
-      return reply.code(404).send({ error: 'House not found' });
+      return reply.fail({ code: 404, message: '房源不存在', error: 'HOUSE_NOT_FOUND' });
     }
 
-    return { data: images.map(toPublicHouseImage) };
+    return reply.ok(images.map(toPublicHouseImage));
   });
 
   app.post('/api/houses/:houseId/images', async (request, reply) => {
     const { houseId } = houseImageParamsSchema.parse(request.params);
 
     if (!request.isMultipart()) {
-      return reply.code(400).send({ error: 'Expected multipart/form-data' });
+      return reply.fail({
+        code: 400,
+        message: '请求格式应为 multipart/form-data',
+        error: 'UNSUPPORTED_MEDIA_TYPE'
+      });
     }
 
     const images = await houseImageService.uploadHouseImages(houseId, request.files()).catch((error: unknown) => {
@@ -40,14 +44,14 @@ export async function registerHouseImageRoutes(app: FastifyInstance) {
     });
 
     if (images instanceof UnsupportedHouseImageError || images instanceof NoHouseImagesUploadedError) {
-      return reply.code(400).send({ error: images.message });
+      return reply.fail({ code: 400, message: images.message, error: 'IMAGE_UPLOAD_FAILED' });
     }
 
     if (!images) {
-      return reply.code(404).send({ error: 'House not found' });
+      return reply.fail({ code: 404, message: '房源不存在', error: 'HOUSE_NOT_FOUND' });
     }
 
-    return reply.code(201).send({ data: images.map(toPublicHouseImage) });
+    return reply.created(images.map(toPublicHouseImage), '图片已上传');
   });
 
   app.delete('/api/houses/:houseId/images/:imageId', async (request, reply) => {
@@ -55,10 +59,10 @@ export async function registerHouseImageRoutes(app: FastifyInstance) {
     const deleted = await houseImageService.deleteImage(houseId, imageId);
 
     if (!deleted) {
-      return reply.code(404).send({ error: 'Image not found' });
+      return reply.fail({ code: 404, message: '图片不存在', error: 'IMAGE_NOT_FOUND' });
     }
 
-    return reply.code(204).send();
+    return reply.noContent();
   });
 
   app.patch('/api/houses/:houseId/images/:imageId', async (request, reply) => {
@@ -67,10 +71,10 @@ export async function registerHouseImageRoutes(app: FastifyInstance) {
     const image = houseImageService.updateImage(houseId, imageId, input);
 
     if (!image) {
-      return reply.code(404).send({ error: 'Image not found' });
+      return reply.fail({ code: 404, message: '图片不存在', error: 'IMAGE_NOT_FOUND' });
     }
 
-    return { data: toPublicHouseImage(image) };
+    return reply.ok(toPublicHouseImage(image), '图片已更新');
   });
 
   app.put('/api/houses/:houseId/images/order', async (request, reply) => {
@@ -79,10 +83,14 @@ export async function registerHouseImageRoutes(app: FastifyInstance) {
     const images = houseImageService.reorderHouseImages(houseId, imageIds);
 
     if (!images) {
-      return reply.code(400).send({ error: 'Image order must include all images for the house' });
+      return reply.fail({
+        code: 400,
+        message: '图片排序必须包含该房源的全部图片',
+        error: 'INVALID_IMAGE_ORDER'
+      });
     }
 
-    return { data: images.map(toPublicHouseImage) };
+    return reply.ok(images.map(toPublicHouseImage), '图片顺序已更新');
   });
 }
 

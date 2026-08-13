@@ -88,10 +88,10 @@ export async function registerMapRoutes(app: FastifyInstance) {
     const result = await amapService.geocode(input.address, input.city);
 
     if (!result) {
-      return reply.code(404).send({ error: 'Address not found' });
+      return reply.fail({ code: 404, message: '未找到该地址', error: 'ADDRESS_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
   app.post('/api/maps/reverse-geocode', async (request, reply) => {
@@ -99,10 +99,10 @@ export async function registerMapRoutes(app: FastifyInstance) {
     const result = await amapService.reverseGeocode(input.longitude, input.latitude);
 
     if (!result) {
-      return reply.code(404).send({ error: 'Coordinates not found' });
+      return reply.fail({ code: 404, message: '未找到该坐标对应的地址', error: 'COORDINATES_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
   app.post('/api/maps/driving-distance', async (request, reply) => {
@@ -110,10 +110,10 @@ export async function registerMapRoutes(app: FastifyInstance) {
     const result = await getCachedDrivingDistance(input.origin, input.destination);
 
     if (!result) {
-      return reply.code(404).send({ error: 'Route not found' });
+      return reply.fail({ code: 404, message: '未找到驾车路线', error: 'ROUTE_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
   app.post('/api/maps/driving-route', async (request, reply) => {
@@ -121,10 +121,10 @@ export async function registerMapRoutes(app: FastifyInstance) {
     const result = await getCachedDrivingRoute(input.origin, input.destination);
 
     if (!result) {
-      return reply.code(404).send({ error: 'Route not found' });
+      return reply.fail({ code: 404, message: '未找到驾车路线', error: 'ROUTE_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
   app.post('/api/maps/commute-distance', async (request, reply) => {
@@ -136,10 +136,10 @@ export async function registerMapRoutes(app: FastifyInstance) {
     );
 
     if (!result) {
-      return reply.code(404).send({ error: 'Route not found' });
+      return reply.fail({ code: 404, message: '未找到通勤路线', error: 'ROUTE_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
   app.post('/api/maps/commute-route', async (request, reply) => {
@@ -151,16 +151,16 @@ export async function registerMapRoutes(app: FastifyInstance) {
     );
 
     if (!result) {
-      return reply.code(404).send({ error: 'Route not found' });
+      return reply.fail({ code: 404, message: '未找到通勤路线', error: 'ROUTE_NOT_FOUND' });
     }
 
-    return { data: result };
+    return reply.ok(result);
   });
 
-  app.post('/api/maps/isochrone', async (request) => {
+  app.post('/api/maps/isochrone', async (request, reply) => {
     const input = isochroneSchema.parse(request.body);
     const result = await amapService.getTransitIsochrone(input.longitude, input.latitude, input.minutes);
 
-    return { data: result };
+    return reply.ok(result);
   });
 }

@@ -19,13 +19,13 @@ const dataTransferService = new DataTransferService(
 );
 
 export async function registerDataTransferRoutes(app: FastifyInstance) {
-  app.get('/api/data/export', async (request) => {
+  app.get('/api/data/export', async (request, reply) => {
     const { scope } = exportDataQuerySchema.parse(request.query);
-    return { data: dataTransferService.exportData(scope) };
+    return reply.ok(dataTransferService.exportData(scope));
   });
 
-  app.post('/api/data/import', async (request) => {
+  app.post('/api/data/import', async (request, reply) => {
     const input = importDataSchema.parse(request.body);
-    return { data: { imported: dataTransferService.importData(input) } };
+    return reply.ok({ imported: dataTransferService.importData(input) }, '数据导入完成');
   });
 }

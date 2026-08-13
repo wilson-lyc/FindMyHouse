@@ -12,14 +12,14 @@ const agentService = new AgentService();
 const chatSessionRepository = new ChatSessionRepository(db);
 
 export async function registerAgentRoutes(app: FastifyInstance) {
-  app.get('/api/chat/sessions', async () => {
-    return { data: chatSessionRepository.list() };
+  app.get('/api/chat/sessions', async (_request, reply) => {
+    return reply.ok(chatSessionRepository.list());
   });
 
   app.post('/api/chat/sessions', async (request, reply) => {
     const input = createChatSessionSchema.parse(request.body);
     const session = chatSessionRepository.create(input);
-    return reply.code(201).send({ data: session });
+    return reply.created(session, '会话已创建');
   });
 
   app.get('/api/chat/sessions/:id', async (request, reply) => {
@@ -27,10 +27,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const session = chatSessionRepository.findById(id);
 
     if (!session) {
-      return reply.code(404).send({ error: 'Chat session not found' });
+      return reply.fail({ code: 404, message: '会话不存在', error: 'CHAT_SESSION_NOT_FOUND' });
     }
 
-    return { data: session };
+    return reply.ok(session);
   });
 
   app.patch('/api/chat/sessions/:id', async (request, reply) => {
@@ -39,10 +39,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const session = chatSessionRepository.update(id, input);
 
     if (!session) {
-      return reply.code(404).send({ error: 'Chat session not found' });
+      return reply.fail({ code: 404, message: '会话不存在', error: 'CHAT_SESSION_NOT_FOUND' });
     }
 
-    return { data: session };
+    return reply.ok(session, '会话已更新');
   });
 
   app.delete('/api/chat/sessions/:id', async (request, reply) => {
@@ -50,25 +50,25 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const deleted = chatSessionRepository.delete(id);
 
     if (!deleted) {
-      return reply.code(404).send({ error: 'Chat session not found' });
+      return reply.fail({ code: 404, message: '会话不存在', error: 'CHAT_SESSION_NOT_FOUND' });
     }
 
-    return reply.code(204).send();
+    return reply.noContent();
   });
 
-  app.post('/api/chat/sessions/batch-delete', async (request) => {
+  app.post('/api/chat/sessions/batch-delete', async (request, reply) => {
     const { ids } = deleteChatSessionsSchema.parse(request.body);
     const deletedCount = chatSessionRepository.deleteMany(ids);
-    return { data: { deletedCount } };
+    return reply.ok({ deletedCount }, '批量删除完成');
   });
 
   app.post('/api/chat', async (request, reply) => {
     const { messages } = agentMessageSchema.parse(request.body);
     const result = await agentService.chat(messages);
-    return { data: result };
+    return reply.ok(result);
   });
 
-  app.post('/api/chat/debug', async (request) => {
+  app.post('/api/chat/debug', async (request, reply) => {
     const { messages } = agentMessageSchema.parse(request.body);
     const llm = getLlm();
     const langchainMessages = [
@@ -79,13 +79,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       new HumanMessage(messages[messages.length - 1].content),
     ];
     const response = await llm.invoke(langchainMessages);
-    return {
-      data: {
-        content: typeof response.content === 'string' ? response.content : JSON.stringify(response.content),
-        additional_kwargs: response.additional_kwargs,
-        response_metadata: response.response_metadata,
-        tool_calls: response.tool_calls,
-      }
-    };
+    return reply.ok({
+      content: typeof response.content === 'string' ? response.content : JSON.stringify(response.content),
+      additional_kwargs: response.additional_kwargs,
+      response_metadata: response.response_metadata,
+      tool_calls: response.tool_calls,
+    });
   });
 }

@@ -3,18 +3,16 @@ import { configService } from './index.js';
 import { configDataSchema } from './config.schema.js';
 
 export async function registerConfigRoutes(app: FastifyInstance) {
-  app.get('/api/config', async () => {
-    return {
-      data: {
-        openaiBaseUrl: configService.getOpenaiBaseUrl() ?? '',
-        openaiApiKey: configService.getOpenaiApiKey() ?? '',
-        openaiModel: configService.getOpenaiModel(),
-        openaiTemperature: configService.getOpenaiTemperature(),
-        amapWebServiceKey: configService.getAmapWebServiceKey() ?? '',
-        viteAmapJsKey: configService.getViteAmapJsKey() ?? '',
-        viteAmapSecurityJsCode: configService.getViteAmapSecurityJsCode() ?? '',
-      },
-    };
+  app.get('/api/config', async (_request, reply) => {
+    return reply.ok({
+      openaiBaseUrl: configService.getOpenaiBaseUrl() ?? '',
+      openaiApiKey: configService.getOpenaiApiKey() ?? '',
+      openaiModel: configService.getOpenaiModel(),
+      openaiTemperature: configService.getOpenaiTemperature(),
+      amapWebServiceKey: configService.getAmapWebServiceKey() ?? '',
+      viteAmapJsKey: configService.getViteAmapJsKey() ?? '',
+      viteAmapSecurityJsCode: configService.getViteAmapSecurityJsCode() ?? '',
+    });
   });
 
   app.post('/api/config', async (request, reply) => {
@@ -26,6 +24,6 @@ export async function registerConfigRoutes(app: FastifyInstance) {
     configService.set('AMAP_WEB_SERVICE_KEY', input.amapWebServiceKey);
     configService.set('VITE_AMAP_JS_KEY', input.viteAmapJsKey);
     configService.set('VITE_AMAP_SECURITY_JS_CODE', input.viteAmapSecurityJsCode);
-    return reply.code(200).send({ data: { ok: true } });
+    return reply.ok({ ok: true }, '配置已保存');
   });
 }
