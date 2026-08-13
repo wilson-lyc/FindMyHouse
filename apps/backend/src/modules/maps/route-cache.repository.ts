@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { CommuteDistanceResult, CommuteMode } from './amap.service.js';
+import type { CommuteDistanceResult, CommuteMode } from '@findmyhouse/contracts';
 
 export type RouteCacheKind = 'distance';
 

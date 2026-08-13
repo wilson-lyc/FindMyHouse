@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
-import type { House } from './domain/house.js';
-import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema, validateCreateHouse, validateUpdateHouse } from './dto/house.schema.js';
+import type { House } from '@findmyhouse/contracts';
+import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema, validateCreateHouse, validateUpdateHouse } from '@findmyhouse/contracts';
 import { HouseRepository } from './house.repository.js';
 import { HouseService } from './house.service.js';
 

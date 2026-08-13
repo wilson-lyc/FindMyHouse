@@ -1,12 +1,6 @@
-export interface Schedule {
-  id: string;
-  houseId: string;
-  viewingAt: string;
-  note?: string;
-  houseName?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Schedule } from '@findmyhouse/contracts';
+
+export type { Schedule };
 
 export interface ScheduleForm {
   houseId: string;

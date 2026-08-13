@@ -5,8 +5,8 @@ import {
   houseImageParamsSchema,
   reorderHouseImagesSchema,
   updateHouseImageSchema
-} from './dto/house-image.schema.js';
-import type { HouseImage } from './domain/house-image.js';
+} from '@findmyhouse/contracts';
+import type { HouseImage } from '@findmyhouse/contracts';
 import { HouseImageRepository } from './house-image.repository.js';
 import { HouseImageService, NoHouseImagesUploadedError, UnsupportedHouseImageError } from './house-image.service.js';
 

@@ -1,5 +1,5 @@
-import type { Location, LocationCategory } from './domain/location.js';
-import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { Location, LocationCategory } from '@findmyhouse/contracts';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from '@findmyhouse/contracts';
 
 export interface LocationRow {
   id: string;

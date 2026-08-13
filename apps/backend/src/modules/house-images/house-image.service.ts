@@ -5,7 +5,7 @@ import { basename, extname, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { MultipartFile } from '@fastify/multipart';
 import sharp from 'sharp';
-import type { HouseImage } from './domain/house-image.js';
+import type { HouseImage } from '@findmyhouse/contracts';
 import type { HouseImageRepository } from './house-image.repository.js';
 import { houseImageUploadsRoot, toHouseImageUrl } from './house-image.storage.js';
 

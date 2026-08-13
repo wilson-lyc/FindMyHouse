@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { tool } from '@langchain/core/tools';
-import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters, type HouseStatus } from '../houses/domain/house.js';
-import { createHouseSchema, idParamsSchema, listHousesQuerySchema, validateCreateHouse, validateDeleteHouse, validateUpdateHouse } from '../houses/dto/house.schema.js';
+import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters, type HouseStatus } from '@findmyhouse/contracts';
+import { createHouseSchema, idParamsSchema, listHousesQuerySchema, validateCreateHouse, validateDeleteHouse, validateUpdateHouse } from '@findmyhouse/contracts';
 import type { HouseRepository } from '../houses/house.repository.js';
 import type { AmapService } from '../maps/amap.service.js';
 
@@ -601,7 +601,7 @@ function deleteHouse(params: Record<string, unknown>, { houseRepository }: Agent
     };
   }
 
-  const house = houseRepository.findById(validation.id);
+  const house = houseRepository.findById(validation.data.id);
 
   if (!house) {
     return {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { HouseImage } from './domain/house-image.js';
+import type { HouseImage } from '@findmyhouse/contracts';
 import { toHouseImage, type HouseImageRow } from './house-image.mapper.js';
 
 export interface CreateHouseImageInput {

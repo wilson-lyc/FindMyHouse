@@ -1,5 +1,5 @@
-import type { House, HouseFilters } from './domain/house.js';
-import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
+import type { House, HouseFilters } from '@findmyhouse/contracts';
+import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from '@findmyhouse/contracts';
 import type { HouseRepository } from './house.repository.js';
 
 export class HouseService {

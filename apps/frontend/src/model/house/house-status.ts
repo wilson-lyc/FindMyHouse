@@ -1,4 +1,8 @@
-import type { HouseStatus } from './house';
+import type { HouseStatus } from '@findmyhouse/contracts';
+import { houseStatuses } from '@findmyhouse/contracts';
+
+export { houseStatuses };
+export type { HouseStatus };
 
 export const statusLabels: Record<HouseStatus, string> = {
   watching: '观望中',

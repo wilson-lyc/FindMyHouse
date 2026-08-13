@@ -8,7 +8,7 @@ import { LocationService } from '../locations/location.service.js';
 import { RouteCacheRepository } from '../maps/route-cache.repository.js';
 import { ScheduleRepository } from '../schedules/schedule.repository.js';
 import { ScheduleService } from '../schedules/schedule.service.js';
-import { exportDataQuerySchema, importDataSchema } from './data-transfer.schema.js';
+import { exportDataQuerySchema, importDataSchema } from '@findmyhouse/contracts';
 import { DataTransferService } from './data-transfer.service.js';
 
 const dataTransferService = new DataTransferService(

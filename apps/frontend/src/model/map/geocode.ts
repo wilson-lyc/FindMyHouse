@@ -1,44 +1,26 @@
-export type CommuteMode = 'driving' | 'transit' | 'cycling' | 'walking';
+import type {
+  CommuteMode,
+  GeocodeResult,
+  CommuteDistanceResult,
+  CommuteRouteResult,
+  IsochroneRing,
+  IsochroneResult
+} from '@findmyhouse/contracts';
+import { commuteModes } from '@findmyhouse/contracts';
 
-export interface GeocodeResult {
-  provider: 'amap';
-  formattedAddress: string;
-  latitude: number;
-  longitude: number;
-  province?: string;
-  city?: string;
-  district?: string;
-}
+export {
+  commuteModes
+};
+export type {
+  CommuteMode,
+  GeocodeResult,
+  CommuteDistanceResult,
+  CommuteRouteResult,
+  IsochroneRing,
+  IsochroneResult
+};
 
 export type ReverseGeocodeResult = GeocodeResult;
-
-export interface CommuteDistanceResult {
-  origin: string;
-  destination: string;
-  distance: number;
-  duration: number;
-  mode: CommuteMode;
-}
-
-export interface CommuteRouteResult {
-  origin: string;
-  destination: string;
-  distance: number;
-  duration: number;
-  polyline?: Array<[number, number]>;
-  mode: CommuteMode;
-}
-
-export interface IsochroneRing {
-  minutes: number;
-  path: Array<[number, number]>;
-}
-
-export interface IsochroneResult {
-  center: [number, number];
-  mode: 'transit';
-  rings: IsochroneRing[];
-}
 
 // 向后兼容别名
 export type DrivingDistanceResult = CommuteDistanceResult;

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { Location, LocationFilters } from './domain/location.js';
-import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { Location, LocationFilters } from '@findmyhouse/contracts';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from '@findmyhouse/contracts';
 import { toLocation, toLocationRowParams, type LocationRow } from './location.mapper.js';
 
 export class LocationRepository {

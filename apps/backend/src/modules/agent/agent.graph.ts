@@ -6,7 +6,7 @@ import { getLlm } from '../langchain/llm.js';
 import { db } from '../../database/connection.js';
 import { HouseRepository } from '../houses/house.repository.js';
 import { AmapService } from '../maps/amap.service.js';
-import type { House } from '../houses/domain/house.js';
+import type { House } from '@findmyhouse/contracts';
 import type { AgentFrontendAction, ToolResult } from './agent.tools.js';
 import { createAgentTools, toolGroups } from './agent.tools.js';
 import {

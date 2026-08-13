@@ -1,5 +1,4 @@
-import type { Schedule, ScheduleFilters } from './domain/schedule.js';
-import type { CreateScheduleInput, UpdateScheduleInput } from './dto/schedule.schema.js';
+import type { Schedule, ScheduleFilters, CreateScheduleInput, UpdateScheduleInput } from '@findmyhouse/contracts';
 import { type ImportScheduleInput, ScheduleRepository } from './schedule.repository.js';
 
 export class ScheduleService {

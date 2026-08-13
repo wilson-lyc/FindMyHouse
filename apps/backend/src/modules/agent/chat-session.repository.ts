@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { ChatSessionMessage, CreateChatSessionInput, UpdateChatSessionInput } from './chat-session.schema.js';
+import type { ChatSessionMessage, CreateChatSessionInput, UpdateChatSessionInput } from '@findmyhouse/contracts';
 
 export interface ChatSession {
   id: string;

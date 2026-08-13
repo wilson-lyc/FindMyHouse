@@ -1,4 +1,4 @@
-import type { HouseImage } from './domain/house-image.js';
+import type { HouseImage } from '@findmyhouse/contracts';
 
 export interface HouseImageRow {
   id: string;

@@ -1,5 +1,5 @@
 import { AIMessage, BaseMessage } from '@langchain/core/messages';
-import type { House } from '../houses/domain/house.js';
+import type { House } from '@findmyhouse/contracts';
 import type { AgentFrontendAction } from './agent.tools.js';
 import { createAgentGraph, getLastAiMessage, responseContentToString, toLangChainMessages } from './agent.graph.js';
 

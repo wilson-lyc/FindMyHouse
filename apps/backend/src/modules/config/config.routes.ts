@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { configService } from './index.js';
-import { configDataSchema } from './config.schema.js';
+import { configDataSchema } from '@findmyhouse/contracts';
 
 export async function registerConfigRoutes(app: FastifyInstance) {
   app.get('/api/config', async (_request, reply) => {

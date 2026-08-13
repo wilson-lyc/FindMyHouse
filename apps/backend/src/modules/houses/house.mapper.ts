@@ -2,13 +2,13 @@ import {
   rentPaymentPeriods,
   type CustomFeeItem,
   type House,
-  type HouseImageItem,
+  type HouseImage,
   type HouseSourceChannel,
   type HouseStatus,
   type RentPaymentPeriod,
   type ViewingScheduleItem
-} from './domain/house.js';
-import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
+} from '@findmyhouse/contracts';
+import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from '@findmyhouse/contracts';
 
 export interface HouseRow {
   id: string;
@@ -48,7 +48,7 @@ export interface ViewingScheduleRow {
   updated_at: string;
 }
 
-export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[], images?: HouseImageItem[]): House {
+export function toHouse(row: HouseRow, viewingSchedules?: ViewingScheduleItem[], images?: HouseImage[]): House {
   return {
     id: row.id,
     name: row.name,

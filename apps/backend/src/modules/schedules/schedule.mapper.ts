@@ -1,4 +1,4 @@
-import type { Schedule } from './domain/schedule.js';
+import type { Schedule } from '@findmyhouse/contracts';
 
 export interface ScheduleRow {
   id: string;

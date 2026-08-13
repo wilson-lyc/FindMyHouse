@@ -5,7 +5,7 @@ import {
   idParamsSchema,
   listSchedulesQuerySchema,
   updateScheduleSchema
-} from './dto/schedule.schema.js';
+} from '@findmyhouse/contracts';
 import { ScheduleRepository } from './schedule.repository.js';
 import { ScheduleService } from './schedule.service.js';
 

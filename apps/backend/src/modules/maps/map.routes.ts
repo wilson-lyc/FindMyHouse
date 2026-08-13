@@ -7,11 +7,11 @@ import {
   commuteDistanceSchema,
   commuteRouteSchema,
   isochroneSchema
-} from './dto/map.schema.js';
+} from '@findmyhouse/contracts';
 import { AmapService, type CommuteDistanceResult, type CommuteRouteResult, type CommuteMode } from './amap.service.js';
 import { RouteCacheRepository } from './route-cache.repository.js';
 import { LocationRepository } from '../locations/location.repository.js';
-import type { Location } from '../locations/domain/location.js';
+import type { Location } from '@findmyhouse/contracts';
 
 const amapService = new AmapService();
 const routeCacheRepository = new RouteCacheRepository(db);

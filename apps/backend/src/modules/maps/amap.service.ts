@@ -1,6 +1,7 @@
 import { configService } from '../config/index.js';
+import type { CommuteMode, GeocodeResult, CommuteDistanceResult, CommuteRouteResult, IsochroneRing, IsochroneResult } from '@findmyhouse/contracts';
 
-export type CommuteMode = 'driving' | 'transit' | 'cycling' | 'walking';
+export type { CommuteMode, GeocodeResult, CommuteDistanceResult, CommuteRouteResult, IsochroneRing, IsochroneResult };
 
 interface AmapGeocodeResponse {
   status: string;
@@ -28,44 +29,7 @@ interface AmapReverseGeocodeResponse {
   };
 }
 
-export interface GeocodeResult {
-  provider: 'amap';
-  formattedAddress: string;
-  latitude: number;
-  longitude: number;
-  province?: string;
-  city?: string;
-  district?: string;
-}
-
-export interface CommuteDistanceResult {
-  origin: string;
-  destination: string;
-  distance: number;
-  duration: number;
-  mode: CommuteMode;
-}
-
-export interface CommuteRouteResult {
-  origin: string;
-  destination: string;
-  distance: number;
-  duration: number;
-  polyline?: Array<[number, number]>;
-  mode: CommuteMode;
-}
-
-export interface IsochroneRing {
-  minutes: number;
-  path: Array<[number, number]>;
-}
-
-export interface IsochroneResult {
-  center: [number, number];
-  mode: 'transit';
-  rings: IsochroneRing[];
-}
-
+// 类型已从 @findmyhouse/contracts 导入并 re-export（见文件顶部）。
 // 向后兼容别名
 export type DrivingDistanceResult = CommuteDistanceResult;
 export type DrivingRouteResult = CommuteRouteResult;

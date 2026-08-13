@@ -1,6 +1,8 @@
-export const locationCategories = ['work', 'school', 'transport', 'common', 'other'] as const;
+import type { Location, LocationCategory, LocationFilters as ContractLocationFilters } from '@findmyhouse/contracts';
+import { locationCategories } from '@findmyhouse/contracts';
 
-export type LocationCategory = (typeof locationCategories)[number];
+export { locationCategories };
+export type { Location, LocationCategory };
 
 export const locationCategoryLabels: Record<LocationCategory, string> = {
   work: '公司',
@@ -10,21 +12,11 @@ export const locationCategoryLabels: Record<LocationCategory, string> = {
   other: '其他'
 };
 
-export interface Location {
-  id: string;
-  name: string;
-  category: LocationCategory;
-  address: string;
-  latitude?: number;
-  longitude?: number;
-  isFocus: boolean;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type LocationForm = Omit<Location, 'id' | 'createdAt' | 'updatedAt'>;
 
 export interface LocationFilters {
   category: LocationCategory | '';
 }
+
+// 保留契约中的查询筛选结构以备后端查询使用
+export type { ContractLocationFilters };

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { Schedule, ScheduleFilters } from './domain/schedule.js';
-import type { CreateScheduleInput, UpdateScheduleInput } from './dto/schedule.schema.js';
+import type { Schedule, ScheduleFilters, CreateScheduleInput, UpdateScheduleInput } from '@findmyhouse/contracts';
 import { toSchedule, type ScheduleRow } from './schedule.mapper.js';
 
 export interface ImportScheduleInput {

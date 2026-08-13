@@ -1,16 +1,16 @@
-export const houseStatuses = [
-  'watching',
-  'interested',
-  'negotiating',
-  'abandoned',
-  'signed'
-] as const;
+import type {
+  House as ContractHouse,
+  HouseImageItem,
+  HouseStatus,
+  HouseSourceChannel,
+  RentPaymentPeriod,
+  CustomFeeItem,
+  ViewingScheduleItem
+} from '@findmyhouse/contracts';
+import { houseStatuses, houseSourceChannels, rentPaymentPeriods } from '@findmyhouse/contracts';
 
-export type HouseStatus = (typeof houseStatuses)[number];
-
-export const houseSourceChannels = ['beike', 'mini_program', 'anjuke', 'lianjia', 'offline_agent', 'other'] as const;
-
-export type HouseSourceChannel = (typeof houseSourceChannels)[number];
+export { houseStatuses, houseSourceChannels, rentPaymentPeriods };
+export type { HouseStatus, HouseSourceChannel, RentPaymentPeriod, CustomFeeItem, ViewingScheduleItem };
 
 export const houseSourceChannelLabels: Record<HouseSourceChannel, string> = {
   beike: '贝壳',
@@ -21,10 +21,6 @@ export const houseSourceChannelLabels: Record<HouseSourceChannel, string> = {
   other: '其他'
 };
 
-export const rentPaymentPeriods = ['monthly', 'quarterly', 'semiannually', 'annually'] as const;
-
-export type RentPaymentPeriod = (typeof rentPaymentPeriods)[number];
-
 export const rentPaymentPeriodLabels: Record<RentPaymentPeriod, string> = {
   monthly: '月付',
   quarterly: '季付',
@@ -32,67 +28,31 @@ export const rentPaymentPeriodLabels: Record<RentPaymentPeriod, string> = {
   annually: '年付'
 };
 
-export interface CustomFeeItem {
-  name: string;
-  amount: number;
+/** 房源图片实体(在契约 HouseImageItem 基础上补充前端展示字段)。 */
+export interface HouseImage extends HouseImageItem {
+  thumbnailUrl?: string;
+  fileName?: string;
 }
 
+/** 看房日程单项(前端表单用)。 */
 export interface ViewingSchedule {
   id: string;
   viewingAt: string;
   note?: string;
 }
 
-export interface HouseImage {
-  id: string;
-  houseId: string;
-  url: string;
-  thumbnailUrl?: string;
-  originalName?: string;
-  fileName?: string;
-  mimeType?: string;
-  size?: number;
-  width?: number;
-  height?: number;
-  sortOrder: number;
-  isCover: boolean;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface House {
-  id: string;
-  name: string;
-  status: HouseStatus;
-  bedroomCount: number;
-  livingRoomCount: number;
-  bathroomCount: number;
-  sourceChannel?: HouseSourceChannel;
-  address: string;
-  latitude?: number;
-  longitude?: number;
-  rentPrice: number;
-  rentPaymentPeriods?: RentPaymentPeriod[];
-  earnestMoney?: number;
-  deposit?: number;
-  propertyFee?: number;
-  waterFeePerTon?: number;
-  electricityFeePerKwh?: number;
-  customFees?: CustomFeeItem[];
-  feeNotes?: string;
-  contactName?: string;
-  phone?: string;
-  wechat?: string;
-  contactNotes?: string;
-  viewingSchedules?: ViewingSchedule[];
+/** 房源实体(响应 DTO)。 */
+export interface House extends ContractHouse {
   images?: HouseImage[];
-  createdAt: string;
-  updatedAt: string;
 }
 
-export type HouseForm = Omit<House, 'id' | 'createdAt' | 'updatedAt' | 'rentPrice' | 'sourceChannel'> & {
+export type HouseForm = Omit<
+  House,
+  'id' | 'createdAt' | 'updatedAt' | 'rentPrice' | 'sourceChannel' | 'viewingSchedules'
+> & {
   rentPrice?: number;
   sourceChannel?: HouseSourceChannel | '' | null;
+  viewingSchedules?: ViewingSchedule[];
 };
 
 export interface HouseFilters {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { House, HouseFilters, HouseImageItem, ViewingScheduleItem } from './domain/house.js';
-import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from './dto/house.schema.js';
+import type { House, HouseFilters, HouseImage, ViewingScheduleItem } from '@findmyhouse/contracts';
+import type { CreateHouseInput, ImportHouseInput, UpdateHouseInput } from '@findmyhouse/contracts';
 import { toHouse, toHouseRowParams, toViewingSchedule, type HouseRow, type ViewingScheduleRow } from './house.mapper.js';
 import { toHouseImage, type HouseImageRow } from '../house-images/house-image.mapper.js';
 
@@ -293,8 +293,8 @@ export class HouseRepository {
     return schedulesByHouseId;
   }
 
-  private findImagesByHouseIds(houseIds: string[]): Map<string, HouseImageItem[]> {
-    const imagesByHouseId = new Map<string, HouseImageItem[]>();
+  private findImagesByHouseIds(houseIds: string[]): Map<string, HouseImage[]> {
+    const imagesByHouseId = new Map<string, HouseImage[]>();
     if (!houseIds.length) {
       return imagesByHouseId;
     }

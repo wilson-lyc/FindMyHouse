@@ -1,11 +1,11 @@
 import type { ConfigService } from '../config/index.js';
-import type { House } from '../houses/domain/house.js';
+import type { House } from '@findmyhouse/contracts';
 import type { HouseService } from '../houses/house.service.js';
-import type { Location } from '../locations/domain/location.js';
+import type { Location } from '@findmyhouse/contracts';
 import type { LocationService } from '../locations/location.service.js';
-import type { Schedule } from '../schedules/domain/schedule.js';
+import type { Schedule } from '@findmyhouse/contracts';
 import type { ScheduleService } from '../schedules/schedule.service.js';
-import type { ExportScope, ImportDataInput } from './data-transfer.schema.js';
+import type { ExportScope, ImportDataInput } from '@findmyhouse/contracts';
 
 interface ExportDataPayload {
   exportedAt: string;

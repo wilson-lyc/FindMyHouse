@@ -1,5 +1,5 @@
-import type { Location, LocationFilters } from './domain/location.js';
-import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from './dto/location.schema.js';
+import type { Location, LocationFilters } from '@findmyhouse/contracts';
+import type { CreateLocationInput, ImportLocationInput, UpdateLocationInput } from '@findmyhouse/contracts';
 import type { LocationRepository } from './location.repository.js';
 import type { RouteCacheRepository } from '../maps/route-cache.repository.js';
 

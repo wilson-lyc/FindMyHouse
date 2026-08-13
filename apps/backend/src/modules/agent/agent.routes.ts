@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { agentMessageSchema } from './agent.schema.js';
+import { agentMessageSchema } from '@findmyhouse/contracts';
 import { AgentService } from './agent.service.js';
 import { getLlm } from '../langchain/llm.js';
 import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import { db } from '../../database/connection.js';
-import { idParamsSchema } from '../houses/dto/house.schema.js';
+import { idParamsSchema } from '@findmyhouse/contracts';
 import { ChatSessionRepository } from './chat-session.repository.js';
-import { createChatSessionSchema, deleteChatSessionsSchema, updateChatSessionSchema } from './chat-session.schema.js';
+import { createChatSessionSchema, deleteChatSessionsSchema, updateChatSessionSchema } from '@findmyhouse/contracts';
 
 const agentService = new AgentService();
 const chatSessionRepository = new ChatSessionRepository(db);
