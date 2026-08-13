@@ -1,0 +1,12 @@
+$:
+  vscode:
+    - runner:
+        cpus: 2
+      docker:
+        image: cnbcool/default-dev-env:latest
+      services:
+        - vscode
+        - docker
+      stages:
+        - name: 配置镜像
+          script: npm config set registry https://mirrors.cloud.tencent.com/npm/
