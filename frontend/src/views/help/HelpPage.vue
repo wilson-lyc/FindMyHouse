@@ -144,9 +144,9 @@ const screenshots = [
         <div class="help-content">
           <section class="help-intro">
             <img class="help-logo" src="/favicon.png" alt="FindMyHouse" />
-            <h2>AI 找房助手</h2>
+            <h2>AI 租房助手</h2>
             <p class="help-intro-text">
-              FindMyHouse 是一个集房源管理、AI 对话、地图可视化和数据统计于一体的找房助手。
+              FindMyHouse 是一个集房源管理、AI 对话、地图可视化和数据统计于一体的租房助手。
               您可以在「对话」页面通过自然语言与 AI 助手交流，或在「房源」页面直接管理数据。
               系统自动计算通勤路线，并提供多维度的统计分析，助您高效决策。
             </p>

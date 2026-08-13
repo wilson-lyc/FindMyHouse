@@ -452,7 +452,7 @@ watch(loading, () => {
       <el-splitter-panel min="160px">
         <div ref="messagesContainerRef" class="chat-messages">
           <div v-if="messages.length === 0" class="chat-empty">
-            <p>你好！我是你的找房助手，有什么可以帮你的吗？</p>
+            <p>你好！我是你的租房助手，有什么可以帮你的吗？</p>
             <p class="chat-hints">
               试试问：<br>
               "帮我找月租5000以下的两居室"<br>

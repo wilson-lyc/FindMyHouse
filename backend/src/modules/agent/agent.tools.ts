@@ -488,7 +488,7 @@ function askUserToChooseNearbyLocation(
   options.push({
     id: 'other-location',
     label: '不是这些地点',
-    value: '我想换一个地点附近找房。',
+    value: '我想换一个地点附近租房。',
   });
 
   return askUser({
