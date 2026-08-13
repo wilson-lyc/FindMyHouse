@@ -7,8 +7,7 @@ import {
   type AgentFrontendAction,
   type ChatMessage as ApiChatMessage,
   type ConfirmCompareHousesResult,
-  type ConfirmCreateHouseResult,
-  type ConfirmCreateLocationResult
+  type ConfirmCreateHouseResult
 } from '../../api/chat/chat-api';
 import ChatMessageItem from './ChatMessageItem.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -19,8 +18,6 @@ import ChatCompareConfirmDialog from './ChatCompareConfirmDialog.vue';
 import { useChatSession } from '../../composables/chat/useChatSession';
 import { useChatShare } from '../../composables/chat/useChatShare';
 import type { House } from '../../model/house/house';
-import type { Location } from '../../model/location/location';
-import { locationCategoryLabels, type LocationCategory } from '../../model/location/location';
 import { statusLabels } from '../../model/house/house-status';
 import { formatCurrency } from '../../lib/format';
 import type { ChatMessage } from '../../model/chat/chat-message';
@@ -47,7 +44,6 @@ const emit = defineEmits<{
   selectHouse: [house: House];
   openHouseCompare: [houses: House[]];
   confirmCreateHouse: [action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>, done: (result: ConfirmCreateHouseResult) => void];
-  confirmCreateLocation: [action: Extract<AgentFrontendAction, { type: 'confirm_create_location' }>, done: (result: ConfirmCreateLocationResult) => void];
 }>();
 
 onMounted(() => {
@@ -163,10 +159,6 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
       continue;
     }
 
-    if (action.type === 'show_location_search_results') {
-      continue;
-    }
-
     if (action.type === 'confirm_create_house') {
       const result = await requestCreateHouseConfirmation(action);
 
@@ -186,18 +178,6 @@ async function executeAgentActions(actions: AgentFrontendAction[]) {
         await runConfirmedComparison(result.houses);
       } else {
         messages.value.push({ role: 'assistant', content: '已取消房源对比。' });
-        await sessionState.persistCurrentSession(messages.value);
-      }
-    }
-
-    if (action.type === 'confirm_create_location') {
-      const result = await requestCreateLocationConfirmation(action);
-
-      if (result.status === 'created') {
-        appendCreatedLocationResponse(result.location);
-        await sessionState.persistCurrentSession(messages.value);
-      } else {
-        messages.value.push({ role: 'assistant', content: '已取消新增地点。' });
         await sessionState.persistCurrentSession(messages.value);
       }
     }
@@ -235,12 +215,6 @@ function submitCustomChoiceAnswer(message: ChatMessage) {
 function requestCreateHouseConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_create_house' }>) {
   return new Promise<ConfirmCreateHouseResult>((resolve) => {
     emit('confirmCreateHouse', action, resolve);
-  });
-}
-
-function requestCreateLocationConfirmation(action: Extract<AgentFrontendAction, { type: 'confirm_create_location' }>) {
-  return new Promise<ConfirmCreateLocationResult>((resolve) => {
-    emit('confirmCreateLocation', action, resolve);
   });
 }
 
@@ -335,12 +309,6 @@ function appendCreatedHouseResponse(house: House) {
   });
 }
 
-function appendCreatedLocationResponse(location: Location) {
-  appendAssistantResponse({
-    reply: createLocationCreatedReply(location)
-  });
-}
-
 function createHouseCreatedReply(house: House) {
   const rows = [
     ['名称', house.name],
@@ -364,24 +332,6 @@ function createHouseCreatedReply(house: House) {
 
   return [
     '房源创建成功，以下是新增房源的信息：',
-    '',
-    '| 项目 | 内容 |',
-    '| --- | --- |',
-    ...rows.map(([label, value]) => `| ${escapeMarkdownTableCell(label)} | ${escapeMarkdownTableCell(value)} |`)
-  ].join('\n');
-}
-
-function createLocationCreatedReply(location: Location) {
-  const rows = [
-    ['名称', location.name],
-    ['地址', location.address],
-    ['分类', locationCategoryLabels[location.category as LocationCategory] ?? location.category],
-    ['焦点地点', location.isFocus ? '是' : '否'],
-    ['备注', location.notes || undefined]
-  ].filter((row): row is [string, string] => Boolean(row[1]));
-
-  return [
-    '地点创建成功，以下是新增地点的信息：',
     '',
     '| 项目 | 内容 |',
     '| --- | --- |',

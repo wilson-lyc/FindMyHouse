@@ -260,7 +260,7 @@ async function submitLocation(form: LocationForm) {
     const savedLocation = await saveLocation(form, editingLocation.value);
 
     if (savedLocation) {
-      locationDialogStore.resolveCreated(savedLocation);
+      locationDialogStore.resolveCreated();
     }
 
     locationDialogStore.close();

@@ -2,50 +2,43 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { tool } from '@langchain/core/tools';
 import { houseSourceChannels, houseStatuses, rentPaymentPeriods, type House, type HouseFilters, type HouseStatus } from '../houses/domain/house.js';
-import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from '../houses/dto/house.schema.js';
-import { locationCategories, type Location } from '../locations/domain/location.js';
-import { createLocationSchema } from '../locations/dto/location.schema.js';
+import { createHouseSchema, idParamsSchema, listHousesQuerySchema, validateCreateHouse, validateDeleteHouse, validateUpdateHouse } from '../houses/dto/house.schema.js';
 import type { HouseRepository } from '../houses/house.repository.js';
-import type { LocationRepository } from '../locations/location.repository.js';
 import type { AmapService } from '../maps/amap.service.js';
 
 export const agentToolNames = [
   'ask_user',
   'search_houses',
-  'search_houses_near_location',
   'get_house',
   'prepare_house_comparison',
   'create_house',
   'update_house',
   'delete_house',
-  'search_locations',
-  'get_location',
-  'create_location',
-  'update_location',
-  'delete_location',
-  'get_focus_location',
 ] as const;
 
+// 按功能职责把工具分成三组，每个 agent 节点只绑定自己的一组，避免无关工具干扰判断。
 export const toolGroups = {
+  // 写操作：新增/修改/删除房源。
   write: [
     'ask_user',
     'search_houses',
     'get_house',
     'create_house',
     'update_house',
-    'search_locations',
-    'get_location',
-    'create_location',
-    'update_location',
+    'delete_house',
   ] as const satisfies readonly string[],
+  // 搜索/查看：查询、筛选、列出售源。
   query: [
     'ask_user',
     'search_houses',
-    'search_houses_near_location',
+    'get_house',
+  ] as const satisfies readonly string[],
+  // 对比：整理候选房源并请用户确认后对比。
+  compare: [
+    'ask_user',
+    'search_houses',
     'get_house',
     'prepare_house_comparison',
-    'search_locations',
-    'get_focus_location',
   ] as const satisfies readonly string[],
 };
 
@@ -63,11 +56,20 @@ export interface ConfirmCreateHouseAction {
   payload: z.infer<typeof createHouseSchema>;
 }
 
-export interface ConfirmCreateLocationAction {
+interface ConfirmUpdateHouseAction {
   id: string;
-  type: 'confirm_create_location';
+  type: 'confirm_update_house';
   title: string;
-  payload: z.infer<typeof createLocationSchema>;
+  houseId: string;
+  payload: House;
+}
+
+interface ConfirmDeleteHouseAction {
+  id: string;
+  type: 'confirm_delete_house';
+  title: string;
+  houseId: string;
+  houseName: string;
 }
 
 export interface ShowHouseSearchResultsAction {
@@ -75,13 +77,6 @@ export interface ShowHouseSearchResultsAction {
   type: 'show_house_search_results';
   title: string;
   houses: House[];
-}
-
-export interface ShowLocationSearchResultsAction {
-  id: string;
-  type: 'show_location_search_results';
-  title: string;
-  locations: Location[];
 }
 
 export interface ConfirmCompareHousesAction {
@@ -106,14 +101,14 @@ export interface AskSingleChoiceAction {
 
 export type AgentFrontendAction =
   | ConfirmCreateHouseAction
-  | ConfirmCreateLocationAction
+  | ConfirmUpdateHouseAction
+  | ConfirmDeleteHouseAction
   | ShowHouseSearchResultsAction
-  | ShowLocationSearchResultsAction
   | ConfirmCompareHousesAction
   | AskSingleChoiceAction;
 
 export interface ToolResult {
-  kind: 'houses' | 'house' | 'locations' | 'mutation' | 'frontend_action' | 'focus_location' | 'empty' | 'invalid_params' | 'unknown_tool';
+  kind: 'houses' | 'house' | 'mutation' | 'frontend_action' | 'empty' | 'invalid_params' | 'unknown_tool';
   content: string;
   houses: House[];
   actions?: AgentFrontendAction[];
@@ -122,7 +117,6 @@ export interface ToolResult {
 
 interface AgentToolContext {
   houseRepository: HouseRepository;
-  locationRepository: LocationRepository;
   amapService: AmapService;
 }
 
@@ -167,18 +161,6 @@ const searchHousesToolSchema = z.object({
   maxLongitude: optionalNumberToolSchema.describe('最大经度'),
   limit: z.number().int().positive().max(100).optional().describe('返回数量限制，默认20'),
 });
-
-const searchHousesNearLocationToolSchema = searchHousesToolSchema
-  .omit({
-    minLatitude: true,
-    maxLatitude: true,
-    minLongitude: true,
-    maxLongitude: true,
-  })
-  .extend({
-    locationName: z.string().trim().min(1).describe('地点名称，例如拱北口岸、公司、学校或已保存地点名称'),
-    radiusKm: z.number().positive().max(50).default(1).describe('搜索半径，单位公里'),
-  });
 
 const houseInputToolSchema = z.object({
   name: z.string().trim().min(1).describe('房源名称'),
@@ -227,31 +209,6 @@ const prepareHouseComparisonToolSchema = z
     message: '至少需要提供两个房源 ID 或名称关键词。',
   });
 
-const searchLocationsToolSchema = z.object({
-  q: z.string().trim().min(1).optional().describe('地点名称或地址关键词'),
-  category: z.enum(locationCategories).optional().describe('地点分类'),
-});
-
-const locationInputToolSchema = z.object({
-  name: z.string().trim().min(1).describe('地点名称'),
-  category: z.enum(locationCategories).optional().describe('地点分类，默认 other'),
-  address: z.string().trim().min(1).describe('地址'),
-  latitude: optionalNumberToolSchema.describe('纬度'),
-  longitude: optionalNumberToolSchema.describe('经度'),
-  isFocus: z.boolean().optional().describe('是否设为焦点地点'),
-  notes: z.string().trim().optional().describe('备注'),
-});
-
-const createLocationToolSchema = locationInputToolSchema;
-
-const updateLocationToolSchema = z.object({
-  id: idParamsSchema.shape.id,
-  data: locationInputToolSchema.partial(),
-});
-
-const deleteLocationToolSchema = idParamsSchema;
-const getLocationToolSchema = idParamsSchema;
-
 const toolDefinitions: Array<{
   name: AgentToolName;
   description: string;
@@ -259,18 +216,11 @@ const toolDefinitions: Array<{
 }> = [
   { name: 'ask_user', description: '当用户信息不足、目标记录不明确或需要用户从候选方案中选择时使用。每次追问必须提供 2-5 个选项，前端会额外提供一个自定义输入选项。', schema: askUserToolSchema },
   { name: 'search_houses', description: '根据 LLM 构建的关键词、租金、户型、状态、来源渠道或坐标范围搜索房源。用户想找、筛选、列出或比较房源时使用；如果用户提到小区、地址、联系人、来源描述或其他文本线索，应先由 LLM 提炼成 q 关键词传入。', schema: searchHousesToolSchema },
-  { name: 'search_houses_near_location', description: '按某个已保存地点附近的距离搜索房源。用户说”某地点附近/周边/N公里内的房子”时使用。如果地点名称是泛称或不完整，例如“口岸”“学校”“公司附近”，工具会先把已保存地点作为选项追问用户，不能替用户直接选择某一个地点。', schema: searchHousesNearLocationToolSchema },
   { name: 'get_house', description: '根据明确的房源 ID 查询单套房源详情。', schema: getHouseToolSchema },
   { name: 'prepare_house_comparison', description: '当用户要求对比房源时优先使用。可以直接传入用户提到的房源名称/关键词（houseNames），例如”人才公寓””保利公寓”；如果已经知道房源 ID，也可以传 houseIds。工具会整理 2-4 套候选房源并让前端弹窗请用户确认，确认后用户会把确认结果作为回调发回来，你再基于确认的房源做对比分析。', schema: prepareHouseComparisonToolSchema },
-  { name: 'create_house', description: '准备新增一套房源并交给前端弹窗让用户确认。必填项与手动创建一致：名称、地址、定位坐标、房租；工具会根据地址获取坐标，缺少名称/地址/房租或无法定位时不能创建。卧室数、客厅数、卫生间数未提供时默认 1。调用后不会直接入库。', schema: createHouseToolSchema },
+  { name: 'create_house', description: '从用户的自然语言里提炼创建房源所需的字段，并进行代码硬编码校验，校验通过后把数据回填成表单交给前端弹窗让用户二次确认；工具本身绝不写数据库。流程：1) 你负责从对话中提炼 name/address/rentPrice 等字段填入本工具；2) 工具用代码严格校验必填项（名称、地址、租金）是否齐全、字段是否合法；3) 不齐全或非法时，工具会精确返回缺失/非法的字段清单，你据此用中文向用户追问补全省量，用户补充后再次调用本工具；4) 校验通过后，工具返回 confirm_create_house 弹窗（含已识别的全部字段），由用户在弹窗中修改错别字/不符项并点击确认，前端再调用统一创建接口入库。卧室数、客厅数、卫生间数未提供时默认 1。', schema: createHouseToolSchema },
   { name: 'update_house', description: '更新一套已存在房源。必须有明确房源 ID 和要更新的字段；如果用户只描述房源名称或特征，先搜索候选房源。', schema: updateHouseToolSchema },
   { name: 'delete_house', description: '删除一套房源。删除不可逆，只有用户明确要求删除且提供明确房源 ID 时使用；否则先搜索或要求确认。', schema: deleteHouseToolSchema },
-  { name: 'search_locations', description: '根据名称、地址关键词或分类搜索已保存地点。用户想找、列出、查看地点，或查询条件里提到不完整地点线索时使用。', schema: searchLocationsToolSchema },
-  { name: 'get_location', description: '根据明确的地点 ID 查询单条地点详情。', schema: getLocationToolSchema },
-  { name: 'create_location', description: '准备新增一个地点并交给前端弹窗让用户确认。必填项：名称、地址；工具会根据地址获取坐标，缺少名称/地址或无法定位时不能创建。调用后不会直接入库。', schema: createLocationToolSchema },
-  { name: 'update_location', description: '更新一个已存在地点。必须有明确地点 ID 和要更新的字段；如果用户只描述地点名称或特征，先搜索候选地点。', schema: updateLocationToolSchema },
-  { name: 'delete_location', description: '删除一个地点。删除不可逆，只有用户明确要求删除且提供明确地点 ID 时使用；否则先搜索或要求确认。', schema: deleteLocationToolSchema },
-  { name: 'get_focus_location', description: '仅当用户明确询问焦点地点在哪里、是什么或要求查询焦点地点时使用。用户创建房源时提到”焦点地点是...”通常只是上下文，不要调用这个工具。', schema: z.object({}) },
 ];
 
 export function createAgentTools(
@@ -318,10 +268,6 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
       return searchHouses(params, context);
     }
 
-    if (toolCall.tool === 'search_houses_near_location') {
-      return searchHousesNearLocation(params, context);
-    }
-
     if (toolCall.tool === 'get_house') {
       return getHouse(params, context);
     }
@@ -340,30 +286,6 @@ export async function runAgentTool(toolCall: AgentToolCall, context: AgentToolCo
 
     if (toolCall.tool === 'delete_house') {
       return deleteHouse(params, context);
-    }
-
-    if (toolCall.tool === 'search_locations') {
-      return searchLocations(params, context);
-    }
-
-    if (toolCall.tool === 'get_location') {
-      return getLocation(params, context);
-    }
-
-    if (toolCall.tool === 'create_location') {
-      return createLocation(params, context);
-    }
-
-    if (toolCall.tool === 'update_location') {
-      return updateLocation(params, context);
-    }
-
-    if (toolCall.tool === 'delete_location') {
-      return deleteLocation(params, context);
-    }
-
-    if (toolCall.tool === 'get_focus_location') {
-      return getFocusLocation(context);
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -409,107 +331,6 @@ function askUser(params: Record<string, unknown>): ToolResult {
     ],
     reply: input.question,
   };
-}
-
-function searchHousesNearLocation(params: Record<string, unknown>, { houseRepository, locationRepository }: AgentToolContext): ToolResult {
-  const { locationName, radiusKm, ...houseFilterParams } = searchHousesNearLocationToolSchema.parse(params);
-  const searchConditions = formatHouseSearchConditions(houseFilterParams, {
-    locationName,
-    radiusKm,
-  });
-  const locations = locationRepository.list({ q: locationName });
-  const exactLocation = findExactLocationMatch(locations, locationName);
-
-  if (!exactLocation && locations.length > 0) {
-    return askUserToChooseNearbyLocation(locations, locationName, radiusKm, houseFilterParams);
-  }
-
-  const location = exactLocation;
-
-  if (!location || location.latitude === undefined || location.longitude === undefined) {
-    return {
-      kind: 'empty',
-      content: '没有找到可用于附近房源搜索的地点。',
-      houses: [],
-      reply: `${searchConditions}\n\n没有找到可用于搜索的地点「${locationName}」，所以暂时无法筛选附近房源。`,
-    };
-  }
-
-  const bounds = createCoordinateBounds(location.latitude, location.longitude, radiusKm);
-  const filters = toolParamsAsSearchFilters({
-    ...houseFilterParams,
-    ...bounds,
-    limit: undefined,
-  });
-  const limit = typeof houseFilterParams.limit === 'number' ? houseFilterParams.limit : undefined;
-  const houses = houseRepository
-    .list(filters)
-    .filter((house) => isHouseWithinRadius(house, location, radiusKm))
-    .slice(0, limit);
-
-  if (houses.length === 0) {
-    return {
-      kind: 'empty',
-      content: '没有找到符合条件的房源。',
-      houses: [],
-      reply: `${searchConditions}\n\n没有找到符合这些条件的房源，建议放宽距离、预算、户型或状态后再试。`,
-    };
-  }
-
-  return {
-    kind: 'houses',
-    content: formatHouseSummary(houses),
-    houses,
-    reply: `${searchConditions}\n\n共有 ${houses.length} 套房源：\n\n${formatHouseSummary(houses)}`,
-    actions: [
-      {
-        id: randomUUID(),
-        type: 'show_house_search_results',
-        title: `找到 ${houses.length} 套房源`,
-        houses,
-      },
-    ],
-  };
-}
-
-function askUserToChooseNearbyLocation(
-  locations: Location[],
-  locationName: string,
-  radiusKm: number,
-  houseFilterParams: Record<string, unknown>
-): ToolResult {
-  const candidateLocations = locations.slice(0, 4);
-  const options = candidateLocations.map((location) => ({
-    id: location.id,
-    label: location.name,
-    value: formatNearbyLocationChoiceValue(location, radiusKm, houseFilterParams),
-  }));
-
-  options.push({
-    id: 'other-location',
-    label: '不是这些地点',
-    value: '我想换一个地点附近租房。',
-  });
-
-  return askUser({
-    title: '确认地点',
-    question: `你说的「${locationName}」是指哪个已保存地点附近？`,
-    options,
-    customOptionLabel: '输入其他地点',
-  });
-}
-
-function formatNearbyLocationChoiceValue(location: Location, radiusKm: number, filters: Record<string, unknown>): string {
-  const constraints = [
-    typeof filters.maxRentPrice === 'number' ? `租金不高于 ${filters.maxRentPrice} 元/月` : undefined,
-    typeof filters.minRentPrice === 'number' ? `租金不低于 ${filters.minRentPrice} 元/月` : undefined,
-    typeof filters.minBedroomCount === 'number' ? `至少 ${filters.minBedroomCount} 个卧室` : undefined,
-    typeof filters.maxBedroomCount === 'number' ? `最多 ${filters.maxBedroomCount} 个卧室` : undefined,
-    typeof filters.q === 'string' && filters.q.trim() ? `关键词是「${filters.q.trim()}」` : undefined,
-  ].filter(Boolean);
-  const constraintText = constraints.length ? `，${constraints.join('，')}` : '';
-
-  return `我想看「${location.name}」附近 ${formatDistanceKm(radiusKm)} 内${constraintText}的房子。`;
 }
 
 function searchHouses(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
@@ -650,12 +471,36 @@ function normalizeSearchText(value: string): string {
     .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
+// 创建房源工具：只负责“从对话提炼字段 + 复用 House 层统一校验 + 回填表单交前端确认”，绝不写库。
+// 校验链：1) 先补默认值，再调用 House 层统一的 validateCreateHouse（确定性代码，单一事实来源，不依赖 AI 判断）；
+//        2) 不齐全/非法 → 返回缺失字段清单，由 agent 引导用户补充，再重新调用；
+//        3) 通过 → 高德定位地址，回填坐标后交前端二次确认弹窗，入库由统一接口完成。
 async function createHouse(params: Record<string, unknown>, { amapService }: AgentToolContext): Promise<ToolResult> {
-  const toolInput = createHouseToolSchema.parse(params);
-  let geocodeResult;
+  const rawInput = createHouseToolSchema.parse(params);
 
+  // 1) 先补默认值，再复用 House 层统一校验函数；手动表单提交也走同一份规则，保证一致性。
+  const normalizedInput = {
+    ...rawInput,
+    bedroomCount: rawInput.bedroomCount ?? 1,
+    livingRoomCount: rawInput.livingRoomCount ?? 1,
+    bathroomCount: rawInput.bathroomCount ?? 1,
+  };
+  const validation = validateCreateHouse(normalizedInput);
+
+  if (!validation.success) {
+    const missing = validation.errors.join('；');
+    return {
+      kind: 'invalid_params',
+      content: `创建房源信息不完整：${missing}`,
+      houses: [],
+      reply: `房源还没创建成功，还缺这些信息：${missing}。麻烦补充一下，我再帮你生成表单。`,
+    };
+  }
+
+  // 2) 地址定位：定位失败属于外部依赖错误，同样反馈给用户补充地址，不静默吞掉。
+  let geocodeResult;
   try {
-    geocodeResult = await amapService.geocode(toolInput.address);
+    geocodeResult = await amapService.geocode(validation.data.address);
   } catch (error) {
     return {
       kind: 'invalid_params',
@@ -668,25 +513,14 @@ async function createHouse(params: Record<string, unknown>, { amapService }: Age
   if (!geocodeResult) {
     return {
       kind: 'invalid_params',
-      content: `无法定位地址：${toolInput.address}`,
+      content: `无法定位地址：${validation.data.address}`,
       houses: [],
-      reply: `房源还没有创建成功：无法定位地址「${toolInput.address}」。请提供更完整的城市、区县、小区或楼栋地址。`,
+      reply: `房源还没有创建成功：无法定位地址「${validation.data.address}」。请提供更完整的城市、区县、小区或楼栋地址。`,
     };
   }
 
-  const normalizedInput = createHouseSchema.parse({
-    ...toolInput,
-    bedroomCount: toolInput.bedroomCount ?? 1,
-    livingRoomCount: toolInput.livingRoomCount ?? 1,
-    bathroomCount: toolInput.bathroomCount ?? 1,
-  });
-
-  const input = createHouseSchema.parse({
-    ...normalizedInput,
-    address: geocodeResult.formattedAddress,
-    latitude: geocodeResult.latitude,
-    longitude: geocodeResult.longitude,
-  });
+  // 3) 校验通过：回填定位后的地址与坐标，交给前端 confirm_create_house 二次确认弹窗。
+  const input = { ...validation.data, address: geocodeResult.formattedAddress, latitude: geocodeResult.latitude, longitude: geocodeResult.longitude };
 
   return {
     kind: 'frontend_action',
@@ -704,29 +538,11 @@ async function createHouse(params: Record<string, unknown>, { amapService }: Age
   };
 }
 
+// 更新房源工具：只负责“提炼字段 + 复用 House 层统一校验 + 回填表单交前端二次确认”，绝不写库。
+// 流程：1) 用 validateUpdateHouse 校验本次提供的字段是否合法；2) 校验通过则合并到现有房源上，
+//       生成完整表单返回 confirm_update_house 弹窗；3) 用户在前端确认后由统一更新接口入库。
 function updateHouse(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
   const { id, data } = updateHouseToolSchema.parse(params);
-  const house = houseRepository.update(id, data);
-
-  if (!house) {
-    return {
-      kind: 'empty',
-      content: '未找到这套房源。',
-      houses: [],
-      reply: '没有找到这套房源，无法更新。',
-    };
-  }
-
-  return {
-    kind: 'mutation',
-    content: formatHouseDetails(house),
-    houses: [house],
-    reply: `已更新房源「${house.name}」。\n${formatHouseDetails(house)}`,
-  };
-}
-
-function deleteHouse(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
-  const { id } = deleteHouseToolSchema.parse(params);
   const house = houseRepository.findById(id);
 
   if (!house) {
@@ -734,206 +550,83 @@ function deleteHouse(params: Record<string, unknown>, { houseRepository }: Agent
       kind: 'empty',
       content: '未找到这套房源。',
       houses: [],
-      reply: '没有找到这套房源，无法删除。',
+      reply: '没有找到这套房源，无法更新。请确认房源名称或 ID 是否正确。',
     };
   }
 
-  houseRepository.delete(id);
+  const validation = validateUpdateHouse(data);
 
-  return {
-    kind: 'mutation',
-    content: `已删除房源：${formatHouseLine(house)}`,
-    houses: [],
-    reply: `已删除房源「${house.name}」。`,
-  };
-}
-
-function getFocusLocation({ locationRepository }: AgentToolContext): ToolResult {
-  const focusLocation = locationRepository.list().find((location) => location.isFocus);
-
-  if (!focusLocation) {
-    return {
-      kind: 'focus_location',
-      content: '当前没有设置焦点地点。',
-      houses: [],
-      reply: '当前没有设置焦点地点。',
-    };
-  }
-
-  return {
-    kind: 'focus_location',
-    content: `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`,
-    houses: [],
-    reply: `焦点地点是「${focusLocation.name}」，地址：${focusLocation.address}`,
-  };
-}
-
-function searchLocations(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
-  const locations = locationRepository.list(searchLocationsToolSchema.parse(params));
-
-  if (locations.length === 0) {
-    return {
-      kind: 'empty',
-      content: '没有找到匹配的地点。',
-      houses: [],
-      reply: '没有找到匹配的地点。',
-    };
-  }
-
-  return {
-    kind: 'locations',
-    content: formatLocationSummary(locations),
-    houses: [],
-    reply: `找到 ${locations.length} 个地点：\n${formatLocationSummary(locations)}`,
-    actions: [
-      {
-        id: randomUUID(),
-        type: 'show_location_search_results',
-        title: `找到 ${locations.length} 个地点`,
-        locations,
-      },
-    ],
-  };
-}
-
-function getLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
-  const { id } = getLocationToolSchema.parse(params);
-  const location = locationRepository.findById(id);
-
-  if (!location) {
-    return {
-      kind: 'empty',
-      content: '未找到这个地点。',
-      houses: [],
-      reply: '没有找到这个地点。',
-    };
-  }
-
-  return {
-    kind: 'house',
-    content: formatLocationDetails(location),
-    houses: [],
-    reply: `找到这个地点：\n${formatLocationDetails(location)}`,
-  };
-}
-
-async function createLocation(params: Record<string, unknown>, { amapService }: AgentToolContext): Promise<ToolResult> {
-  const toolInput = createLocationToolSchema.parse(params);
-  let geocodeResult;
-
-  try {
-    geocodeResult = await amapService.geocode(toolInput.address);
-  } catch (error) {
+  if (!validation.success) {
+    const invalid = validation.errors.join('；');
     return {
       kind: 'invalid_params',
-      content: error instanceof Error ? error.message : '地址定位失败。',
+      content: `更新房源信息不合法：${invalid}`,
       houses: [],
-      reply: '地点还没有创建成功：地址定位失败。请确认地址足够完整，或稍后再试。',
+      reply: `房源还没更新成功，这些字段有问题：${invalid}。麻烦修正后我再帮你提交。`,
     };
   }
 
-  if (!geocodeResult) {
-    return {
-      kind: 'invalid_params',
-      content: `无法定位地址：${toolInput.address}`,
-      houses: [],
-      reply: `地点还没有创建成功：无法定位地址「${toolInput.address}」。请提供更完整的城市、区县、小区或楼栋地址。`,
-    };
-  }
-
-  const input = createLocationSchema.parse({
-    ...toolInput,
-    address: geocodeResult.formattedAddress,
-    latitude: geocodeResult.latitude,
-    longitude: geocodeResult.longitude,
-  });
+  // 把用户提供的字段合并到现有房源上（undefined 的字段不覆盖原值），形成完整表单交前端弹窗确认。
+  const cleanedData = Object.fromEntries(Object.entries(validation.data).filter(([, v]) => v !== undefined));
+  const merged = { ...house, ...cleanedData } as typeof house;
 
   return {
     kind: 'frontend_action',
-    content: formatPendingLocationDetails(input),
+    content: formatHouseDetails(house),
     houses: [],
     actions: [
       {
         id: randomUUID(),
-        type: 'confirm_create_location',
-        title: `确认新增地点「${input.name}」`,
-        payload: input,
+        type: 'confirm_update_house',
+        title: `确认更新房源「${house.name}」`,
+        houseId: house.id,
+        payload: merged,
       },
     ],
-    reply: `我已识别出一个待新增地点，请在弹窗中确认后再入库。`,
+    reply: `我已整理出房源「${house.name}」的待更新内容，请在弹窗中确认或修改。`,
   };
 }
 
-function updateLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
-  const { id, data } = updateLocationToolSchema.parse(params);
-  const location = locationRepository.update(id, data);
+// 删除房源工具：只负责“校验 id + 交前端二次确认”，绝不写库。
+// 流程：1) validateDeleteHouse 校验 id；2) 返回 confirm_delete_house 弹窗；3) 用户确认后由统一删除接口入库。
+function deleteHouse(params: Record<string, unknown>, { houseRepository }: AgentToolContext): ToolResult {
+  const validation = validateDeleteHouse(deleteHouseToolSchema.parse(params).id);
 
-  if (!location) {
+  if (!validation.success) {
+    return {
+      kind: 'invalid_params',
+      content: validation.error,
+      houses: [],
+      reply: validation.error,
+    };
+  }
+
+  const house = houseRepository.findById(validation.id);
+
+  if (!house) {
     return {
       kind: 'empty',
-      content: '未找到这个地点。',
+      content: '未找到这套房源。',
       houses: [],
-      reply: '没有找到这个地点，无法更新。',
+      reply: '没有找到这套房源，无法删除。请确认房源名称或 ID 是否正确。',
     };
   }
 
   return {
-    kind: 'mutation',
-    content: formatLocationDetails(location),
+    kind: 'frontend_action',
+    content: `待删除房源：${formatHouseLine(house)}`,
     houses: [],
-    reply: `已更新地点「${location.name}」。\n${formatLocationDetails(location)}`,
+    actions: [
+      {
+        id: randomUUID(),
+        type: 'confirm_delete_house',
+        title: `确认删除房源「${house.name}」`,
+        houseId: house.id,
+        houseName: house.name,
+      },
+    ],
+    reply: `即将删除房源「${house.name}」，请在弹窗中确认。`,
   };
-}
-
-function deleteLocation(params: Record<string, unknown>, { locationRepository }: AgentToolContext): ToolResult {
-  const { id } = deleteLocationToolSchema.parse(params);
-  const location = locationRepository.findById(id);
-
-  if (!location) {
-    return {
-      kind: 'empty',
-      content: '未找到这个地点。',
-      houses: [],
-      reply: '没有找到这个地点，无法删除。',
-    };
-  }
-
-  locationRepository.delete(id);
-
-  return {
-    kind: 'mutation',
-    content: `已删除地点：${formatLocationLine(location)}`,
-    houses: [],
-    reply: `已删除地点「${location.name}」。`,
-  };
-}
-
-function formatLocationLine(location: Location): string {
-  return `${location.name} | 地址: ${location.address} | 分类: ${location.category}${location.isFocus ? ' | 焦点地点' : ''}`;
-}
-
-function formatLocationSummary(locations: Location[]): string {
-  return locations.map((location) => `- ${formatLocationLine(location)}`).join('\n');
-}
-
-function formatLocationDetails(location: Location): string {
-  const lines = [
-    formatLocationLine(location),
-    location.latitude !== undefined && location.longitude !== undefined ? `坐标：${location.latitude}, ${location.longitude}` : undefined,
-    location.notes ? `备注：${location.notes}` : undefined,
-  ].filter(Boolean);
-
-  return lines.join('\n');
-}
-
-function formatPendingLocationDetails(location: z.infer<typeof createLocationSchema>): string {
-  const lines = [
-    formatLocationLine(location as Location),
-    location.latitude !== undefined && location.longitude !== undefined ? `坐标：${location.latitude}, ${location.longitude}` : undefined,
-    location.notes ? `备注：${location.notes}` : undefined,
-  ].filter(Boolean);
-
-  return lines.join('\n');
 }
 
 function formatHouseLine(house: House): string {
@@ -941,11 +634,9 @@ function formatHouseLine(house: House): string {
 }
 
 function formatHouseSearchConditions(
-  filters: HouseFilters,
-  locationScope?: { locationName: string; radiusKm: number }
+  filters: HouseFilters
 ): string {
   const conditions = [
-    locationScope ? `地点：「${locationScope.locationName}」附近 ${formatDistanceKm(locationScope.radiusKm)} 内` : undefined,
     filters.q ? `关键词：「${filters.q}」` : undefined,
     filters.minRentPrice !== undefined && filters.maxRentPrice !== undefined
       ? `租金：${filters.minRentPrice}-${filters.maxRentPrice} 元/月`
@@ -983,59 +674,6 @@ function hasCoordinateBounds(filters: HouseFilters): boolean {
     filters.minLongitude !== undefined ||
     filters.maxLongitude !== undefined
   );
-}
-
-function findExactLocationMatch(locations: Location[], query: string): Location | undefined {
-  const normalizedQuery = normalizeSearchText(query);
-  if (!normalizedQuery) return undefined;
-
-  return locations.find((location) => normalizeSearchText(location.name) === normalizedQuery);
-}
-
-function createCoordinateBounds(latitude: number, longitude: number, radiusKm: number) {
-  const latitudeDelta = radiusKm / 111.32;
-  const longitudeDelta = radiusKm / (111.32 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.01));
-
-  return {
-    minLatitude: latitude - latitudeDelta,
-    maxLatitude: latitude + latitudeDelta,
-    minLongitude: longitude - longitudeDelta,
-    maxLongitude: longitude + longitudeDelta,
-  };
-}
-
-function isHouseWithinRadius(house: House, location: Location, radiusKm: number): boolean {
-  if (
-    house.latitude === undefined ||
-    house.longitude === undefined ||
-    location.latitude === undefined ||
-    location.longitude === undefined
-  ) {
-    return false;
-  }
-
-  return calculateDistanceKm(house.latitude, house.longitude, location.latitude, location.longitude) <= radiusKm;
-}
-
-function calculateDistanceKm(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number): number {
-  const earthRadiusKm = 6371;
-  const latitudeDelta = degreesToRadians(toLatitude - fromLatitude);
-  const longitudeDelta = degreesToRadians(toLongitude - fromLongitude);
-  const fromLatitudeRadians = degreesToRadians(fromLatitude);
-  const toLatitudeRadians = degreesToRadians(toLatitude);
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(fromLatitudeRadians) * Math.cos(toLatitudeRadians) * Math.sin(longitudeDelta / 2) ** 2;
-
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-}
-
-function degreesToRadians(value: number): number {
-  return (value * Math.PI) / 180;
-}
-
-function formatDistanceKm(value: number): string {
-  return Number.isInteger(value) ? `${value} 公里` : `${value.toFixed(1)} 公里`;
 }
 
 function formatPendingHouseDetails(house: z.infer<typeof createHouseSchema>): string {

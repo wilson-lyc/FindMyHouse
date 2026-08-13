@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../../database/connection.js';
 import type { House } from './domain/house.js';
-import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema } from './dto/house.schema.js';
+import { createHouseSchema, idParamsSchema, listHousesQuerySchema, updateHouseSchema, validateCreateHouse, validateUpdateHouse } from './dto/house.schema.js';
 import { HouseRepository } from './house.repository.js';
 import { HouseService } from './house.service.js';
 
@@ -14,8 +14,13 @@ export async function registerHouseRoutes(app: FastifyInstance) {
   });
 
   app.post('/api/houses', async (request, reply) => {
-    const input = createHouseSchema.parse(request.body);
-    const house = houseService.createHouse(input);
+    const validation = validateCreateHouse(request.body);
+
+    if (!validation.success) {
+      return reply.code(400).send({ error: '房源信息校验未通过', details: validation.errors });
+    }
+
+    const house = houseService.createHouse(validation.data);
     return reply.code(201).send({ data: toPublicHouse(house) });
   });
 
@@ -32,8 +37,13 @@ export async function registerHouseRoutes(app: FastifyInstance) {
 
   app.patch('/api/houses/:id', async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
-    const input = updateHouseSchema.parse(request.body);
-    const house = houseService.updateHouse(id, input);
+    const validation = validateUpdateHouse(request.body);
+
+    if (!validation.success) {
+      return reply.code(400).send({ error: '房源更新信息校验未通过', details: validation.errors });
+    }
+
+    const house = houseService.updateHouse(id, validation.data);
 
     if (!house) {
       return reply.code(404).send({ error: 'House not found' });

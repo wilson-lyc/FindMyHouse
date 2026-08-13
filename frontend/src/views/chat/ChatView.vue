@@ -22,6 +22,5 @@ if (!context) {
     @select-house="context.onChatSelectHouse"
     @open-house-compare="houseCompareStore.open"
     @confirm-create-house="houseDialogStore.openAgentCreate"
-    @confirm-create-location="locationDialogStore.openAgentCreate"
   />
 </template>

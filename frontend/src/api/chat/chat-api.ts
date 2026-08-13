@@ -1,6 +1,5 @@
 import { postData } from '../http';
 import type { House, HouseForm } from '../../model/house/house';
-import type { Location, LocationForm } from '../../model/location/location';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -20,11 +19,20 @@ export interface ConfirmCreateHouseAction {
   payload: HouseForm;
 }
 
-export interface ConfirmCreateLocationAction {
+export interface ConfirmUpdateHouseAction {
   id: string;
-  type: 'confirm_create_location';
+  type: 'confirm_update_house';
   title: string;
-  payload: LocationForm;
+  houseId: string;
+  payload: House;
+}
+
+export interface ConfirmDeleteHouseAction {
+  id: string;
+  type: 'confirm_delete_house';
+  title: string;
+  houseId: string;
+  houseName: string;
 }
 
 export interface ShowHouseSearchResultsAction {
@@ -32,13 +40,6 @@ export interface ShowHouseSearchResultsAction {
   type: 'show_house_search_results';
   title: string;
   houses: House[];
-}
-
-export interface ShowLocationSearchResultsAction {
-  id: string;
-  type: 'show_location_search_results';
-  title: string;
-  locations: Location[];
 }
 
 export interface ConfirmCompareHousesAction {
@@ -63,9 +64,9 @@ export interface AskSingleChoiceAction {
 
 export type AgentFrontendAction =
   | ConfirmCreateHouseAction
-  | ConfirmCreateLocationAction
+  | ConfirmUpdateHouseAction
+  | ConfirmDeleteHouseAction
   | ShowHouseSearchResultsAction
-  | ShowLocationSearchResultsAction
   | ConfirmCompareHousesAction
   | AskSingleChoiceAction;
 
@@ -73,8 +74,12 @@ export type ConfirmCreateHouseResult =
   | { status: 'created'; house: House }
   | { status: 'cancelled' };
 
-export type ConfirmCreateLocationResult =
-  | { status: 'created'; location: Location }
+export type ConfirmUpdateHouseResult =
+  | { status: 'updated'; house: House }
+  | { status: 'cancelled' };
+
+export type ConfirmDeleteHouseResult =
+  | { status: 'deleted'; houseId: string }
   | { status: 'cancelled' };
 
 export type ConfirmCompareHousesResult =
