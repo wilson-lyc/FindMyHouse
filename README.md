@@ -106,7 +106,7 @@ npm run start
 默认数据库文件：
 
 ```text
-backend/data/find-my-house.sqlite
+apps/backend/data/find-my-house.sqlite
 ```
 
 这个 SQLite 文件包含房源、地点、路线缓存、AI 会话和页面配置。需要备份时，停止服务后复制这个文件即可。
@@ -115,7 +115,7 @@ backend/data/find-my-house.sqlite
 
 - `HOST`：默认 `0.0.0.0`
 - `PORT`：默认 `3001`
-- `DATABASE_URL`：SQLite 文件路径；不设置时使用 `backend/data/find-my-house.sqlite`
+- `DATABASE_URL`：SQLite 文件路径；不设置时使用 `apps/backend/data/find-my-house.sqlite`
 
 前端开发环境会读取根目录 `.env`，主要用于设置 Vite 端口和开发代理，例如 `VITE_PORT` 以及代理目标端口 `PORT`。
 
@@ -132,8 +132,8 @@ npm run build
 
 构建产物：
 
-- 后端：`backend/dist/`
-- 前端：`frontend/dist/`
+- 后端：`apps/backend/dist/`
+- 前端：`apps/frontend/dist/`
 
 ### 2. 启动后端
 

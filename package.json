@@ -10,8 +10,8 @@
     "start": "npm run start --workspace backend"
   },
   "workspaces": [
-    "backend",
-    "frontend"
+    "apps/backend",
+    "apps/frontend"
   ],
   "devDependencies": {
     "concurrently": "^9.2.1"

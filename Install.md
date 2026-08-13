@@ -73,7 +73,7 @@ EOF
 npm install
 ```
 
-这会自动安装根目录、`backend/` 和 `frontend/` 的所有依赖（npm workspaces）。
+这会自动安装根目录、`apps/backend/` 和 `apps/frontend/` 的所有依赖（npm workspaces）。
 
 ## 步骤 5：启动项目
 
@@ -164,7 +164,7 @@ curl -X POST http://localhost:3001/api/config \
 
 ### 数据库文件在哪？
 
-默认位置是 `backend/data/find-my-house.sqlite`（相对于项目根目录为 `./data/find-my-house.sqlite`），由 `.env` 中的 `DATABASE_URL` 控制。
+默认位置是 `apps/backend/data/find-my-house.sqlite`（相对于项目根目录为 `apps/backend/data/find-my-house.sqlite`），由 `.env` 中的 `DATABASE_URL` 控制。
 
 ### 如何重置数据库？
 
