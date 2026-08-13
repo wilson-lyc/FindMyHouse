@@ -14,19 +14,25 @@ import {
   compareSystemPrompt,
   intentAnalysisPrompt,
   querySystemPrompt,
-  writeSystemPrompt,
+  writeCreateSystemPrompt,
+  writeUpdateSystemPrompt,
+  writeDeleteSystemPrompt,
 } from './agent.prompts.js';
 
 const houseRepository = new HouseRepository(db);
 const amapService = new AmapService();
 
-// 意图决定分流到哪个功能节点。compare 已从 query 中拆出，作为独立功能。
+// 意图节点把用户诉求细分为：单纯对话(chat)、新增(create)、修改(update)、删除(delete)、
+// 查询(query)、对比(compare)，以及无法归类需追问(ask)。
+// 其中 create/update/delete 同属“编辑房源节点”职责（一个节点负责房源的创建、编辑与删除），
+// 因此用 writeKind 记录写操作的子类型，图分流时统一汇入 agent_write 节点。
 type Intent = 'write' | 'query' | 'compare' | 'chat';
+type WriteKind = 'create' | 'update' | 'delete';
 
 // state 分为两类职责：
 // 1) 会话记忆（贯穿整个会话）：messages（对话历史）、interestedHouses（用户关注过的房源累计）。
 // 2) 运行时/控制流变量（单次请求内有效，每轮重新计算）：focusedHouse（前端当前聚焦的房源）、
-//    actions（本轮要下发的动作）、intent / needsClarification（意图判断）。
+//    actions（本轮要下发的动作）、intent / writeKind / needsClarification（意图判断）。
 // 注意：工具调用结果不再写入 state，而是直接从 messages 尾部的 ToolMessage 派生，
 // 避免残留旧结果干扰 agent 判断（见 collectToolResults / getTrailingToolResults）。
 const AgentState = Annotation.Root({
@@ -50,10 +56,15 @@ const AgentState = Annotation.Root({
     reducer: (_left, right) => right,
     default: () => [],
   }),
-  // 控制流：本轮意图判断，仅在单次请求内有效。
+  // 控制流：本轮意图大类，仅在单次请求内有效。write 涵盖 create/update/delete。
   intent: Annotation<Intent>({
     reducer: (_left, right) => right,
     default: () => 'chat',
+  }),
+  // 控制流：当 intent 为 write 时，标记具体子操作（新建/修改/删除），用于精准引导提示词。
+  writeKind: Annotation<WriteKind | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
   }),
   // 控制流：是否需要澄清，仅在单次请求内有效。
   needsClarification: Annotation<boolean>({
@@ -203,13 +214,75 @@ const clarificationQuestionAction: AgentFrontendAction = {
   question: '你想让我接下来帮你做什么？',
   options: [
     { id: 'search', label: '搜索/查看房源', value: '我想搜索或查看房源信息。' },
-    { id: 'write', label: '新增/修改记录', value: '我想新增或修改房源、地点记录。' },
+    { id: 'write', label: '新增/修改房源', value: '我想新增或修改一套房源。' },
+    { id: 'delete', label: '删除房源', value: '我想删除一套房源。' },
     { id: 'compare', label: '对比几套房源', value: '我想对比几套房源。' },
   ],
   customOptionLabel: '自定义',
 };
 
-// 意图分析节点：调用 LLM 仅判断最新消息意图，ask 时直接抛出澄清动作。
+// 把 LLM 输出的细粒度意图映射为 { intent（大类）, writeKind（写子类型） }。
+// 意图节点负责精确识别用户是单纯对话、还是新增/修改/删除/查询/对比房源，以及是否需要追问澄清。
+function resolveIntent(
+  result: string
+): { intent: Intent; writeKind?: WriteKind } {
+  switch (result) {
+    case 'create':
+      return { intent: 'write', writeKind: 'create' };
+    case 'update':
+      return { intent: 'write', writeKind: 'update' };
+    case 'delete':
+      return { intent: 'write', writeKind: 'delete' };
+    case 'query':
+      return { intent: 'query' };
+    case 'compare':
+      return { intent: 'compare' };
+    default:
+      return { intent: 'chat' };
+  }
+}
+
+// ── 意图识别漏斗 ───────────────────────────────────────────────────────
+// 第一层（文本规则）：零成本关键词匹配，覆盖高频明确意图，避免把每条消息都打到 AI。
+// 第二层（小模型）：本环境无小模型，略过。
+// 第三层（LLM 兜底）：仅当规则层无法判定（返回 null）时才调用，作为兜底。
+// 规则层对“高确定性”表达才下结论；拿不准一律返回 null 交给 LLM，避免误判。
+
+// 每条规则：命中关键词 + 对应细粒度意图。按优先级从高到低排列，先命中先生效。
+const intentRuleMatchers: { pattern: RegExp; intent: 'create' | 'update' | 'delete' | 'compare' | 'query' | 'chat' }[] = [
+  // 删除（强意图，优先于 query/chat）
+  { pattern: /(删\s*除|删\s*掉|移\s*除|下\s*架|不\s*要\s*这\s*套|删\s*了\s*吧)/, intent: 'delete' },
+  // 创建（强意图）
+  { pattern: /(新\s*增|新\s*建|添\s*加|创\s*建|录\s*入|登\s*记|上\s*架|记\s*一\s*套|记\s*下\s*来|帮\s*我\s*加|给\s*我\s*加|看\s*中\s*一\s*套|收\s*到\s*一\s*套)/, intent: 'create' },
+  // 更新（含议价/调价等隐性修改表达，强意图）
+  {
+    pattern: /(修\s*改|改\s*一\s*下|更\s*新|调\s*价|改\s*价|降\s*到|升\s*到|涨\s*到|谈\s*到|谈\s*好|谈\s*拢|定\s*下\s*来|换\s*个\s*价\s*格|价\s*格\s*改|租\s*金\s*改|改\s*成|变\s*更|标\s*记\s*为|标\s*为)/,
+    intent: 'update',
+  },
+  // 对比
+  { pattern: /(对\s*比|比\s*较|比\s*一\s*下|哪\s*个\s*更|分\s*析\s*一\s*下|横\s*向|PK|pk)/, intent: 'compare' },
+  // 纯闲聊（问候/感谢，弱意图，放较后以免误吞查询）
+  { pattern: /^(你\s*好|您\s*好|在\s*吗|谢\s*谢|感\s*谢|多\s*谢|你\s*是\s*谁|叫\s*什\s*么)/, intent: 'chat' },
+  // 查询（高频，放最后作为“找/搜”兜底）
+  { pattern: /(搜\s*索|查\s*找|查\s*一\s*下|查\s*看|找\s*一\s*个|找\s*套|找\s*房|看\s*看|有\s*没\s*有|有\s*哪\s*些|推\s*荐|列\s*出|附\s*近|帮\s*我\s*找|想\s*租|看\s*房)/, intent: 'query' },
+];
+
+// 规则层：返回细粒度意图或 null（无法判定，交给下一层）。
+function matchIntentByRules(text: string): 'create' | 'update' | 'delete' | 'compare' | 'query' | 'chat' | null {
+  const normalized = text.trim().toLowerCase();
+
+  if (normalized.length === 0) return null;
+
+  for (const matcher of intentRuleMatchers) {
+    if (matcher.pattern.test(normalized)) {
+      return matcher.intent;
+    }
+  }
+
+  return null;
+}
+
+// 意图分析节点：漏斗式识别——先规则层，规则无法判定再用 LLM 兜底。
 async function analyzeIntent(state: AgentStateType): Promise<Partial<AgentStateType>> {
   const lastUserMessage = [...state.messages].reverse().find((m) => m instanceof HumanMessage);
 
@@ -217,6 +290,17 @@ async function analyzeIntent(state: AgentStateType): Promise<Partial<AgentStateT
     return { intent: 'chat' };
   }
 
+  const userText = responseContentToString(lastUserMessage.content).trim();
+
+  // 第一层：文本规则匹配（零 AI 成本）。
+  const ruleIntent = matchIntentByRules(userText);
+
+  if (ruleIntent) {
+    const { intent, writeKind } = resolveIntent(ruleIntent);
+    return { intent, ...(writeKind ? { writeKind } : {}) };
+  }
+
+  // 第三层：LLM 兜底（第二层小模型本环境缺失，略过）。
   const llm = getLlm();
   const response = await llm.invoke([
     new SystemMessage(intentAnalysisPrompt),
@@ -234,9 +318,9 @@ async function analyzeIntent(state: AgentStateType): Promise<Partial<AgentStateT
     };
   }
 
-  const intent: Intent = ['write', 'query', 'compare'].includes(result) ? (result as Intent) : 'chat';
+  const { intent, writeKind } = resolveIntent(result);
 
-  return { intent };
+  return { intent, ...(writeKind ? { writeKind } : {}) };
 }
 
 function routeFromAnalyzeIntent(state: AgentStateType) {
@@ -273,13 +357,30 @@ function createAgentGraph() {
     return { messages: response };
   };
 
+  // 编辑房源节点：一个节点负责房源的“创建/编辑/删除”三类写操作。
+  // 依据意图节点下发的 writeKind 选择对应的子提示词，让用户意图（新建/改/删）得到精准引导，
+  // 同时保持工具集一致（create/update/delete 共用 write 工具组）。
+  const resolveWritePrompt = (writeKind: WriteKind | undefined): string => {
+    if (writeKind === 'update') return writeUpdateSystemPrompt;
+    if (writeKind === 'delete') return writeDeleteSystemPrompt;
+    return writeCreateSystemPrompt;
+  };
+  const agentWriteNode = async (state: AgentStateType) => {
+    const llm = getLlm().bindTools(writeTools);
+    const response = await llm.invoke([
+      new SystemMessage(resolveWritePrompt(state.writeKind)),
+      ...prepareMessagesForLlm(state.messages),
+    ]);
+    return { messages: response };
+  };
+
   return new StateGraph(AgentState)
     .addNode('analyze_intent', analyzeIntent)
-    // 写操作节点：新增/修改房源与地点。
-    .addNode('agent_write', callLlmWithTools(writeSystemPrompt, writeTools))
-    // 搜索/查看节点：查询、筛选、列出售源与地点。
+    // 写操作节点：新增/修改/删除房源（按 writeKind 精准引导）。
+    .addNode('agent_write', agentWriteNode)
+    // 搜索/查看节点：把自然语言查询条件转为具体搜索字段，调用搜索工具查询数据库。
     .addNode('agent_search', callLlmWithTools(querySystemPrompt, queryTools))
-    // 对比节点：整理候选房源并对比分析。
+    // 对比节点：整理候选房源并基于房源数据做综合分析对比。
     .addNode('agent_compare', callLlmWithTools(compareSystemPrompt, compareTools))
     // 闲聊引导节点：无工具。
     .addNode('agent_chat', async (state) => {
